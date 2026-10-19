@@ -10,4 +10,5 @@ pub mod tila;
 pub mod varasto;
 pub mod vertaiset;
 pub mod virta;
+pub mod web;
 pub mod yksikko;
