@@ -1,5 +1,195 @@
-// peili: runko (T-16-G)
+//! Transkriptipeili (S-5a): adapterin lisäämät jsonl-rivit ytimen kopioon offset-tarkistuksella.
+//! Yksikkö: polku "peili", id `<tiedosto>:<offset>`, sisältö = rivit JSON-taulukkona (lisäysyhdistäjä).
+//! Tiedoston ytimen tuntema offset: polku "peili-offset", id `<tiedosto>`, sisältö `{"offset":n}` (LWW),
+//! kirjoitetaan suoraan varastoon eikä sitä ilmoiteta virran broadcast-kanavaan.
 
-pub fn reitit(_tila: std::sync::Arc<crate::api::Tila>) -> axum::Router {
-    axum::Router::new()
+use crate::api::{kello_ms, kirjoita_yhdistajalla, Tila};
+use crate::muutosloki::Result;
+use crate::varasto::Varasto;
+use crate::yksikko::{Hlc, Yhdistaja, Yksikko};
+use axum::{
+    body::Bytes,
+    extract::{Path, State},
+    http::StatusCode,
+    response::{IntoResponse, Response},
+    routing::{get, post},
+    Json, Router,
+};
+use serde_json::{json, Value};
+use sha2::{Digest, Sha256};
+use std::collections::BTreeMap;
+use std::sync::{Arc, Mutex};
+
+const POLKU: &str = "peili";
+const OFFSET_POLKU: &str = "peili-offset";
+
+/// Sarjoittaa offsetin tarkistuksen ja kirjoituksen, jotta kaksi samanaikaista POST:ia ei kirjoita päällekkäin.
+static KIRJOITUS: Mutex<()> = Mutex::new(());
+
+pub fn reitit(tila: Arc<Tila>) -> Router {
+    Router::new()
+        .route("/api/peili", post(laheta))
+        .route("/api/peili/*tiedosto", get(hae_offset))
+        .with_state(tila)
+}
+
+fn virhe(koodi: StatusCode, teksti: &str) -> Response {
+    (koodi, Json(json!({"virhe": teksti}))).into_response()
+}
+
+fn muunnosvirhe(teksti: String) -> rusqlite::Error {
+    rusqlite::Error::FromSqlConversionFailure(0, rusqlite::types::Type::Text, teksti.into())
+}
+
+/// Ytimen tiedossa oleva offset tiedostolle; tuntematon tiedosto = 0.
+pub fn offset(varasto: &Varasto, tiedosto: &str) -> Result<u64> {
+    let Some(y) = varasto.lue(OFFSET_POLKU, tiedosto)? else {
+        return Ok(0);
+    };
+    if y.poistettu {
+        return Ok(0);
+    }
+    let arvo: Value = y
+        .sisalto
+        .as_deref()
+        .map(serde_json::from_slice)
+        .transpose()
+        .map_err(|e| muunnosvirhe(e.to_string()))?
+        .unwrap_or(Value::Null);
+    arvo.get("offset")
+        .and_then(Value::as_u64)
+        .ok_or_else(|| muunnosvirhe(format!("virheellinen offset-yksikkö: {tiedosto}")))
+}
+
+/// Kaikki tiedoston peiliyksiköiden rivit offset-järjestyksessä yhdistettynä.
+pub fn rivit(varasto: &Varasto, tiedosto: &str) -> Result<Vec<String>> {
+    let mut osat: Vec<(u64, Vec<String>)> = Vec::new();
+    for y in varasto.listaa(POLKU)? {
+        if y.poistettu {
+            continue;
+        }
+        let Some((nimi, alku)) = y.id.rsplit_once(':') else {
+            continue;
+        };
+        if nimi != tiedosto {
+            continue;
+        }
+        let Ok(alku) = alku.parse::<u64>() else {
+            continue;
+        };
+        let taulukko: Vec<String> = y
+            .sisalto
+            .as_deref()
+            .map(serde_json::from_slice)
+            .transpose()
+            .map_err(|e| muunnosvirhe(e.to_string()))?
+            .unwrap_or_default();
+        osat.push((alku, taulukko));
+    }
+    osat.sort_by_key(|(alku, _)| *alku);
+    Ok(osat.into_iter().flat_map(|(_, r)| r).collect())
+}
+
+/// Rivien tiiviste kuten adapterissa: rivit rivinvaihtoineen.
+fn tiiviste(rivit: &[String]) -> String {
+    let mut sha = Sha256::new();
+    for r in rivit {
+        sha.update(r.as_bytes());
+        sha.update(b"\n");
+    }
+    sha.finalize().iter().map(|b| format!("{b:02x}")).collect()
+}
+
+/// Tulos: Ok(uusi offset) tai Err(ytimen offset) kun offset ei täsmää.
+fn kirjoita(
+    t: &Tila,
+    tiedosto: &str,
+    alku: u64,
+    rivit: &[String],
+) -> Result<std::result::Result<u64, u64>> {
+    let _vuoro = KIRJOITUS.lock().unwrap_or_else(|e| e.into_inner());
+    let tunnettu = offset(&t.varasto, tiedosto)?;
+    if alku != tunnettu {
+        return Ok(Err(tunnettu));
+    }
+    if rivit.is_empty() {
+        return Ok(Ok(alku));
+    }
+    let tavut: u64 = rivit.iter().map(|r| r.len() as u64 + 1).sum();
+    let uusi = alku + tavut;
+    let nyt = kello_ms();
+
+    let peili = Yksikko {
+        polku: POLKU.to_string(),
+        id: format!("{tiedosto}:{alku}"),
+        versio: BTreeMap::from([(t.laite.clone(), 1)]),
+        aika: Hlc::nyt(&t.laite, None, nyt),
+        sisalto: Some(serde_json::to_vec(rivit).unwrap_or_default()),
+        poistettu: false,
+    };
+    // Peiliyksikkö ensin: katkon jälkeen sama POST on idempotentti (lisäys ei korvaa olemassa olevaa).
+    kirjoita_yhdistajalla(t, &peili, Yhdistaja::Lisays)?;
+
+    let edellinen = t.varasto.lue(OFFSET_POLKU, tiedosto)?;
+    let mut versio = edellinen
+        .as_ref()
+        .map(|y| y.versio.clone())
+        .unwrap_or_default();
+    *versio.entry(t.laite.clone()).or_insert(0) += 1;
+    let tallennus = Yksikko {
+        polku: OFFSET_POLKU.to_string(),
+        id: tiedosto.to_string(),
+        versio,
+        aika: Hlc::nyt(&t.laite, edellinen.as_ref().map(|y| &y.aika), nyt),
+        sisalto: Some(serde_json::to_vec(&json!({"offset": uusi})).unwrap_or_default()),
+        poistettu: false,
+    };
+    // Sisäinen yksikkö: suoraan varastoon, ei broadcast-ilmoitusta.
+    t.varasto.kirjoita(&tallennus, Yhdistaja::Lww)?;
+    Ok(Ok(uusi))
+}
+
+async fn laheta(State(t): State<Arc<Tila>>, runko: Bytes) -> Response {
+    let Ok(Value::Object(o)) = serde_json::from_slice::<Value>(&runko) else {
+        return virhe(StatusCode::BAD_REQUEST, "runko ei ole JSON-olio");
+    };
+    let Some(tiedosto) = o
+        .get("tiedosto")
+        .and_then(Value::as_str)
+        .filter(|s| !s.is_empty())
+    else {
+        return virhe(StatusCode::BAD_REQUEST, "tiedosto puuttuu");
+    };
+    let Some(alku) = o.get("offset").and_then(Value::as_u64) else {
+        return virhe(StatusCode::BAD_REQUEST, "offset puuttuu");
+    };
+    let Some(Ok(rivit)) = o
+        .get("rivit")
+        .map(|r| serde_json::from_value::<Vec<String>>(r.clone()))
+    else {
+        return virhe(StatusCode::BAD_REQUEST, "rivit ei ole merkkijonotaulukko");
+    };
+    let Some(sha) = o.get("sha256").and_then(Value::as_str) else {
+        return virhe(StatusCode::BAD_REQUEST, "sha256 puuttuu");
+    };
+    if !sha.eq_ignore_ascii_case(&tiiviste(&rivit)) {
+        return virhe(StatusCode::BAD_REQUEST, "sha256 ei täsmää");
+    }
+    match kirjoita(&t, tiedosto, alku, &rivit) {
+        Ok(Ok(uusi)) => Json(json!({"offset": uusi})).into_response(),
+        Ok(Err(tunnettu)) => {
+            (StatusCode::CONFLICT, Json(json!({"offset": tunnettu}))).into_response()
+        }
+        Err(e) => virhe(StatusCode::INTERNAL_SERVER_ERROR, &e.to_string()),
+    }
+}
+
+async fn hae_offset(State(t): State<Arc<Tila>>, Path(polku): Path<String>) -> Response {
+    let Some(tiedosto) = polku.strip_suffix("/offset").filter(|s| !s.is_empty()) else {
+        return virhe(StatusCode::NOT_FOUND, "tuntematon polku");
+    };
+    match offset(&t.varasto, tiedosto) {
+        Ok(n) => Json(json!({"offset": n})).into_response(),
+        Err(e) => virhe(StatusCode::INTERNAL_SERVER_ERROR, &e.to_string()),
+    }
 }
