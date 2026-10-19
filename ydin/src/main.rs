@@ -1,7 +1,7 @@
 use clap::{Parser, Subcommand};
 use scopes_ydin::api::{self, Tila};
 use scopes_ydin::varasto::Varasto;
-use scopes_ydin::{lr, nakymat, vertaiset};
+use scopes_ydin::{lr, nakymat, vertaiset, web};
 use std::io::Write;
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -30,6 +30,9 @@ struct Args {
     vertainen: Vec<String>,
     #[arg(long)]
     lr_vertainen: Option<String>,
+    /// Web-asiakkaan hakemisto (tarjoillaan polusta /web/)
+    #[arg(long)]
+    web: Option<PathBuf>,
     #[command(subcommand)]
     komento: Option<Komento>,
 }
@@ -119,7 +122,10 @@ async fn main() {
     let _replikointi = vertaiset::kaynnista(tila.clone());
     let _nakymat = nakymat::kaynnista(tila.clone());
     let _lr = lr::kaynnista(tila.clone());
-    axum::serve(kuuntelija, api::router(tila))
-        .await
-        .expect("palvelin kaatui");
+    axum::serve(
+        kuuntelija,
+        api::router(tila).merge(web::reitit(args.web.map(kotiin))),
+    )
+    .await
+    .expect("palvelin kaatui");
 }
