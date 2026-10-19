@@ -333,7 +333,6 @@ fn sillattava_lista() {
     let kylla = [
         (M::POST, "/api/skoopit/a/viesti"),
         (M::POST, "/api/skoopit/a/stream"),
-        (M::POST, "/api/skoopit/a/liite"),
         (M::POST, "/api/skoopit/a/stop"),
         (M::POST, "/api/skoopit/a/malli"),
         (M::POST, "/api/skoopit/a/kysymys-pois"),
@@ -366,6 +365,7 @@ fn sillattava_lista() {
         (M::POST, "/api/nebius-avain"),
         (M::GET, "/api/lr/x"),
         (M::GET, "/api/skoopit/a/viesti"),
+        (M::POST, "/api/skoopit/a/liite"),
         (M::POST, "/api/purkajat"),
         (M::POST, "/api/viat"),
         (M::GET, "/api/chatti"),

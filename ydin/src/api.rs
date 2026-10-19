@@ -3,7 +3,7 @@
 use crate::muutosloki::{Result, Tapahtuma};
 use crate::varasto::Varasto;
 use crate::yksikko::{yhdistaja_yksikolle, Yhdistaja, Yksikko};
-use crate::{lahde, lr, nakymat, peili, replikointi, silta, tila, virta};
+use crate::{lahde, liite, lr, nakymat, peili, replikointi, silta, tila, virta};
 use axum::{
     extract::{Request, State},
     http::{header, StatusCode},
@@ -192,6 +192,7 @@ pub fn router_valilla(tila: Arc<Tila>, ka: Duration) -> Router {
         .merge(nakymat::reitit(tila.clone()))
         .merge(replikointi::reitit(tila.clone()))
         .merge(lr::reitit(tila.clone()))
+        .merge(liite::reitit(tila.clone()))
         .fallback_service(silta::reitit(tila.clone()))
         .layer(middleware::from_fn_with_state(tila.clone(), tunnista));
     Router::new()

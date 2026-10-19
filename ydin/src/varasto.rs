@@ -5,7 +5,7 @@ use crate::yksikko::{vertaa, Hlc, Tulos, Vertailu, Yhdistaja, Yksikko};
 use rusqlite::{params, Connection, OptionalExtension, Row, TransactionBehavior};
 use sha2::{Digest, Sha256};
 use std::collections::BTreeSet;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::sync::{Mutex, MutexGuard};
 
 const SKEEMAVERSIO: &str = "1";
@@ -23,6 +23,7 @@ const YKSIKKO_KENTAT: &str = "polku, id, versio, aika, sisalto, poistettu";
 
 pub struct Varasto {
     yhteys: Mutex<Connection>,
+    polku: PathBuf,
 }
 
 fn muunnosvirhe(
@@ -89,7 +90,13 @@ impl Varasto {
         Self::migroi(&mut c)?;
         Ok(Varasto {
             yhteys: Mutex::new(c),
+            polku: polku.to_path_buf(),
         })
+    }
+
+    /// Solmun datahakemisto: tietokantatiedoston hakemisto.
+    pub fn data(&self) -> Option<&Path> {
+        self.polku.parent()
     }
 
     fn migroi(c: &mut Connection) -> Result<()> {

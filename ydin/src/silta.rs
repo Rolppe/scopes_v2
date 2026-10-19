@@ -64,7 +64,6 @@ pub fn sillattava(metodi: &Method, polku: &str) -> bool {
                 verbi,
                 "viesti"
                     | "stream"
-                    | "liite"
                     | "stop"
                     | "malli"
                     | "kysymys-pois"
