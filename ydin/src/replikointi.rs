@@ -1,5 +1,5 @@
 // replikointi: runko (T-16-G)
 
-pub fn reitit() -> axum::Router {
+pub fn reitit(_tila: std::sync::Arc<crate::api::Tila>) -> axum::Router {
     axum::Router::new()
 }
