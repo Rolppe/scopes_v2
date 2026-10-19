@@ -113,7 +113,9 @@ async fn virta(
             match s.tila.varasto.loki(s.viimeinen, 200) {
                 Ok(erä) if !erä.is_empty() => {
                     s.viimeinen = erä.last().map_or(s.viimeinen, |t| t.seq);
-                    s.jono.extend(erä);
+                    // S-5: "peili-offset" on sisäinen yksikkö, ei virtaan
+                    s.jono
+                        .extend(erä.into_iter().filter(|t| t.polku != "peili-offset"));
                     continue;
                 }
                 Ok(_) => {}
