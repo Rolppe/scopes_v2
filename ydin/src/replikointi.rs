@@ -27,6 +27,11 @@ use std::time::Duration;
 
 /// Erän koko: `hae`, `laheta` ja virran soveltaminen.
 pub const ERA: usize = 300;
+/// `/api/hae`-vastauksen sisältöjen enimmäistavut (raakana; JSON-tavutaulukkona ~3,6 ×). Vähintään yksi
+/// yksikkö palautetaan aina; loput tunnukset kentässä `jatko` (T-36 ajo 3: 300 peiliyksikköä = ~764 Mt JSONia).
+pub const HAE_TAVUT: usize = 8 * 1024 * 1024;
+/// `/api/laheta`-pyynnön sisältöjen enimmäistavut: vastaanottajan runkoraja on axumin oletus 2 Mt JSONina.
+pub const LAHETA_TAVUT: usize = 400 * 1024;
 /// Sisäinen yksikkö (S-5), ei replikoida.
 const SISAINEN: &str = "peili-offset";
 /// Virran hiljaisuus, jonka jälkeen kerätty erä sovelletaan.
@@ -87,6 +92,18 @@ struct Lista {
 #[derive(Deserialize)]
 struct Yksikot {
     yksikot: Vec<Yksikko>,
+    /// Tavubudjetin vuoksi palauttamatta jääneet tunnukset (puuttuu = kaikki palautettiin).
+    #[serde(default)]
+    jatko: Vec<String>,
+}
+
+/// `/api/hae`-vastaus ja `/api/laheta`-runko sarjoitetaan suoraan: `json!` rakentaisi ensin
+/// `Value`-puun, jossa jokainen sisällön tavu on oma solmunsa (~24 tavua/tavu; T-36 ajo 3: VmHWM 630 MiB).
+#[derive(Serialize)]
+struct YksikotUlos<'a> {
+    yksikot: &'a [Yksikko],
+    #[serde(skip_serializing_if = "<[String]>::is_empty")]
+    jatko: &'a [String],
 }
 
 #[derive(Deserialize)]
@@ -183,16 +200,32 @@ async fn hae(State(t): State<Arc<Tila>>, Json(p): Json<HaePyynto>) -> Response {
     if p.idt.len() > ERA {
         return virhe(StatusCode::BAD_REQUEST, "enintään 300 tunnusta");
     }
-    let mut ys = Vec::with_capacity(p.idt.len());
-    for id in &p.idt {
+    let mut ys = Vec::new();
+    let mut tavut = 0usize;
+    for (i, id) in p.idt.iter().enumerate() {
         match t.varasto.lue(&p.polku, id) {
-            Ok(Some(y)) if crate::tila::nakyy(&t, &y) => ys.push(y),
+            Ok(Some(y)) if crate::tila::nakyy(&t, &y) => {
+                let koko = y.sisalto.as_ref().map_or(0, Vec::len);
+                if !ys.is_empty() && tavut + koko > HAE_TAVUT {
+                    return Json(YksikotUlos {
+                        yksikot: &ys,
+                        jatko: &p.idt[i..],
+                    })
+                    .into_response();
+                }
+                tavut += koko;
+                ys.push(y);
+            }
             Ok(Some(_)) => {}
             Ok(None) => {}
             Err(e) => return sisainen(e),
         }
     }
-    Json(json!({"yksikot": ys})).into_response()
+    Json(YksikotUlos {
+        yksikot: &ys,
+        jatko: &[],
+    })
+    .into_response()
 }
 
 async fn laheta(State(t): State<Arc<Tila>>, Json(p): Json<LahetaPyynto>) -> Response {
@@ -236,16 +269,36 @@ async fn hae_erissa(
     idt: &[String],
 ) -> Result<()> {
     for pala in idt.chunks(ERA) {
-        let vastaus: Yksikot = json_vastaus(
-            v,
-            http.post(osoite(v, "/api/hae"))
-                .json(&json!({"polku": polku, "idt": pala})),
-        )
-        .await?;
-        for y in vastaus.yksikot.iter().filter(|y| y.polku == polku) {
-            kirjoita_ja_ilmoita(tila, y).await?;
+        let mut pyydetyt = pala.to_vec();
+        loop {
+            let vastaus: Yksikot = json_vastaus(
+                v,
+                http.post(osoite(v, "/api/hae"))
+                    .json(&json!({"polku": polku, "idt": &pyydetyt})),
+            )
+            .await?;
+            for y in vastaus.yksikot.iter().filter(|y| y.polku == polku) {
+                kirjoita_ja_ilmoita(tila, y).await?;
+            }
+            // Jatko on aina lyhyempi kuin pyyntö (vähintään yksi palautetaan); muuten vertainen ei etene.
+            if vastaus.jatko.is_empty() || vastaus.jatko.len() >= pyydetyt.len() {
+                break;
+            }
+            pyydetyt = vastaus.jatko;
         }
     }
+    Ok(())
+}
+
+async fn laheta_era(v: &Vertainen, http: &reqwest::Client, pala: &[Yksikko]) -> Result<()> {
+    let _: serde_json::Value = json_vastaus(
+        v,
+        http.post(osoite(v, "/api/laheta")).json(&YksikotUlos {
+            yksikot: pala,
+            jatko: &[],
+        }),
+    )
+    .await?;
     Ok(())
 }
 
@@ -308,19 +361,24 @@ async fn tasaa(tila: &Tila, v: &Vertainen, http: &reqwest::Client) -> Result<u64
         );
         hae_erissa(tila, v, http, p, &haettavat).await?;
     }
-    for era in lahetettavat.chunks(ERA) {
-        let mut pala: Vec<Yksikko> = Vec::with_capacity(era.len());
-        for (polku, id) in era {
-            if let Some(y) = tila.varasto.lue(polku, id)? {
-                pala.push(y);
-            }
+    // Erä: enintään ERA yksikköä ja LAHETA_TAVUT sisältöä (vähintään yksi yksikkö).
+    let mut pala: Vec<Yksikko> = Vec::new();
+    let mut tavut = 0usize;
+    for (polku, id) in &lahetettavat {
+        let Some(y) = tila.varasto.lue(polku, id)? else {
+            continue;
+        };
+        let koko = y.sisalto.as_ref().map_or(0, Vec::len);
+        if !pala.is_empty() && (pala.len() == ERA || tavut + koko > LAHETA_TAVUT) {
+            laheta_era(v, http, &pala).await?;
+            pala.clear();
+            tavut = 0;
         }
-        let _: serde_json::Value = json_vastaus(
-            v,
-            http.post(osoite(v, "/api/laheta"))
-                .json(&json!({"yksikot": pala})),
-        )
-        .await?;
+        tavut += koko;
+        pala.push(y);
+    }
+    if !pala.is_empty() {
+        laheta_era(v, http, &pala).await?;
     }
     Ok(eta.seq)
 }
