@@ -403,3 +403,29 @@ fn polut_erilliset() {
     let polut: Vec<String> = v.polut().unwrap().into_iter().collect();
     assert_eq!(polut, vec!["lahde", "peili", "tila/x"]);
 }
+
+#[test]
+fn listaa_otsakkeet_ilman_sisaltoa() {
+    let tmp = Tmp::uusi();
+    let v = Varasto::avaa(&tmp.0).unwrap();
+    let a = yksikko("peili", "f:0", &[("a", 1)], hlc(1, 0, "a"), "iso sisältö");
+    let mut b = yksikko("peili", "f:12", &[("a", 2)], hlc(2, 0, "a"), "x");
+    b.poistettu = true;
+    v.kirjoita(&a, Yhdistaja::Lww).unwrap();
+    v.kirjoita(&b, Yhdistaja::Lww).unwrap();
+    v.kirjoita(
+        &yksikko("muu", "f:0", &[("a", 1)], hlc(1, 0, "a"), "m"),
+        Yhdistaja::Lww,
+    )
+    .unwrap();
+    let otsakkeet = v.listaa_otsakkeet("peili").unwrap();
+    let taydet = v.listaa("peili").unwrap();
+    assert_eq!(otsakkeet.len(), 2);
+    for (o, t) in otsakkeet.iter().zip(&taydet) {
+        assert_eq!(o.sisalto, None);
+        assert_eq!(
+            (&o.polku, &o.id, &o.versio, &o.aika, o.poistettu),
+            (&t.polku, &t.id, &t.versio, &t.aika, t.poistettu)
+        );
+    }
+}
