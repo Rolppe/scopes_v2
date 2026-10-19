@@ -1,0 +1,155 @@
+{
+ "nimi": "scopes macos",
+ "auki": true,
+ "istunto": {
+  "id": "28f5f18b-5ca1-41d3-9ebd-680e09cfd7bd",
+  "nimi": "palvelin-21",
+  "tila": "idle",
+  "konteksti": {
+   "tokenit": 103176,
+   "aika": "2026-10-19T13:14:21.597Z"
+  },
+  "tyyppi": "claude",
+  "malli": "claude-opus-5-5",
+  "effort": null
+ },
+ "voiLahettaa": true,
+ "viestit": [
+  {
+   "rooli": "kayttaja",
+   "teksti": "/pura scopes macos",
+   "aika": "2026-10-19T12:40:01.000Z"
+  },
+  {
+   "rooli": "kayttaja",
+   "teksti": "Hei, tee koe-ajo.",
+   "aika": "2026-10-19T12:40:04.000Z"
+  },
+  {
+   "rooli": "agentti",
+   "teksti": "Aloitan.\nKaksi osaa.",
+   "aika": "2026-10-19T12:40:05.000Z"
+  },
+  {
+   "rooli": "tyokalu",
+   "teksti": "$ ls -la",
+   "aika": "2026-10-19T12:40:05.000Z"
+  },
+  {
+   "rooli": "agentti",
+   "teksti": "Välissä tekstiä.",
+   "aika": "2026-10-19T12:40:05.000Z"
+  },
+  {
+   "rooli": "tyokalu",
+   "teksti": "✎ /home/x/a.rs",
+   "aika": "2026-10-19T12:40:05.000Z"
+  },
+  {
+   "rooli": "tyokalu",
+   "teksti": "luki b.md",
+   "aika": "2026-10-19T12:40:05.000Z"
+  },
+  {
+   "rooli": "tyokalu",
+   "teksti": "haki fn main",
+   "aika": "2026-10-19T12:40:05.000Z"
+  },
+  {
+   "rooli": "tyokalu",
+   "teksti": "ali-agentti: kartoita",
+   "aika": "2026-10-19T12:40:05.000Z"
+  },
+  {
+   "rooli": "tyokalu",
+   "teksti": "WebFetch",
+   "aika": "2026-10-19T12:40:05.000Z"
+  },
+  {
+   "rooli": "agentti",
+   "teksti": "Valitse:",
+   "aika": "2026-10-19T12:40:09.000Z"
+  },
+  {
+   "rooli": "kysymys",
+   "teksti": "Kumpi?\n1. Eka\n2. Toka\n\nMitkä?\n1. A\n2. B",
+   "aika": "2026-10-19T12:40:09.000Z",
+   "kysymykset": [
+    {
+     "kysymys": "Kumpi?",
+     "otsikko": "Valinta",
+     "monivalinta": false,
+     "vaihtoehdot": [
+      {
+       "nimi": "Eka",
+       "kuvaus": "ensimmäinen"
+      },
+      {
+       "nimi": "Toka",
+       "kuvaus": null
+      }
+     ]
+    },
+    {
+     "kysymys": "Mitkä?",
+     "otsikko": null,
+     "monivalinta": true,
+     "vaihtoehdot": [
+      {
+       "nimi": "A",
+       "kuvaus": null
+      },
+      {
+       "nimi": "B",
+       "kuvaus": "bee"
+      }
+     ]
+    }
+   ],
+   "vastattu": true
+  },
+  {
+   "rooli": "kayttaja",
+   "teksti": "Eka\nA, B",
+   "aika": "2026-10-19T12:40:10.000Z"
+  },
+  {
+   "rooli": "agentti",
+   "teksti": "xxxxxxxxxx",
+   "aika": "2026-10-19T12:40:12.000Z"
+  },
+  {
+   "rooli": "tyokalu",
+   "teksti": "$ cargo test yyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyy…",
+   "aika": "2026-10-19T12:40:12.000Z"
+  },
+  {
+   "rooli": "agentti",
+   "teksti": "merkkijonovastaus",
+   "aika": "2026-10-19T12:40:13.000Z"
+  },
+  {
+   "rooli": "kysymys",
+   "teksti": "Jatketaanko?\n1. Kyllä\n2. Ei",
+   "aika": "2026-10-19T12:40:15.000Z",
+   "kysymykset": [
+    {
+     "kysymys": "Jatketaanko?",
+     "otsikko": null,
+     "monivalinta": false,
+     "vaihtoehdot": [
+      {
+       "nimi": "Kyllä",
+       "kuvaus": null
+      },
+      {
+       "nimi": "Ei",
+       "kuvaus": null
+      }
+     ]
+    }
+   ],
+   "vastattu": false
+  }
+ ]
+}
