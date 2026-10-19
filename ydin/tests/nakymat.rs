@@ -1,5 +1,8 @@
 //! Johdetut reitit (T-35): lähde- ja peilisyötteet varastoon → vastaukset vastaavat vanhan 8787:n fixtureita,
 //! `since`-ero, nollaus ja X-Lahde; lähde puuttuu → mock-silta vastaa.
+//! R-1: rekisterikentät ja `/api/rekisterit/<p>` ytimen `rekisterit/<p>`-yksiköistä (odotetut arvot
+//! `rekisterit-ydin-odotettu.json`, tuotettu lahteet.mjs:llä synteettisistä `rekisteri-*.md`-teksteistä) ja
+//! siltavälimuisti (`/api/skoopit` ei kutsu siltaa pyyntöä kohden).
 
 use axum::{
     extract::Path,
@@ -9,15 +12,17 @@ use axum::{
     Json, Router,
 };
 use scopes_ydin::api::{self, Tila};
+use scopes_ydin::lr;
 use scopes_ydin::nakymat;
 use scopes_ydin::varasto::Varasto;
+use scopes_ydin::yksikko::rekisteri::{self, Laite, Rivi};
 use scopes_ydin::yksikko::{Hlc, Yhdistaja, Yksikko};
 use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
 use std::collections::BTreeMap;
 use std::path::PathBuf;
-use std::sync::atomic::{AtomicU32, Ordering};
-use std::sync::Arc;
+use std::sync::atomic::{AtomicU32, AtomicUsize, Ordering};
+use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 static LASKURI: AtomicU32 = AtomicU32::new(0);
@@ -124,10 +129,42 @@ async fn mock_skooppi(Path(nimi): Path<String>) -> Response {
     }
 }
 
-async fn mock_vanha() -> String {
+/// Mock-sillan tila: `/api/skoopit`-kutsujen määrä, vastauksen viive ja muutettava lista.
+struct Mock {
+    skoopit_kutsut: AtomicUsize,
+    viive: Duration,
+    lista: Mutex<Value>,
+}
+
+impl Mock {
+    fn uusi(viive: Duration) -> Arc<Mock> {
+        Arc::new(Mock {
+            skoopit_kutsut: AtomicUsize::new(0),
+            viive,
+            lista: Mutex::new(sillan_lista()),
+        })
+    }
+
+    fn kutsut(&self) -> usize {
+        self.skoopit_kutsut.load(Ordering::SeqCst)
+    }
+}
+
+async fn mock_vanha(mock: Arc<Mock>) -> String {
     let app =
         Router::new()
-            .route("/api/skoopit", get(|| async { Json(sillan_lista()) }))
+            .route(
+                "/api/skoopit",
+                get(move || {
+                    let m = mock.clone();
+                    async move {
+                        m.skoopit_kutsut.fetch_add(1, Ordering::SeqCst);
+                        tokio::time::sleep(m.viive).await;
+                        let lista = m.lista.lock().unwrap().clone();
+                        Json(lista)
+                    }
+                }),
+            )
             .route("/api/skoopit/:nimi", get(mock_skooppi))
             .route(
                 "/api/skoopit/:nimi/viestit",
@@ -176,7 +213,11 @@ impl Drop for Ydin {
 
 impl Ydin {
     async fn kaynnista() -> Ydin {
-        let vanha = mock_vanha().await;
+        Ydin::kaynnista_mockilla(Mock::uusi(Duration::ZERO)).await
+    }
+
+    async fn kaynnista_mockilla(mock: Arc<Mock>) -> Ydin {
+        let vanha = mock_vanha(mock).await;
         let n = LASKURI.fetch_add(1, Ordering::SeqCst);
         let db = PathBuf::from(env!("CARGO_TARGET_TMPDIR"))
             .join(format!("nakymat-{}-{n}.db", std::process::id()));
@@ -572,5 +613,284 @@ async fn kaynnista_pitaa_nakyman_ajan_tasalla() {
         odotettu += 1;
     }
     assert_eq!(n.seq(), tavoite);
+    kasittelija.abort();
+}
+
+// ---- R-1: rekisterikentät ytimestä ---------------------------------------------------------------------------------
+
+const NYT: &str = "2026-10-19T00:00:00.000Z";
+
+fn hlc(ms: u64) -> Hlc {
+    Hlc {
+        ms,
+        laskuri: 0,
+        laite: "koe".to_string(),
+    }
+}
+
+/// Rivin lisäkentät `rekisterit-meta/<p>`-yksikön sisältönä (lr.rs `Lisat`).
+fn lisat(r: &Rivi) -> Vec<u8> {
+    serde_json::to_vec(&json!({
+        "laji": r.laji, "osio": r.osio, "jarjestys": r.jarjestys,
+        "muutettu": r.muutettu, "muuttaja": r.muuttaja,
+        "lahdeSisalto": r.lahde_sisalto, "lahdeVersio": r.lahde_versio,
+    }))
+    .unwrap()
+}
+
+/// Rekisteriteksti varastoon lr.rs:n mallilla: rivit `rekisteri::pilko`n osina (tuo_rekisteri) polkuun
+/// `rekisterit/<p>` (Lr), meta ja rivien lisäkentät polkuun `rekisterit-meta/<p>` (Lww).
+fn tallenna_rekisteri(tila: &Tila, polku: &str, teksti: &str) -> rekisteri::Rekisteri {
+    let mut rv = rekisteri::Varasto::default();
+    let mut laite = Laite::uusi("koe");
+    rv.tuo_rekisteri(&mut laite, polku, teksti, "c0ffee", NYT)
+        .unwrap();
+    let rek = rv.rekisterit[polku].clone();
+    let meta = Yksikko {
+        polku: format!("rekisterit-meta/{polku}"),
+        id: "meta".to_string(),
+        versio: rek.meta.versio.clone(),
+        aika: hlc(1_000),
+        sisalto: Some(serde_json::to_vec(&rek.meta).unwrap()),
+        poistettu: false,
+    };
+    api::kirjoita_yhdistajalla(tila, &meta, Yhdistaja::Lww).unwrap();
+    for (i, r) in rek.rivit.values().enumerate() {
+        let lisa = Yksikko {
+            polku: format!("rekisterit-meta/{polku}"),
+            id: r.id.clone(),
+            versio: r.versio.clone(),
+            aika: hlc(1_001 + i as u64),
+            sisalto: Some(lisat(r)),
+            poistettu: false,
+        };
+        api::kirjoita_yhdistajalla(tila, &lisa, Yhdistaja::Lww).unwrap();
+        api::kirjoita_yhdistajalla(tila, &r.yksikko(hlc(1_001 + i as u64)), Yhdistaja::Lr).unwrap();
+    }
+    assert_eq!(
+        lr::teksti(&tila.varasto, polku),
+        teksti,
+        "lr::teksti {polku}"
+    );
+    rek
+}
+
+fn odotettu(polku: &str) -> Value {
+    fixture_json("rekisterit-ydin-odotettu.json")[polku].clone()
+}
+
+/// Ytimen rekisterit: test/REKISTERI.md (skooppi test) ja jaettu scopes/macos/REKISTERI.md (leimatut rivit).
+async fn syota_rekisterit(y: &Ydin) -> rekisteri::Rekisteri {
+    let r = tallenna_rekisteri(&y.tila, "test/REKISTERI.md", &fixture("rekisteri-test.md"));
+    tallenna_rekisteri(
+        &y.tila,
+        "scopes/macos/REKISTERI.md",
+        &fixture("rekisteri-jaettu.md"),
+    );
+    r
+}
+
+#[tokio::test]
+async fn rekisterikentat_ytimesta() {
+    let y = Ydin::kaynnista().await;
+    y.syota().await;
+    let rek_test = syota_rekisterit(&y).await;
+
+    // (a) Yksityiskohta: seuraava/avoimet/viat ytimestä, muut kentät kuten ennen.
+    let o = odotettu("test/REKISTERI.md");
+    let (k, l, r) = y.hae("/api/skoopit/test").await;
+    assert_eq!((k, l.as_str()), (StatusCode::OK, "ydin"));
+    for kentta in ["seuraava", "avoimet", "viat"] {
+        assert_eq!(r[kentta], o[kentta], "{kentta}");
+    }
+    assert_ne!(r["seuraava"], fixture_json("skooppi-test.json")["seuraava"]);
+    vastaa_fixturea(
+        &r,
+        &fixture_json("skooppi-test.json"),
+        &["/seuraava", "/avoimet", "/viat"],
+    );
+    // Jaettu rekisteri: leimattu [scopes macos] voittaa leimattoman.
+    let o_macos = odotettu("scopes/macos/REKISTERI.md");
+    let (_, l, r) = y.hae("/api/skoopit/scopes%20macos").await;
+    assert_eq!(l, "ydin");
+    for kentta in ["seuraava", "avoimet", "viat"] {
+        assert_eq!(r[kentta], o_macos[kentta], "{kentta}");
+    }
+    assert_eq!(r["seuraava"]["id"], "MACOS-SYNTEETTINEN");
+
+    // (a) Lista: test ja scopes macos ytimestä; (b) muut rivit sillan kentin.
+    let mut lista = fixture_json("skoopit.json");
+    for rivi in lista.as_array_mut().unwrap() {
+        let o = match rivi["nimi"].as_str().unwrap() {
+            "test" => &o,
+            "scopes macos" => &o_macos,
+            _ => continue,
+        };
+        for kentta in ["seuraava", "avoimia", "vikoja"] {
+            rivi[kentta] = o["lista"][kentta].clone();
+        }
+    }
+    let (k, l, r) = y.hae("/api/skoopit").await;
+    assert_eq!((k, l.as_str()), (StatusCode::OK, "ydin"));
+    vastaa_fixturea(&r, &lista, &[]);
+    let test_rivi = r
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|s| s["nimi"] == "test")
+        .unwrap();
+    assert_eq!(test_rivi["avoimia"], 2);
+    assert_eq!(test_rivi["vikoja"], 2);
+
+    // (c) Rekisterin osat ytimestä, tokenit UTF-16-pituudesta.
+    let (k, l, r) = y.hae("/api/rekisterit/test/REKISTERI.md").await;
+    assert_eq!((k, l.as_str()), (StatusCode::OK, "ydin"));
+    assert_eq!(
+        r,
+        json!({"polku": "test/REKISTERI.md", "osat": o["osat"].clone()})
+    );
+    let tekstit: Vec<&str> = r["osat"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|o| o["teksti"].as_str().unwrap())
+        .collect();
+    assert!(tekstit.iter().any(|t| t.contains('ä') && t.contains('ö')));
+    assert!(tekstit.iter().any(|t| t.chars().any(|c| c as u32 > 0xFFFF)));
+    assert!(r["osat"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .any(|o| o["otsikko"] == "Pitkä luku › Toinen alaluku"));
+    let (_, l, r) = y
+        .hae("/api/rekisterit/scopes/macos/REKISTERI.md?since=0")
+        .await;
+    assert_eq!(l, "ydin");
+    assert_eq!(r["nollaus"], true);
+    assert_eq!(r["muuttuneet"][0]["osat"], o_macos["osat"]);
+    // Puuttuva rekisteri → silta.
+    let v = y
+        .asiakas
+        .get(format!("{}/api/rekisterit/claude/REKISTERI.md", y.osoite))
+        .bearer_auth(AVAIN)
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(v.headers()["x-lahde"], "silta");
+    assert_eq!(v.text().await.unwrap(), "# rekisteri\n");
+    let (_, l, r) = y.hae("/api/rekisterit").await;
+    assert_eq!(l, "silta");
+    vastaa_fixturea(&r, &fixture_json("rekisterit.json"), &[]);
+
+    // (d) rekisterit/*-kirjoitus: since palauttaa skoopin muuttuneena uusin kentin.
+    let s = y.seq().await;
+    let (_, _, r) = y.hae(&format!("/api/skoopit?since={s}")).await;
+    assert_eq!(r["muuttuneet"], json!([]));
+    let rivi = rek_test
+        .rivit
+        .values()
+        .find(|r| r.sisalto.contains("| Ensimmäinen |"))
+        .unwrap();
+    let mut versio = rivi.versio.clone();
+    *versio.entry("koe".to_string()).or_default() += 1;
+    let uusi = Rivi {
+        sisalto: rivi.sisalto.replace("avoin 19.10.2026", "valmis"),
+        versio,
+        ..rivi.clone()
+    };
+    api::kirjoita_ja_ilmoita(&y.tila, &uusi.yksikko(hlc(9_000)))
+        .await
+        .unwrap()
+        .unwrap();
+    let (_, l, r) = y.hae(&format!("/api/skoopit?since={s}")).await;
+    assert_eq!(l, "ydin");
+    let test_rivi = r["muuttuneet"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|s| s["nimi"] == "test")
+        .cloned()
+        .unwrap_or_else(|| panic!("test puuttuu: {r}"));
+    assert_eq!(test_rivi["avoimia"], 1);
+    let (_, _, r) = y.hae(&format!("/api/skoopit/test?since={s}")).await;
+    let m = r["muuttuneet"].as_array().unwrap();
+    assert_eq!(m.len(), 1);
+    assert_eq!(m[0]["avoimet"][0]["Tila"], "valmis");
+}
+
+#[tokio::test]
+async fn skoopit_siltavalimuistista_ilman_synkronista_siltaa() {
+    let viive = Duration::from_millis(500);
+    let vali = Duration::from_millis(1000);
+    let mock = Mock::uusi(viive);
+    let y = Ydin::kaynnista_mockilla(mock.clone()).await;
+    y.syota().await;
+    let kasittelija = nakymat::kaynnista_valilla(y.tila.clone(), vali);
+
+    // Lämmitys: ensimmäinen pyyntö (tai taustahaku) täyttää välimuistin.
+    let (k, l, _) = y.hae("/api/skoopit").await;
+    assert_eq!((k, l.as_str()), (StatusCode::OK, "ydin"));
+    assert!(mock.kutsut() >= 1);
+
+    let alku = std::time::Instant::now();
+    let c0 = mock.kutsut();
+    for i in 0..20 {
+        let t = std::time::Instant::now();
+        let (k, l, r) = y.hae("/api/skoopit").await;
+        let kesto = t.elapsed();
+        assert_eq!((k, l.as_str()), (StatusCode::OK, "ydin"));
+        assert_eq!(r.as_array().unwrap().len(), 92);
+        assert!(kesto < Duration::from_millis(100), "pyyntö {i}: {kesto:?}");
+    }
+    let kulunut = alku.elapsed();
+    let lisaa = mock.kutsut() - c0;
+    // Taustapäivitys enintään kerran välissä (+1 kesken ollut), ei pyyntöä kohden.
+    let raja = (kulunut.as_millis() / vali.as_millis()) as usize + 2;
+    assert!(
+        lisaa <= raja,
+        "siltakutsuja {lisaa} / {kulunut:?} (raja {raja})"
+    );
+
+    // Sillan muutos näkyy viimeistään taustavälin (+ sillan viive) jälkeen, since nostaa vain muuttuneen rivin.
+    let s = y.seq().await;
+    let (_, _, r) = y.hae(&format!("/api/skoopit?since={s}")).await;
+    assert_eq!(r["muuttuneet"], json!([]));
+    {
+        let mut l = mock.lista.lock().unwrap();
+        let rivi = l
+            .as_array_mut()
+            .unwrap()
+            .iter_mut()
+            .find(|s| s["nimi"] == "claude")
+            .unwrap();
+        rivi["avoimia"] = json!(999);
+    }
+    let muutos = std::time::Instant::now();
+    loop {
+        let (_, _, r) = y.hae("/api/skoopit").await;
+        let claude = r
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|s| s["nimi"] == "claude")
+            .unwrap()
+            .clone();
+        if claude["avoimia"] == 999 {
+            break;
+        }
+        assert!(
+            muutos.elapsed() < vali + viive + Duration::from_millis(1000),
+            "muutos ei näkynyt taustavälin jälkeen"
+        );
+        tokio::time::sleep(Duration::from_millis(50)).await;
+    }
+    let (_, _, r) = y.hae(&format!("/api/skoopit?since={s}")).await;
+    let nimet: Vec<&str> = r["muuttuneet"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|s| s["nimi"].as_str().unwrap())
+        .collect();
+    assert_eq!(nimet, vec!["claude"]);
     kasittelija.abort();
 }

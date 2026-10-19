@@ -425,3 +425,33 @@ fn avain_luodaan_ja_luetaan() {
     assert_eq!(api::lataa_avain(&tiedosto).unwrap(), a);
     let _ = std::fs::remove_dir_all(&kansio);
 }
+
+/// S-5 / R-1: peili-POST tuottaa virtaan tapahtuman polulle `peili`, ei sisäiselle `peili-offset`-polulle.
+#[tokio::test]
+async fn peili_virrassa_ilman_peili_offsetia() {
+    use sha2::{Digest, Sha256};
+    let p = Palvelin::kaynnista().await;
+    let mut v = p.get("/api/virta?since=0").send().await.unwrap();
+    let rivit = vec![r#"{"type":"user"}"#.to_string(), "toinen rivi".to_string()];
+    let mut sha = Sha256::new();
+    for r in &rivit {
+        sha.update(r.as_bytes());
+        sha.update(b"\n");
+    }
+    let sha: String = sha.finalize().iter().map(|b| format!("{b:02x}")).collect();
+    let r = p
+        .pyynto(reqwest::Method::POST, "/api/peili")
+        .json(&json!({"tiedosto": "koe/t.jsonl", "offset": 0, "rivit": rivit, "sha256": sha}))
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(r.status(), 200);
+    // Peilin jälkeinen merkki: kun se on virrassa, kaikki peilin tapahtumat on jo lähetetty.
+    let merkki = p.kirjoita("merkki", 1).await;
+    let teksti = lue_kunnes(&mut v, |s| s.contains(&format!("id: {merkki}\n"))).await;
+    assert!(teksti.contains("\"polku\":\"peili\""), "{teksti}");
+    assert!(!teksti.contains("peili-offset"), "{teksti}");
+    // Offset-yksikkö on silti varastossa (suodatus koskee vain virtaa).
+    let loki = p.tila.varasto.loki(0, 100).unwrap();
+    assert!(loki.iter().any(|t| t.polku == "peili-offset"));
+}

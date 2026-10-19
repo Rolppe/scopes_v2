@@ -364,3 +364,106 @@ async fn katko_erien_valissa_toipuu_eika_kursori_taannu() {
     naytteet.abort();
     assert!(!taantui.load(Ordering::SeqCst), "kursori taantui");
 }
+
+/// Yksikkö annetulla versiovektorilla ja HLC:n laitteella.
+fn versioitu(polku: &str, id: &str, versio: &[(&str, u64)], laite: &str, ms: u64) -> Yksikko {
+    Yksikko {
+        versio: versio.iter().map(|(l, n)| (l.to_string(), *n)).collect(),
+        aika: Hlc {
+            ms,
+            laskuri: 0,
+            laite: laite.to_string(),
+        },
+        sisalto: Some(format!("{polku}/{id}@{laite}:{ms}").into_bytes()),
+        ..yksikko(polku, id, laite, 1, ms)
+    }
+}
+
+/// R-1: `rekisterit-meta/<p>` yhdistetään Lww:llä, joten uudempi meta korvaa vanhan replikoinnissa
+/// (Lisays jättäisi B:lle vanhan). Samalla havainto: `rekisterit/<p>`:n sisarusyksikkö `<id>~<laite>`
+/// saa Lr-yhdistäjällä uuden sisaruksen `<id>~<laite>~<laite>`, jos solmujen sisarversiot ovat rinnakkaiset;
+/// samalla versiolla ei synny mitään.
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn rekisterit_meta_lww_korvaa_vanhan() {
+    let a = solmu("a");
+    let b = solmu("b");
+    let meta = "rekisterit-meta/r1";
+    assert_eq!(
+        yhdistaja_polulle(meta),
+        scopes_ydin::yksikko::Yhdistaja::Lww
+    );
+    // Meta: A:lla uudempi versio ja HLC.
+    kirjoita(&a.tila, &versioitu(meta, "meta", &[("a", 2)], "a", 2_000));
+    kirjoita(&b.tila, &versioitu(meta, "meta", &[("a", 1)], "a", 1_000));
+    // Rivin lisäkentät: rinnakkaiset versiot, A:n HLC suurempi → A voittaa molemmilla.
+    kirjoita(&a.tila, &versioitu(meta, "x", &[("a", 2)], "a", 2_000));
+    kirjoita(&b.tila, &versioitu(meta, "x", &[("b", 1)], "b", 1_500));
+    // Rivit ja sisarukset (lr.rs kirjoittaa sisaruksen Lww:llä).
+    let r = "rekisterit/r1";
+    for s in [&a, &b] {
+        kirjoita(&s.tila, &versioitu(r, "x", &[("a", 1)], "a", 1_000));
+        api::kirjoita_yhdistajalla(
+            &s.tila,
+            &versioitu(r, "y~c", &[("c", 1)], "c", 1_000),
+            scopes_ydin::yksikko::Yhdistaja::Lww,
+        )
+        .unwrap();
+    }
+    api::kirjoita_yhdistajalla(
+        &a.tila,
+        &versioitu(r, "x~c", &[("a", 1), ("c", 1)], "a", 1_100),
+        scopes_ydin::yksikko::Yhdistaja::Lww,
+    )
+    .unwrap();
+    api::kirjoita_yhdistajalla(
+        &b.tila,
+        &versioitu(r, "x~c", &[("c", 2)], "b", 1_200),
+        scopes_ydin::yksikko::Yhdistaja::Lww,
+    )
+    .unwrap();
+    let uusi_meta = a.tila.varasto.lue(meta, "meta").unwrap().unwrap();
+    let uusi_x = a.tila.varasto.lue(meta, "x").unwrap().unwrap();
+
+    let pa = kaynnista(a.tila.clone(), 0, None);
+    let pb = kaynnista(b.tila.clone(), 0, None);
+    let sa = tokio::spawn(replikointi::silmukka(a.tila.clone(), pb.vertainen()));
+    let sb = tokio::spawn(replikointi::silmukka(b.tila.clone(), pa.vertainen()));
+
+    odota("B:n meta korvautuu A:n uudemmalla", || {
+        b.tila.varasto.lue(meta, "meta").unwrap().as_ref() == Some(&uusi_meta)
+            && b.tila.varasto.lue(meta, "x").unwrap().as_ref() == Some(&uusi_x)
+    })
+    .await;
+    assert_eq!(
+        a.tila.varasto.lue(meta, "meta").unwrap().as_ref(),
+        Some(&uusi_meta)
+    );
+    assert_eq!(
+        a.tila.varasto.lue(meta, "x").unwrap().as_ref(),
+        Some(&uusi_x)
+    );
+    assert_eq!(b.tila.varasto.listaa(meta).unwrap().len(), 2);
+
+    // Havainto (lr.rs on R-1:ssä must not, ei korjata): rinnakkaiset sisarversiot tuottavat sisaruksen sisaruksen.
+    odota("rinnakkaiset sisarukset ~c~<laite>", || {
+        b.tila.varasto.lue(r, "x~c~a").unwrap().is_some()
+            && a.tila.varasto.lue(r, "x~c~b").unwrap().is_some()
+    })
+    .await;
+    for s in [&a, &b] {
+        let idt: Vec<String> = s
+            .tila
+            .varasto
+            .listaa(r)
+            .unwrap()
+            .into_iter()
+            .map(|y| y.id)
+            .collect();
+        assert!(
+            !idt.iter().any(|i| i.starts_with("y~c~")),
+            "sama sisarversio ei tuota uutta: {idt:?}"
+        );
+    }
+    sa.abort();
+    sb.abort();
+}
