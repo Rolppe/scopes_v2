@@ -1,10 +1,11 @@
 use clap::{Parser, Subcommand};
-use scopes_ydin::api::{self, Tila};
+use scopes_ydin::api;
+use scopes_ydin::lr;
+use scopes_ydin::solmu::{self, Asetukset, Avainlahde};
 use scopes_ydin::varasto::Varasto;
-use scopes_ydin::{lr, nakymat, vertaiset, web};
 use std::io::Write;
 use std::path::PathBuf;
-use std::sync::Arc;
+use std::time::Duration;
 
 #[derive(Parser, Debug)]
 #[command(name = "scopes-solmu")]
@@ -84,12 +85,12 @@ fn laite_id() -> String {
 async fn main() {
     let args = Args::parse();
     let data = kotiin(args.data);
-    std::fs::create_dir_all(&data).expect("datahakemiston luonti epäonnistui");
-    let varasto = Varasto::avaa(&data.join("ydin.db")).expect("varaston avaus epäonnistui");
     if let Some(Komento::Lr {
         lr: LrKomento::Vie { kuiva, etuliite },
     }) = args.komento
     {
+        std::fs::create_dir_all(&data).expect("datahakemiston luonti epäonnistui");
+        let varasto = Varasto::avaa(&data.join("ydin.db")).expect("varaston avaus epäonnistui");
         if !kuiva {
             eprintln!("lr vie: vain --kuiva tuetaan");
             std::process::exit(2);
@@ -102,30 +103,27 @@ async fn main() {
         return;
     }
     let avain = api::lataa_avain(&kotiin(args.avain)).expect("avaimen luku tai luonti epäonnistui");
-    let (lahetin, _) = tokio::sync::broadcast::channel(1024);
-    let tila = Arc::new(Tila {
-        varasto: Arc::new(varasto),
-        laite: laite_id(),
-        headless: args.headless,
+    let asetukset = Asetukset {
+        data,
         avain,
-        vanha: args.vanha,
-        vanha_avain: Some(kotiin(args.vanha_avain)),
+        portti: args.portti,
         vertaiset: args.vertainen,
+        vanha: args.vanha,
+        vanha_avain: Avainlahde::Tiedosto(kotiin(args.vanha_avain)),
+        headless: args.headless,
+        laite: laite_id(),
         lr_vertainen: args.lr_vertainen,
-        lahetin,
-    });
-    let osoite = format!("127.0.0.1:{}", args.portti);
-    let kuuntelija = tokio::net::TcpListener::bind(&osoite)
+        web: args.web.map(kotiin),
+    };
+    let kaynnissa = solmu::kaynnista(asetukset)
         .await
-        .expect("portin sidonta epäonnistui");
-    eprintln!("scopes-solmu kuuntelee {osoite}");
-    let _replikointi = vertaiset::kaynnista(tila.clone());
-    let _nakymat = nakymat::kaynnista(tila.clone());
-    let _lr = lr::kaynnista(tila.clone());
-    axum::serve(
-        kuuntelija,
-        api::router(tila).merge(web::reitit(args.web.map(kotiin))),
-    )
-    .await
-    .expect("palvelin kaatui");
+        .unwrap_or_else(|v| panic!("{}", v.teksti));
+    eprintln!("scopes-solmu kuuntelee 127.0.0.1:{}", kaynnissa.portti);
+    let mut sigterm = tokio::signal::unix::signal(tokio::signal::unix::SignalKind::terminate())
+        .expect("SIGTERM-käsittelijä epäonnistui");
+    tokio::select! {
+        _ = tokio::signal::ctrl_c() => {}
+        _ = sigterm.recv() => {}
+    }
+    kaynnissa.sammuta(Duration::from_secs(5)).await;
 }

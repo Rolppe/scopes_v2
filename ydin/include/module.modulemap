@@ -1,0 +1,4 @@
+module ScopesSolmu {
+    header "scopes_solmu.h"
+    export *
+}

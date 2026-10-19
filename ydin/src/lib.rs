@@ -1,4 +1,5 @@
 pub mod api;
+pub mod ffi;
 pub mod lahde;
 pub mod lr;
 pub mod muutosloki;
@@ -6,6 +7,7 @@ pub mod nakymat;
 pub mod peili;
 pub mod replikointi;
 pub mod silta;
+pub mod solmu;
 pub mod tila;
 pub mod varasto;
 pub mod vertaiset;

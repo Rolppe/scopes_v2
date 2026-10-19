@@ -1,1 +1,3 @@
 /target
+/apple/*.xcframework
+/apple/build
