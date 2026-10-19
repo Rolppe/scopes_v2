@@ -18,3 +18,7 @@ futures = "0.3"
 [[bin]]
 name = "scopes-solmu"
 path = "src/main.rs"
+
+[[bin]]
+name = "lr-pariteetti"
+path = "src/bin/lr-pariteetti.rs"
