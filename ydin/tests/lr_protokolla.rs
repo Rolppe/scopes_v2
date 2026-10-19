@@ -397,7 +397,7 @@ fn synkkaa_tuo_kaikki() {
                     "{polku} {id}: poistettu"
                 );
                 // Fixtureissa ei ole rinnakkaisia: sisaryksikköä `<id>~<laite>` ei saa syntyä.
-                assert!(o["rinnakkaiset"].as_array().unwrap().is_empty());
+                assert!(o["rinnakkaiset"].as_array().is_none_or(|a| a.is_empty()));
                 assert!(
                     !talletetut.keys().any(|k| k.starts_with(&format!("{id}~"))),
                     "{polku} {id}: ylimääräinen rinnakkainen"
