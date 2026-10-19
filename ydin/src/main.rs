@@ -1,7 +1,8 @@
-use axum::{routing::get, Json, Router};
 use clap::Parser;
-use serde_json::{json, Value};
+use scopes_ydin::api::{self, Tila};
+use scopes_ydin::varasto::Varasto;
 use std::path::PathBuf;
+use std::sync::Arc;
 
 #[derive(Parser, Debug)]
 #[command(name = "scopes-solmu")]
@@ -29,17 +30,53 @@ struct Args {
     lr_vertainen: Option<String>,
 }
 
-async fn terveys() -> Json<Value> {
-    Json(json!({"ok": true, "v2": true, "seq": 0}))
+/// Laajentaa alun `~/` HOME-hakemistoksi.
+fn kotiin(p: PathBuf) -> PathBuf {
+    match (p.strip_prefix("~"), std::env::var_os("HOME")) {
+        (Ok(loppu), Some(koti)) => PathBuf::from(koti).join(loppu),
+        _ => p,
+    }
+}
+
+/// Laite-id HLC:lle: SCOPES_LAITE, muuten koneen nimi, muuten "solmu".
+fn laite_id() -> String {
+    let nimi = std::env::var("SCOPES_LAITE")
+        .ok()
+        .or_else(|| std::fs::read_to_string("/etc/hostname").ok())
+        .unwrap_or_default();
+    let nimi: String = nimi.trim().chars().filter(|c| !c.is_whitespace()).collect();
+    if nimi.is_empty() {
+        "solmu".to_string()
+    } else {
+        nimi
+    }
 }
 
 #[tokio::main]
 async fn main() {
     let args = Args::parse();
-    let app: Router = Router::new().route("/api/terveys", get(terveys));
+    let data = kotiin(args.data);
+    std::fs::create_dir_all(&data).expect("datahakemiston luonti epäonnistui");
+    let varasto = Varasto::avaa(&data.join("ydin.db")).expect("varaston avaus epäonnistui");
+    let avain = api::lataa_avain(&kotiin(args.avain)).expect("avaimen luku tai luonti epäonnistui");
+    let (lahetin, _) = tokio::sync::broadcast::channel(1024);
+    let tila = Arc::new(Tila {
+        varasto: Arc::new(varasto),
+        laite: laite_id(),
+        headless: args.headless,
+        avain,
+        vanha: args.vanha,
+        vanha_avain: Some(kotiin(args.vanha_avain)),
+        vertaiset: args.vertainen,
+        lr_vertainen: args.lr_vertainen,
+        lahetin,
+    });
     let osoite = format!("127.0.0.1:{}", args.portti);
     let kuuntelija = tokio::net::TcpListener::bind(&osoite)
         .await
         .expect("portin sidonta epäonnistui");
-    axum::serve(kuuntelija, app).await.expect("palvelin kaatui");
+    eprintln!("scopes-solmu kuuntelee {osoite}");
+    axum::serve(kuuntelija, api::router(tila))
+        .await
+        .expect("palvelin kaatui");
 }
