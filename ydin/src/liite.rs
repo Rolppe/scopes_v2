@@ -270,12 +270,15 @@ async fn laheta(
             .body(tavut.as_ref().clone())
             .send()
             .await;
-        if let Ok(r) = r {
-            if r.status() == reqwest::StatusCode::OK {
+        match r {
+            Ok(r) if r.status() == reqwest::StatusCode::OK => {
                 if let Ok(j) = r.json::<Value>().await {
                     return Json(j).into_response();
                 }
             }
+            // Vain tila ja virheteksti; avainta ei lokiteta.
+            Ok(r) => eprintln!("liite: työntö {url} -> {}", r.status()),
+            Err(e) => eprintln!("liite: työntö {url} epäonnistui: {e}"),
         }
     }
     (
