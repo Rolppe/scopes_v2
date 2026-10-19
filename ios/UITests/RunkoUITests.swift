@@ -30,46 +30,88 @@ final class RunkoUITests: XCTestCase {
     private struct Tyhja: Decodable {}
     private struct Viestit: Decodable { let viestit: [Tyhja] }
 
-    /// Näkyvän ikkunan rivit ylhäältä alas yhdellä kyselyllä: (tunniste, sisältö) niille, joiden tunniste täyttää ehdon.
-    private func ikkuna(_ app: XCUIApplication, _ kelpaa: (String) -> Bool) throws -> [(id: String, sisalto: String)] {
-        var tulos: [(id: String, sisalto: String, y: CGFloat)] = []
+    private struct Rivi { let avain: String; let y: CGFloat }
+
+    /// Työkalurivi näkyy kolmena elementtinä (kuva, teksti, säiliö, kaikilla sama tunniste); lasketaan vain kuva, tekstiviesti on yksi elementti.
+    /// Näkyvän ikkunan rivit yhdellä kyselyllä, ylhäältä alas (y kasvaa).
+    private func ikkuna(_ app: XCUIApplication, _ kelpaa: (XCUIElementSnapshot) -> Bool) throws -> [Rivi] {
+        var tulos: [Rivi] = []
         func kay(_ e: XCUIElementSnapshot) {
-            if kelpaa(e.identifier) { tulos.append((e.identifier, e.label + "|" + (e.value as? String ?? ""), e.frame.minY)) }
+            if kelpaa(e) { tulos.append(Rivi(avain: e.identifier + "|" + e.label + "|" + (e.value as? String ?? ""), y: e.frame.minY)) }
             e.children.forEach(kay)
         }
         kay(try app.snapshot())
-        return tulos.sorted { $0.y < $1.y }.map { ($0.id, $0.sisalto) }
+        return tulos.sorted { $0.y < $1.y }
     }
 
-    /// Vetää sisältöä puoli ruutua (hallittu limitys): alas = sisältö liikkuu ylös.
+    /// Vetää sisältöä puoli ruutua: alas = sisältö liikkuu ylös.
     private func vieritaPuoli(_ app: XCUIApplication, alas: Bool) {
         let alku = app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: alas ? 0.75 : 0.3))
         let loppu = app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: alas ? 0.3 : 0.75))
         alku.press(forDuration: 0.05, thenDragTo: loppu)
     }
 
-    /// Käy listan läpi vierittäen ja yhdistää peräkkäiset ikkunat limityksen mukaan. `alas` = suunta, jossa lista tyhjenee.
-    private func kerää(_ app: XCUIApplication, alas: Bool, _ kelpaa: (String) -> Bool) throws -> [String] {
-        var kaikki: [String] = []   // alas-suunnassa ylhäältä alas, ylös-suunnassa alhaalta ylös
-        var muuttumatta = 0
-        var kierroksia = 0
-        while muuttumatta < 2 && kierroksia < 400 {
-            kierroksia += 1
-            var nyt = try ikkuna(app, kelpaa).map { $0.id + "|" + $0.sisalto }
-            if !alas { nyt.reverse() }
-            let ennen = kaikki.count
-            let raja = min(kaikki.count, nyt.count)
-            let limitys = (0...raja).reversed().first { kaikki.suffix($0).elementsEqual(nyt.prefix($0)) } ?? 0
-            kaikki.append(contentsOf: nyt.dropFirst(limitys))
-            muuttumatta = kaikki.count == ennen ? muuttumatta + 1 : 0
+    /// Laskee listan rivit vierittäen. Peräkkäiset ikkunat yhdistetään limityksen mukaan; limitys hyväksytään vain, jos
+    /// kaikkien limittyvien rivien siirtymä on sama (identtiset peräkkäiset rivit eivät sekoita laskentaa).
+    /// `alas` = vieritys alaspäin; muuten ylöspäin (silloin ikkunat käännetään peilikuviksi).
+    private func laske(_ app: XCUIApplication, alas: Bool, _ kelpaa: (XCUIElementSnapshot) -> Bool) throws -> (maara: Int, aukkoja: Int) {
+        let odotettuSiirtyma = app.frame.height * 0.45
+        var edellinen: [Rivi] = []
+        var maara = 0, aukkoja = 0, paikallaan = 0, siirtyma = odotettuSiirtyma
+        var loki: [String] = []
+        defer { let l = XCTAttachment(string: loki.joined(separator: "\n")); l.name = "laskenta"; l.lifetime = .keepAlways; add(l) }
+        for _ in 0..<600 {
+            var nyt = try ikkuna(app, kelpaa)
+            if !alas { nyt = nyt.reversed().map { Rivi(avain: $0.avain, y: -$0.y) } }
+            if edellinen.isEmpty {
+                maara = nyt.count
+                loki += nyt.map { "alku y=\(Int($0.y)) \($0.avain.prefix(70))" }
+            } else {
+                var paras: (k: Int, s: CGFloat)?
+                for k in 1...max(1, min(edellinen.count, nyt.count)) where k <= min(edellinen.count, nyt.count) {
+                    let a = edellinen.suffix(k), b = nyt.prefix(k)
+                    guard zip(a, b).allSatisfy({ $0.avain == $1.avain }) else { continue }
+                    let ero = zip(a, b).map { $0.y - $1.y }
+                    guard let lo = ero.min(), let hi = ero.max(), hi - lo < 6, lo > 4 else { continue }
+                    let s = (lo + hi) / 2
+                    if paras == nil || abs(s - siirtyma) < abs(paras!.s - siirtyma) { paras = (k, s) }
+                }
+                if let p = paras {
+                    maara += nyt.count - p.k
+                    loki += nyt.dropFirst(p.k).map { "uusi k=\(p.k) s=\(Int(p.s)) y=\(Int($0.y)) \($0.avain.prefix(70))" }
+                    siirtyma = p.s
+                    paikallaan = 0
+                } else if nyt.map(\.avain) == edellinen.map(\.avain) && zip(nyt, edellinen).allSatisfy({ abs($0.y - $1.y) < 2 }) {
+                    paikallaan += 1
+                    if paikallaan >= 2 { break }
+                } else {
+                    maara += nyt.count; aukkoja += 1; paikallaan = 0; loki.append("AUKKO \(nyt.count)")   // ei luotettavaa limitystä
+                }
+            }
+            edellinen = nyt
             vieritaPuoli(app, alas: alas)
         }
-        return kaikki
+        return (maara, aukkoja)
+    }
+
+    /// Sivupalkin skooppien nimet vierittämällä (tunnisteet ovat yksilöllisiä).
+    private func nimetListasta(_ app: XCUIApplication) throws -> Set<String> {
+        var nimet = Set<String>(), muuttumatta = 0
+        for _ in 0..<200 where muuttumatta < 3 {
+            let ennen = nimet.count
+            for r in try ikkuna(app, { $0.identifier.hasPrefix("skooppi-") && $0.identifier != "skooppi-suodatin" }) {
+                nimet.insert(String(r.avain.split(separator: "|", maxSplits: 1, omittingEmptySubsequences: false)[0].dropFirst("skooppi-".count)))
+            }
+            muuttumatta = nimet.count == ennen ? muuttumatta + 1 : 0
+            vieritaPuoli(app, alas: true)
+        }
+        return nimet
     }
 
     private func palaaListaan(_ app: XCUIApplication) {
         let takaisin = app.navigationBars.buttons.element(boundBy: 0)
         if takaisin.waitForExistence(timeout: 5) { takaisin.tap() }
+        _ = app.textFields["skooppi-suodatin"].waitForExistence(timeout: 10)
     }
 
     func testListaVastaaPalvelinta() async throws {
@@ -81,8 +123,7 @@ final class RunkoUITests: XCTestCase {
         var nahdyt = Set<String>()
         let loppu = Date().addingTimeInterval(60)
         repeat {
-            let rivit = try kerää(app, alas: true) { $0.hasPrefix("skooppi-") && $0 != "skooppi-suodatin" }
-            nahdyt = Set(rivit.map { String($0.split(separator: "|", maxSplits: 1)[0].dropFirst("skooppi-".count)) })
+            nahdyt = try nimetListasta(app)
             if odotetut.isSubset(of: nahdyt) { break }
         } while Date() < loppu
         XCTAssertTrue(odotetut.isSubset(of: nahdyt), "puuttuu: \(odotetut.subtracting(nahdyt).sorted())")
@@ -100,16 +141,21 @@ final class RunkoUITests: XCTestCase {
         for (nimi, maara) in kaksi {
             // rivi voi olla listan ulkopuolella: vieritä alkuun ja etsi
             let rivi = app.descendants(matching: .any)["skooppi-\(nimi)"].firstMatch
-            var yrityksia = 0
-            while !rivi.waitForExistence(timeout: yrityksia == 0 ? 60 : 1) && yrityksia < 80 {
-                vieritaPuoli(app, alas: true); yrityksia += 1
+            _ = rivi.waitForExistence(timeout: 60)
+            for alas in [true, false] {
+                var yrityksia = 0
+                while !(rivi.exists && rivi.isHittable) && yrityksia < 80 {
+                    vieritaPuoli(app, alas: alas); yrityksia += 1
+                }
+                if rivi.exists && rivi.isHittable { break }
             }
             XCTAssertTrue(rivi.exists, "skooppi \(nimi) ei listalla")
             rivi.tap()
             XCTAssertTrue(app.descendants(matching: .any).matching(NSPredicate(format: "identifier IN {'viesti','tyokalu-rivi'}")).firstMatch.waitForExistence(timeout: 30), "viestejä ei näy: \(nimi)")
             // näkymä alkaa alareunasta: vieritä ylös, kunnes loppuu
-            let rivit = try kerää(app, alas: false) { $0 == "viesti" || $0 == "tyokalu-rivi" }
-            XCTAssertEqual(rivit.count, maara, "viestimäärä skoopissa \(nimi)")
+            let tulos = try laske(app, alas: false) { $0.identifier == "viesti" || ($0.identifier == "tyokalu-rivi" && $0.elementType == .image) }
+            XCTAssertEqual(tulos.aukkoja, 0, "limitys katkesi \(tulos.aukkoja) kertaa skoopissa \(nimi)")
+            XCTAssertEqual(tulos.maara, maara, "viestimäärä skoopissa \(nimi)")
             palaaListaan(app)
         }
     }
