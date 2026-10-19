@@ -30,7 +30,8 @@ final class RunkoUITests: XCTestCase {
     }
 
     private struct Nimi: Decodable { let nimi: String }
-    private struct Viestit: Decodable { let viestit: [Nimi?] }
+    private struct Tyhja: Decodable {}
+    private struct Viestit: Decodable { let viestit: [Tyhja] }
 
     private func skooppiRivit(_ app: XCUIApplication) -> XCUIElementQuery {
         app.descendants(matching: .any).matching(NSPredicate(format: "identifier BEGINSWITH 'skooppi-' AND identifier != 'skooppi-suodatin'"))
