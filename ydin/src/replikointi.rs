@@ -136,8 +136,10 @@ pub fn tiivisteet(tila: &Tila) -> crate::muutosloki::Result<(u64, BTreeMap<Strin
         .collect();
     let mut kartta = BTreeMap::new();
     for p in polut {
-        let h = tila.varasto.tiiviste(&p)?;
-        kartta.insert(p, h);
+        // Headless-solmun UI-avaimet eivät kuulu tiivisteeseen; polku ilman näkyviä yksiköitä jää pois.
+        if let Some(h) = crate::tila::tiiviste(tila, &p)? {
+            kartta.insert(p, h);
+        }
     }
     Ok((seq, kartta))
 }
@@ -145,8 +147,8 @@ pub fn tiivisteet(tila: &Tila) -> crate::muutosloki::Result<(u64, BTreeMap<Strin
 /// `?polku=p` → yhden polun tiiviste; ilman polkua → `{"seq":…,"tiivisteet":{polku:tiiviste}}`.
 async fn tiiviste(State(t): State<Arc<Tila>>, Query(k): Query<PolkuKysely>) -> Response {
     match k.polku {
-        Some(p) => match t.varasto.tiiviste(&p) {
-            Ok(h) => Json(json!({"polku": p, "tiiviste": h})).into_response(),
+        Some(p) => match crate::tila::tiiviste(&t, &p) {
+            Ok(h) => Json(json!({"polku": p, "tiiviste": h.unwrap_or_default()})).into_response(),
             Err(e) => sisainen(e),
         },
         None => match tiivisteet(&t) {
@@ -164,6 +166,7 @@ async fn listat(State(t): State<Arc<Tila>>, Query(k): Query<PolkuKysely>) -> Res
         Ok(ys) => {
             let rivit: Vec<ListaRivi> = ys
                 .into_iter()
+                .filter(|y| crate::tila::nakyy(&t, y))
                 .map(|y| ListaRivi {
                     id: y.id,
                     versio: y.versio,
@@ -183,7 +186,8 @@ async fn hae(State(t): State<Arc<Tila>>, Json(p): Json<HaePyynto>) -> Response {
     let mut ys = Vec::with_capacity(p.idt.len());
     for id in &p.idt {
         match t.varasto.lue(&p.polku, id) {
-            Ok(Some(y)) => ys.push(y),
+            Ok(Some(y)) if crate::tila::nakyy(&t, &y) => ys.push(y),
+            Ok(Some(_)) => {}
             Ok(None) => {}
             Err(e) => return sisainen(e),
         }
@@ -279,7 +283,13 @@ async fn tasaa(tila: &Tila, v: &Vertainen, http: &reqwest::Client) -> Result<u64
         } else {
             Vec::new()
         };
-        let omat_yksikot = tila.varasto.listaa(p)?;
+        // Headless-solmu ei lähetä UI-avaimiaan.
+        let omat_yksikot: Vec<Yksikko> = tila
+            .varasto
+            .listaa(p)?
+            .into_iter()
+            .filter(|y| crate::tila::nakyy(tila, y))
+            .collect();
         let eta_kartta: HashMap<&str, &ListaRivi> =
             eta_rivit.iter().map(|r| (r.id.as_str(), r)).collect();
         let oma_kartta: HashMap<&str, &Yksikko> =

@@ -61,8 +61,13 @@ pub fn kirjoita_yhdistajalla(tila: &Tila, y: &Yksikko, yh: Yhdistaja) -> Result<
     Ok(seq)
 }
 
-/// Kirjoittaa yksikön polun yhdistäjällä ja ilmoittaa muutoksen virtaan.
+/// Kirjoittaa yksikön polun yhdistäjällä ja ilmoittaa muutoksen virtaan. Polun "tila" yksiköt
+/// kulkevat `tila::kirjoita_tilaan`-funktion kautta (LWW, kuittaus suurin-voittaa, headless-suodatin);
+/// `yhdistaja_polulle("tila")` antaisi niille `Lisays`-yhdistäjän, koska polussa ei ole `/`-merkkiä.
 pub async fn kirjoita_ja_ilmoita(tila: &Tila, y: &Yksikko) -> Result<Option<u64>> {
+    if y.polku == tila::POLKU {
+        return tila::kirjoita_tilaan(tila, y);
+    }
     kirjoita_yhdistajalla(tila, y, yhdistaja_polulle(&y.polku))
 }
 
