@@ -63,3 +63,8 @@ for (const l of lehdet) {
 
 juuri.append(palkki, paa);
 nayta('viestit');
+
+// PWA: service worker tallettaa vain kuoren. 127.0.0.1 on suojattu konteksti; http-osoite (esim. WG) ei ole, silloin ohitetaan.
+if ('serviceWorker' in navigator && window.isSecureContext) {
+  navigator.serviceWorker.register('/web/sw.js', { scope: '/web/' }).catch((e: unknown) => { console.warn('service worker ei rekisteröidy', e); });
+}
