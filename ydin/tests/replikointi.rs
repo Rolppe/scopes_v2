@@ -467,3 +467,71 @@ async fn rekisterit_meta_lww_korvaa_vanhan() {
     sa.abort();
     sb.abort();
 }
+
+/// 3 Mt:n peiliyksikkö (HAE_TAVUT 8 Mt → kaksi mahtuu vastaukseen).
+fn iso(id: &str, ms: u64) -> Yksikko {
+    Yksikko {
+        sisalto: Some(vec![b'x'; 3 * 1024 * 1024]),
+        ..yksikko("peili", id, "a", 1, ms)
+    }
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn hae_tavubudjetti_jatko_ja_replikointi_konvergoi() {
+    let a = solmu("a");
+    let b = solmu("b");
+    let idt: Vec<String> = (0..5).map(|i| format!("f:{i}")).collect();
+    for (i, id) in idt.iter().enumerate() {
+        kirjoita(&a.tila, &iso(id, 1_000 + i as u64));
+    }
+    const _: () = assert!(2 * 3 * 1024 * 1024 <= replikointi::HAE_TAVUT);
+    const _: () = assert!(3 * 3 * 1024 * 1024 > replikointi::HAE_TAVUT);
+    let pa = kaynnista(a.tila.clone(), 0, None);
+    let _pb = kaynnista(b.tila.clone(), 0, None);
+
+    // Suora haku: kaksi yksikköä ja jatko kolmelle; jatkon haku palauttaa seuraavat.
+    let http = reqwest::Client::new();
+    let hae = |idt: Vec<String>| {
+        let http = http.clone();
+        let url = format!("http://127.0.0.1:{}/api/hae", pa.portti);
+        async move {
+            http.post(url)
+                .bearer_auth(AVAIN)
+                .json(&serde_json::json!({"polku": "peili", "idt": idt}))
+                .send()
+                .await
+                .unwrap()
+                .json::<serde_json::Value>()
+                .await
+                .unwrap()
+        }
+    };
+    let r = hae(idt.clone()).await;
+    let saadut: Vec<&str> = r["yksikot"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|y| y["id"].as_str().unwrap())
+        .collect();
+    assert_eq!(saadut, vec!["f:0", "f:1"]);
+    assert_eq!(r["jatko"], serde_json::json!(["f:2", "f:3", "f:4"]));
+    let r = hae(vec!["f:4".to_string()]).await;
+    assert_eq!(r["yksikot"].as_array().unwrap().len(), 1);
+    assert!(r.get("jatko").is_none());
+
+    // Replikointi: B hakee kaikki viisi jatkon kautta.
+    let silmukka = tokio::spawn(replikointi::silmukka(b.tila.clone(), pa.vertainen()));
+    odota("B saa 5 isoa peiliyksikköä", || {
+        b.tila.varasto.listaa_otsakkeet("peili").unwrap().len() == 5
+    })
+    .await;
+    assert_eq!(
+        a.tila.varasto.tiiviste("peili").unwrap(),
+        b.tila.varasto.tiiviste("peili").unwrap()
+    );
+    assert_eq!(
+        a.tila.varasto.listaa("peili").unwrap(),
+        b.tila.varasto.listaa("peili").unwrap()
+    );
+    silmukka.abort();
+}
