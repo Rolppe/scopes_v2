@@ -11,8 +11,10 @@ use axum::{
 use scopes_ydin::api::{self, Tila};
 use scopes_ydin::nakymat;
 use scopes_ydin::varasto::Varasto;
+use scopes_ydin::yksikko::{Hlc, Yhdistaja, Yksikko};
 use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
+use std::collections::BTreeMap;
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::Arc;
@@ -491,6 +493,70 @@ async fn since_viestit_tunnisteet_lisaykset_ja_poistot() {
     let viestit = koko["viestit"].as_array().unwrap();
     assert_eq!(viestit.len(), 120);
     assert_eq!(viestit[119]["teksti"], "viesti 129");
+}
+
+#[tokio::test]
+async fn erat_vastaavat_taytta_lukua_ja_lukevat_vain_uudet() {
+    let polku = "/api/skoopit/scopes%20macos/viestit";
+    let uudet: Vec<Vec<String>> = (0..3)
+        .map(|e| {
+            (0..4)
+                .map(|i| kayttajan_rivi(&format!("erä {e} rivi {i}")))
+                .collect()
+        })
+        .collect();
+
+    // Täysi luku: näkymä rakennetaan vasta, kun kaikki rivit ovat peilissä.
+    let a = Ydin::kaynnista().await;
+    let mut offset = a.syota().await;
+    for u in &uudet {
+        offset = a.peili(TIEDOSTO, offset, u).await;
+    }
+    let (_, _, taysi) = a.hae(polku).await;
+
+    // Erät: seuranta alkaa ensimmäisellä haulla, sen jälkeen jokainen lähetys on oma eränsä.
+    let b = Ydin::kaynnista().await;
+    let mut offset = b.syota().await;
+    b.hae(polku).await;
+    for u in &uudet {
+        offset = b.peili(TIEDOSTO, offset, u).await;
+        b.hae(polku).await;
+    }
+    let (_, _, erina) = b.hae(polku).await;
+    assert_eq!(erina, taysi);
+    assert_eq!(
+        taysi["viestit"].as_array().unwrap().last().unwrap()["teksti"],
+        "erä 2 rivi 3"
+    );
+
+    // Jo sovellettu yksikkö ei lue uudelleen: rikottu sisältö vanhassa yksikössä (offset 0) ei kaada
+    // erää, koska rivit_alkaen ohittaa offsetin alle jäävät yksiköt ennen jäsennystä.
+    let rikottu = Yksikko {
+        polku: "peili".to_string(),
+        id: format!("{TIEDOSTO}:0"),
+        versio: BTreeMap::from([("koe".to_string(), 99)]),
+        aika: Hlc {
+            ms: 4_000_000_000_000,
+            laskuri: 0,
+            laite: "koe".to_string(),
+        },
+        sisalto: Some(b"ei json".to_vec()),
+        poistettu: false,
+    };
+    assert!(b
+        .tila
+        .varasto
+        .kirjoita(&rikottu, Yhdistaja::Lww)
+        .unwrap()
+        .is_some());
+    let n = nakymat::nakyma(&b.tila);
+    n.paivita(&b.tila)
+        .expect("erä ei lue jo sovellettua yksikköä");
+    assert_eq!(n.seq(), b.tila.varasto.seq().unwrap());
+    let (_, _, jalkeen) = b.hae(polku).await;
+    assert_eq!(jalkeen["viestit"], taysi["viestit"]);
+    // Sama rikottu yksikkö täydessä luvussa on virhe: testi erottaa erä- ja täyden luvun.
+    assert!(scopes_ydin::peili::rivit(&b.tila.varasto, TIEDOSTO).is_err());
 }
 
 #[tokio::test]

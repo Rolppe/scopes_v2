@@ -129,9 +129,8 @@ pub fn tiivisteet(tila: &Tila) -> crate::muutosloki::Result<(u64, BTreeMap<Strin
     let seq = tila.varasto.seq()?;
     let polut: BTreeSet<String> = tila
         .varasto
-        .listaa_etuliite("")?
+        .polut()?
         .into_iter()
-        .map(|y| y.polku)
         .filter(|p| p != SISAINEN)
         .collect();
     let mut kartta = BTreeMap::new();

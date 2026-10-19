@@ -405,6 +405,8 @@ struct Viesti {
 pub struct Keskustelu {
     istunto: String,
     rivit: usize,
+    /// Seuraava soveltamaton peilin offset (tavuina).
+    peili_offset: u64,
     viestit: VecDeque<Viesti>,
     kysymykset: HashMap<String, String>,
     malli: Value,
@@ -419,6 +421,7 @@ impl Keskustelu {
         Keskustelu {
             istunto: istunto.to_string(),
             rivit: 0,
+            peili_offset: 0,
             viestit: VecDeque::new(),
             kysymykset: HashMap::new(),
             malli: Value::Null,
@@ -429,15 +432,28 @@ impl Keskustelu {
         }
     }
 
-    /// Soveltaa rivit indeksistä `self.rivit` eteenpäin.
-    fn sovella(&mut self, kaikki: &[String], seq: u64) {
-        if kaikki.len() <= self.rivit {
+    /// Lukee peilistä offsetin `self.peili_offset` jälkeiset rivit ja soveltaa ne.
+    fn lue_peilista(
+        &mut self,
+        v: &Varasto,
+        tiedosto: &str,
+        seq: u64,
+    ) -> crate::muutosloki::Result<()> {
+        let (uudet, seuraava) = peili::rivit_alkaen(v, tiedosto, self.peili_offset)?;
+        self.peili_offset = seuraava;
+        self.sovella(&uudet, seq);
+        Ok(())
+    }
+
+    /// Soveltaa uudet rivit rivinumerosta `self.rivit + 1` eteenpäin.
+    fn sovella(&mut self, uudet: &[String], seq: u64) {
+        if uudet.is_empty() {
             return;
         }
-        for (i, rivi) in kaikki.iter().enumerate().skip(self.rivit) {
-            self.rivi(i + 1, rivi, seq);
+        for (i, rivi) in uudet.iter().enumerate() {
+            self.rivi(self.rivit + i + 1, rivi, seq);
         }
-        self.rivit = kaikki.len();
+        self.rivit += uudet.len();
         // Kysymys, jonka perässä on mitä tahansa, ei ole enää auki.
         let n = self.viestit.len();
         for (i, v) in self.viestit.iter_mut().enumerate() {
@@ -819,8 +835,7 @@ impl Nakymat {
             }
             for tiedosto in tiedostot {
                 if let Some(k) = s.viestit.get_mut(&tiedosto) {
-                    let rivit = peili::rivit(v, &tiedosto)?;
-                    k.sovella(&rivit, viimeinen);
+                    k.lue_peilista(v, &tiedosto, viimeinen)?;
                 }
             }
             s.seq_viimeisin = viimeinen;
@@ -885,8 +900,7 @@ impl Sisa {
         for (t, id) in seurattavat {
             if let std::collections::hash_map::Entry::Vacant(e) = self.viestit.entry(t) {
                 let mut k = Keskustelu::uusi(&id, seq);
-                let rivit = peili::rivit(v, e.key())?;
-                k.sovella(&rivit, seq);
+                k.lue_peilista(v, e.key(), seq)?;
                 e.insert(k);
             }
         }
