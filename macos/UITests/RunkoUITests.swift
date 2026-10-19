@@ -5,6 +5,7 @@ import XCTest
 import CryptoKit
 import ScopesCore2
 
+@MainActor
 final class RunkoUITests: XCTestCase {
     private let osoite = ProcessInfo.processInfo.environment["SCOPES2_VERTAINEN"] ?? "http://127.0.0.1:18797"
 
@@ -65,7 +66,8 @@ final class RunkoUITests: XCTestCase {
             let viestit = app.descendants(matching: .any).matching(NSPredicate(format: "identifier IN {'viesti','tyokalu-rivi'}"))
             let loppu = Date().addingTimeInterval(30)
             while Date() < loppu && viestit.count == 0 { try await Task.sleep(nanoseconds: 500_000_000) }
-            XCTAssertEqual(try await laske(app, viestit), maara, "viestimäärä skoopissa \(nimi)")
+            let nahty = try await laske(app, viestit)
+            XCTAssertEqual(nahty, maara, "viestimäärä skoopissa \(nimi)")
         }
     }
 
