@@ -1,0 +1,302 @@
+{
+ "laite": "palvelin",
+ "sisalto": [
+  {
+   "istunto": "00000000-0000-4000-8000-000000000001",
+   "skooppi": "scopes agy siirto",
+   "tila": "idle",
+   "kysely": false,
+   "konteksti": {
+    "tokenit": 159899,
+    "aika": "2026-10-19T12:49:38.003Z"
+   },
+   "pysahdys": "2026-10-19T12:49:38.003Z",
+   "pakattu": false,
+   "hereilla": true,
+   "ladatut": null,
+   "transkripti": "-home-user-palvelin/00000000-0000-4000-8000-000000000001.jsonl",
+   "alkoi": "2026-10-19T10:00:01.000Z",
+   "ruutu": "%101"
+  },
+  {
+   "istunto": "00000000-0000-4000-8000-000000000002",
+   "skooppi": "scopes macos agy",
+   "tila": "idle",
+   "kysely": false,
+   "konteksti": {
+    "tokenit": 264684,
+    "aika": "2026-10-18T14:49:31.263Z"
+   },
+   "pysahdys": "2026-10-18T14:49:31.263Z",
+   "pakattu": true,
+   "hereilla": true,
+   "ladatut": null,
+   "transkripti": "-home-user-palvelin/00000000-0000-4000-8000-000000000002.jsonl",
+   "alkoi": "2026-10-19T10:00:02.000Z",
+   "ruutu": "%102"
+  },
+  {
+   "istunto": "00000000-0000-4000-8000-000000000003",
+   "skooppi": "scopes istunnot",
+   "tila": "idle",
+   "kysely": false,
+   "konteksti": {
+    "tokenit": 307994,
+    "aika": "2026-10-19T13:07:22.605Z"
+   },
+   "pysahdys": "2026-10-19T13:07:22.605Z",
+   "pakattu": false,
+   "hereilla": true,
+   "ladatut": null,
+   "transkripti": "-home-user-palvelin/00000000-0000-4000-8000-000000000003.jsonl",
+   "alkoi": "2026-10-19T10:00:03.000Z",
+   "ruutu": "%103"
+  },
+  {
+   "istunto": "00000000-0000-4000-8000-000000000004",
+   "skooppi": "scopes performance ios",
+   "tila": "idle",
+   "kysely": false,
+   "konteksti": {
+    "tokenit": 54129,
+    "aika": "2026-10-18T14:49:31.267Z"
+   },
+   "pysahdys": "2026-10-18T14:49:31.267Z",
+   "pakattu": false,
+   "hereilla": true,
+   "ladatut": null,
+   "transkripti": "-home-user-palvelin/00000000-0000-4000-8000-000000000004.jsonl",
+   "alkoi": "2026-10-19T10:00:04.000Z",
+   "ruutu": "%104"
+  },
+  {
+   "istunto": "00000000-0000-4000-8000-000000000005",
+   "skooppi": "scopes lostdev",
+   "tila": "idle",
+   "kysely": false,
+   "konteksti": {
+    "tokenit": 182528,
+    "aika": "2026-10-19T12:42:50.335Z"
+   },
+   "pysahdys": "2026-10-19T12:42:50.335Z",
+   "pakattu": false,
+   "hereilla": true,
+   "ladatut": null,
+   "transkripti": "-home-user-palvelin/00000000-0000-4000-8000-000000000005.jsonl",
+   "alkoi": "2026-10-19T10:00:05.000Z",
+   "ruutu": "%105"
+  },
+  {
+   "istunto": "00000000-0000-4000-8000-000000000006",
+   "skooppi": "scopes siirto git",
+   "tila": "idle",
+   "kysely": false,
+   "konteksti": {
+    "tokenit": 68893,
+    "aika": "2026-10-19T12:47:49.419Z"
+   },
+   "pysahdys": "2026-10-19T12:47:49.419Z",
+   "pakattu": false,
+   "hereilla": true,
+   "ladatut": null,
+   "transkripti": "-home-user-palvelin/00000000-0000-4000-8000-000000000006.jsonl",
+   "alkoi": "2026-10-19T10:00:06.000Z",
+   "ruutu": "%106"
+  },
+  {
+   "istunto": "00000000-0000-4000-8000-000000000007",
+   "skooppi": "scopes kysymys",
+   "tila": "idle",
+   "kysely": false,
+   "konteksti": {
+    "tokenit": 115494,
+    "aika": "2026-10-19T12:40:24.291Z"
+   },
+   "pysahdys": "2026-10-19T12:40:24.291Z",
+   "pakattu": false,
+   "hereilla": true,
+   "ladatut": null,
+   "transkripti": "-home-user-palvelin/00000000-0000-4000-8000-000000000007.jsonl",
+   "alkoi": "2026-10-19T10:00:07.000Z",
+   "ruutu": "%107"
+  },
+  {
+   "istunto": "00000000-0000-4000-8000-000000000008",
+   "skooppi": "scopes kordinaattori",
+   "tila": "busy",
+   "kysely": false,
+   "konteksti": {
+    "tokenit": 132119,
+    "aika": "2026-10-19T13:17:10.534Z"
+   },
+   "pysahdys": "2026-10-19T13:17:10.534Z",
+   "pakattu": false,
+   "hereilla": true,
+   "ladatut": null,
+   "transkripti": "-home-user-palvelin/00000000-0000-4000-8000-000000000008.jsonl",
+   "alkoi": "2026-10-19T10:00:08.000Z",
+   "ruutu": "%108"
+  },
+  {
+   "istunto": "00000000-0000-4000-8000-000000000009",
+   "skooppi": "scopes kordinaattori",
+   "tila": "idle",
+   "kysely": false,
+   "konteksti": {
+    "tokenit": 1000,
+    "aika": "2026-10-19T13:17:10.534Z"
+   },
+   "pysahdys": "2026-10-01T00:00:00.000Z",
+   "pakattu": false,
+   "hereilla": true,
+   "ladatut": null,
+   "transkripti": "-home-user-palvelin/00000000-0000-4000-8000-000000000009.jsonl",
+   "alkoi": "2026-10-19T10:00:09.000Z",
+   "ruutu": "%109"
+  },
+  {
+   "istunto": "00000000-0000-4000-8000-000000000010",
+   "skooppi": "scopes siirto automaattisiirto",
+   "tila": "idle",
+   "kysely": false,
+   "konteksti": {
+    "tokenit": 111240,
+    "aika": "2026-10-19T12:46:37.015Z"
+   },
+   "pysahdys": "2026-10-19T12:46:37.015Z",
+   "pakattu": false,
+   "hereilla": true,
+   "ladatut": null,
+   "transkripti": "-home-user-palvelin/00000000-0000-4000-8000-000000000010.jsonl",
+   "alkoi": "2026-10-19T10:00:10.000Z",
+   "ruutu": "%110"
+  },
+  {
+   "istunto": "00000000-0000-4000-8000-000000000011",
+   "skooppi": "scopes test1",
+   "tila": "idle",
+   "kysely": false,
+   "konteksti": null,
+   "pysahdys": "2026-10-19T11:07:10.000Z",
+   "pakattu": false,
+   "hereilla": true,
+   "ladatut": null,
+   "transkripti": "-home-user-palvelin/00000000-0000-4000-8000-000000000011.jsonl",
+   "alkoi": "2026-10-19T10:00:11.000Z",
+   "ruutu": "%111"
+  },
+  {
+   "istunto": "00000000-0000-4000-8000-000000000012",
+   "skooppi": "scopes istunnot mallit",
+   "tila": "idle",
+   "kysely": false,
+   "konteksti": {
+    "tokenit": 156064,
+    "aika": "2026-10-18T14:49:49.899Z"
+   },
+   "pysahdys": "2026-10-18T14:49:49.899Z",
+   "pakattu": false,
+   "hereilla": true,
+   "ladatut": null,
+   "transkripti": "-home-user-palvelin/00000000-0000-4000-8000-000000000012.jsonl",
+   "alkoi": "2026-10-19T10:00:12.000Z",
+   "ruutu": "%112"
+  },
+  {
+   "istunto": "00000000-0000-4000-8000-000000000013",
+   "skooppi": "scopes istunnot test",
+   "tila": "idle",
+   "kysely": false,
+   "konteksti": null,
+   "pysahdys": "2026-10-19T13:12:25.870Z",
+   "pakattu": false,
+   "hereilla": true,
+   "ladatut": null,
+   "transkripti": "-home-user-palvelin/00000000-0000-4000-8000-000000000013.jsonl",
+   "alkoi": "2026-10-19T10:00:13.000Z",
+   "ruutu": "%113"
+  },
+  {
+   "istunto": "00000000-0000-4000-8000-000000000014",
+   "skooppi": "scopes siirto git korjaus1",
+   "tila": "idle",
+   "kysely": false,
+   "konteksti": null,
+   "pysahdys": "2026-10-19T13:07:11.070Z",
+   "pakattu": false,
+   "hereilla": true,
+   "ladatut": null,
+   "transkripti": "-home-user-palvelin/00000000-0000-4000-8000-000000000014.jsonl",
+   "alkoi": "2026-10-19T10:00:14.000Z",
+   "ruutu": "%114"
+  },
+  {
+   "istunto": "00000000-0000-4000-8000-000000000015",
+   "skooppi": "scopes agents",
+   "tila": "idle",
+   "kysely": false,
+   "konteksti": {
+    "tokenit": 277695,
+    "aika": "2026-10-19T13:12:25.057Z"
+   },
+   "pysahdys": "2026-10-19T13:12:25.057Z",
+   "pakattu": false,
+   "hereilla": true,
+   "ladatut": null,
+   "transkripti": "-home-user-palvelin/00000000-0000-4000-8000-000000000015.jsonl",
+   "alkoi": "2026-10-19T10:00:15.000Z",
+   "ruutu": "%115"
+  },
+  {
+   "istunto": "00000000-0000-4000-8000-000000000016",
+   "skooppi": "scopes2 ydin",
+   "tila": "busy",
+   "kysely": false,
+   "konteksti": {
+    "tokenit": 108844,
+    "aika": "2026-10-19T13:14:47.731Z"
+   },
+   "pysahdys": "2026-10-19T13:14:47.731Z",
+   "pakattu": false,
+   "hereilla": true,
+   "ladatut": null,
+   "transkripti": "-home-user-palvelin/00000000-0000-4000-8000-000000000016.jsonl",
+   "alkoi": "2026-10-19T10:00:16.000Z",
+   "ruutu": "%116"
+  },
+  {
+   "istunto": "00000000-0000-4000-8000-000000000017",
+   "skooppi": "scopes2 adapteri",
+   "tila": "idle",
+   "kysely": false,
+   "konteksti": {
+    "tokenit": 150550,
+    "aika": "2026-10-19T13:09:22.904Z"
+   },
+   "pysahdys": "2026-10-19T13:09:22.904Z",
+   "pakattu": false,
+   "hereilla": true,
+   "ladatut": null,
+   "transkripti": "-home-user-palvelin/00000000-0000-4000-8000-000000000017.jsonl",
+   "alkoi": "2026-10-19T10:00:17.000Z",
+   "ruutu": "%117"
+  },
+  {
+   "istunto": "28f5f18b-5ca1-41d3-9ebd-680e09cfd7bd",
+   "skooppi": "scopes macos",
+   "tila": "idle",
+   "kysely": false,
+   "konteksti": {
+    "tokenit": 103176,
+    "aika": "2026-10-19T13:14:21.597Z"
+   },
+   "pysahdys": "2026-10-19T13:14:21.597Z",
+   "pakattu": false,
+   "hereilla": true,
+   "ladatut": null,
+   "transkripti": "-home-user-palvelin/28f5f18b-5ca1-41d3-9ebd-680e09cfd7bd.jsonl",
+   "alkoi": "2026-10-19T12:37:23.688Z",
+   "ruutu": "%382"
+  }
+ ]
+}

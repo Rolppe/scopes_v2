@@ -12,7 +12,21 @@ let package = Package(
     ],
     dependencies: [],
     targets: [
-        .target(name: "ScopesCore2", dependencies: []),
-        .testTarget(name: "ScopesCore2Tests", dependencies: ["ScopesCore2"])
+        // Ydin äpin sisällä (S-8a): XCFramework tulee portista (T-46, ydin/apple/rakenna-xcframework.sh).
+        .binaryTarget(name: "ScopesSolmu", path: "../../ydin/apple/ScopesSolmu.xcframework"),
+        .target(
+            name: "ScopesCore2",
+            dependencies: ["ScopesSolmu"],
+            linkerSettings: [
+                .linkedFramework("Security"),
+                .linkedFramework("SystemConfiguration"),
+                .linkedLibrary("resolv")
+            ]
+        ),
+        .testTarget(
+            name: "ScopesCore2Tests",
+            dependencies: ["ScopesCore2"],
+            resources: [.copy("fixture")]
+        )
     ]
 )
