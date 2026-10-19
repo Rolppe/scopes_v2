@@ -31,7 +31,7 @@ T-52 + `shared/testit/kaksi-laitetta.sh`. Exit 0 vihreä, 1 tuntematon ID/testi 
   `scopes2/shared/ scopes2/ios/ scopes2/macos/`, ulkopuolinen → exit 2). Huom: aita huomaa myös muiden keskustelujen
   samaan aikaan tekemät muutokset koko puussa; punainen exit 2 muualta tulleesta rivistä vaatii uusinta-ajon.
 - Yksi Mac-ajo kerrallaan: `flock /tmp/scopes2-apple-mac.lock` (odotus 15 min).
-- Siirto: tar ssh:n yli Macin `~/scopes2-rakennus`-hakemistoon (`ydin` mukaan vain T-46...T-52; T-45 jättää sen pois).
+- Siirto: tar ssh:n yli Macin `~/scopes2-rakennus`-hakemistoon (`ydin` mukana kaikissa tapauksissa; Mac-lukko estää päällekkäisen rakennuksen). **Poikkeama T-45-G:stä (19.10.2026, koordinaattorin päätös):** T-45 siirtää ydinlähteet ja ajaa XCFramework-vaiheen (rakennetaan, jos puuttuu tai ydin/src on uudempi), koska ScopesUI2 → ScopesCore2 linkittää XCFrameworkin eikä T-45 muuten rakennu tuoreella Macilla.
   Ennen purkua poistetaan Macilta `shared/ScopesCore2`, `shared/ScopesUI2`, `ios|macos/Sources` ja `UITests`;
   `ydin/target` säilyy. Darwinilla portti ajaa suoraan ilman ssh:ta ja siirtoa.
 - Mac-ympäristö: `PATH=$HOME/.cargo/bin:/opt/homebrew/bin:$PATH`, `DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer`.
@@ -53,4 +53,4 @@ T-52 + `shared/testit/kaksi-laitetta.sh`. Exit 0 vihreä, 1 tuntematon ID/testi 
 
 ## LuLu-havainto (P-14, H-7 käyttäjälle)
 
-19.10.2026: ei havaintoa. macOS-äpin UI-testi ei päässyt käyntiin (Developer-tila pois), joten LuLu-kehotetta ei voitu todeta; portti tulostaa havainnon (`LULU: ...`) macOS-UI-testin jälkeen.
+19.10.2026 (T-45 vihreä, Developer mode päällä): macOS UI-testin aikaiset LuLu-lokirivit olivat vain AppKit/FrontBoard-tilarivejä (status item, TouchBar), ei hälytys- tai kehoteriviä; kehotteen ilmestymistä ei voi lokista varmasti sulkea pois, joten H-7 jää käyttäjälle. Portti tulostaa havainnon (`LULU: ...`) macOS-UI-testin jälkeen; se käyttää `/usr/bin/log`ia, koska zsh:n `log` on sisäänrakennettu komento.
