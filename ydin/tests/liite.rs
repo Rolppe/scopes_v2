@@ -1,5 +1,8 @@
-//! Liitteet ytimen reitillä (T-50, S-8b): oikeat `scopes-solmu`-prosessit portissa 18797 (ja 18798
-//! vertaiskokeessa), eivät tuotantoportteja. Testit ottavat yhteisen lukon. `Solmu`-vartija tappaa
+//! Liitteet ytimen reitillä (T-50, S-8b): oikeat `scopes-solmu`-prosessit käyttöjärjestelmän
+//! antamissa vapaissa porteissa (`vapaa_portti`), eivät tuotantoportteissa eivätkä kiinteissä
+//! koeporteissa 18797/18798, joita muut portit (shared/gate.sh, adapteri/gate.sh, tila_kaksi_solmua)
+//! käyttävät: vieras solmu kiinteässä portissa vastasi terveyskyselyyn ja työnnön PUT sai 401 → 503
+//! (T-50 ajo 2). Testit ottavat yhteisen lukon. `Solmu`-vartija tappaa
 //! prosessin myös paniikissa (SIGCONT ei tarvita, SIGKILL toimii pysäytetylle).
 
 use serde_json::{json, Value};
@@ -9,8 +12,6 @@ use std::process::{Child, Command, Stdio};
 use std::time::{Duration, Instant};
 use tokio::sync::Mutex;
 
-const PORTTI_A: u16 = 18797;
-const PORTTI_B: u16 = 18798;
 const AVAIN: &str = "koeavain-liite";
 static LUKKO: Mutex<()> = Mutex::const_new(());
 
@@ -38,13 +39,27 @@ impl Drop for Tmp {
     }
 }
 
+/// Vapaa paikallinen portti (sidotaan porttiin 0 ja vapautetaan). Kiinteät koeportit 18797/18798
+/// ovat muiden porttien käytössä, joten ne eivät kelpaa.
+fn vapaa_portti() -> u16 {
+    std::net::TcpListener::bind("127.0.0.1:0")
+        .expect("vapaan portin varaus")
+        .local_addr()
+        .unwrap()
+        .port()
+}
+
 struct Solmu {
     lapsi: Child,
     data: PathBuf,
+    portti: u16,
+    /// Solmun stderr; rivi "kuuntelee" todistaa, että juuri tämä prosessi sai portin.
+    loki: PathBuf,
 }
 
 impl Solmu {
     fn kaynnista(portti: u16, data: &Path, avain: &Path, vertaiset: &[u16]) -> Solmu {
+        let loki = data.with_extension("loki");
         let mut komento = Command::new(env!("CARGO_BIN_EXE_scopes-solmu"));
         komento
             .arg("--portti")
@@ -56,7 +71,9 @@ impl Solmu {
             .env("SCOPES_LAITE", format!("koe-{portti}"))
             .stdin(Stdio::null())
             .stdout(Stdio::null())
-            .stderr(Stdio::null());
+            .stderr(Stdio::from(
+                std::fs::File::create(&loki).expect("solmun lokitiedosto"),
+            ));
         for v in vertaiset {
             komento
                 .arg("--vertainen")
@@ -66,6 +83,8 @@ impl Solmu {
         Solmu {
             lapsi,
             data: data.to_path_buf(),
+            portti,
+            loki,
         }
     }
 
@@ -95,12 +114,23 @@ fn osoite(portti: u16, polku: &str) -> String {
     format!("http://127.0.0.1:{portti}{polku}")
 }
 
-async fn odota_valmiiksi(http: &reqwest::Client, portti: u16) {
+/// Odottaa, että juuri tämä käynnistetty solmu vastaa terveyskyselyyn. Terveyttä kysytään vasta,
+/// kun oma prosessi on ilmoittanut sitoneensa portin; jos se päättyy (esim. portti varattu),
+/// toisen prosessin vastausta samasta portista ei hyväksytä.
+async fn odota_valmiiksi(http: &reqwest::Client, solmu: &mut Solmu) {
+    let portti = solmu.portti;
     let raja = Instant::now() + Duration::from_secs(20);
     loop {
-        if let Ok(v) = http.get(osoite(portti, "/api/terveys")).send().await {
-            if v.status().is_success() {
-                return;
+        if let Some(tila) = solmu.lapsi.try_wait().expect("try_wait") {
+            panic!("solmu {portti} päättyi ennen valmistumista: {tila}");
+        }
+        let sidottu = std::fs::read_to_string(&solmu.loki)
+            .is_ok_and(|t| t.contains(&format!("kuuntelee 127.0.0.1:{portti}")));
+        if sidottu {
+            if let Ok(v) = http.get(osoite(portti, "/api/terveys")).send().await {
+                if v.status().is_success() {
+                    return;
+                }
             }
         }
         assert!(
@@ -121,12 +151,12 @@ fn sha(tavut: &[u8]) -> String {
 /// Yksi solmu ilman vertaisia.
 async fn yksi(nimi: &str) -> (Tmp, Solmu, reqwest::Client) {
     let tmp = Tmp::uusi(nimi);
-    let solmu = Solmu::kaynnista(PORTTI_A, &tmp.0.join("a"), &tmp.avain(), &[]);
+    let mut solmu = Solmu::kaynnista(vapaa_portti(), &tmp.0.join("a"), &tmp.avain(), &[]);
     let http = reqwest::Client::builder()
         .timeout(Duration::from_secs(90))
         .build()
         .unwrap();
-    odota_valmiiksi(&http, PORTTI_A).await;
+    odota_valmiiksi(&http, &mut solmu).await;
     (tmp, solmu, http)
 }
 
@@ -152,19 +182,19 @@ async fn a_yksi_solmu_ilman_vertaisia() {
     let (_tmp, a, http) = yksi("a").await;
     let tavut = b"liitteen sisalto \x00\x01\x02".to_vec();
     let h = sha(&tavut);
-    let v = laheta(&http, PORTTI_A, "koe", "kuva.png", tavut.clone()).await;
+    let v = laheta(&http, a.portti, "koe", "kuva.png", tavut.clone()).await;
     assert_eq!(v.status(), 200);
     let j: Value = v.json().await.unwrap();
     let odotettu = a.data().join("liitteet").join(&h).join("kuva.png");
     assert_eq!(j["polku"], odotettu.to_string_lossy().as_ref());
     assert_eq!(j["koko"], tavut.len());
     assert_eq!(j["sha256"], h.as_str());
-    assert_eq!(j["solmu"], "koe-18797");
+    assert_eq!(j["solmu"], format!("koe-{}", a.portti).as_str());
     assert_eq!(std::fs::read(&odotettu).unwrap(), tavut);
     assert_eq!(sha(&std::fs::read(&odotettu).unwrap()), h);
     // yksikkö liitteet/<sha>
     let y: Value = http
-        .get(osoite(PORTTI_A, "/api/tiiviste?polku=liitteet"))
+        .get(osoite(a.portti, "/api/tiiviste?polku=liitteet"))
         .bearer_auth(AVAIN)
         .send()
         .await
@@ -198,7 +228,7 @@ async fn a_yksi_solmu_ilman_vertaisia() {
         .unwrap();
     assert_eq!(koko as usize, tavut.len());
     // toinen lähetys samoista tavuista: sama polku
-    let v2 = laheta(&http, PORTTI_A, "koe", "kuva.png", tavut).await;
+    let v2 = laheta(&http, a.portti, "koe", "kuva.png", tavut).await;
     assert_eq!(v2.status(), 200);
     let j2: Value = v2.json().await.unwrap();
     assert_eq!(j2["polku"], j["polku"]);
@@ -207,10 +237,10 @@ async fn a_yksi_solmu_ilman_vertaisia() {
 #[tokio::test]
 async fn b_liian_suuri_413() {
     let _vuoro = LUKKO.lock().await;
-    let (_tmp, _a, http) = yksi("b").await;
+    let (_tmp, a, http) = yksi("b").await;
     let v = laheta(
         &http,
-        PORTTI_A,
+        a.portti,
         "koe",
         "iso.bin",
         vec![7u8; 25 * 1024 * 1024 + 1],
@@ -222,7 +252,7 @@ async fn b_liian_suuri_413() {
     // raja itse menee läpi
     let v = laheta(
         &http,
-        PORTTI_A,
+        a.portti,
         "koe",
         "raja.bin",
         vec![7u8; 25 * 1024 * 1024],
@@ -237,7 +267,7 @@ async fn c_nimi_ei_karkaa_hakemistosta() {
     let (_tmp, a, http) = yksi("c").await;
     let tavut = b"salaisuus".to_vec();
     let h = sha(&tavut);
-    let v = laheta(&http, PORTTI_A, "koe", "../../x", tavut.clone()).await;
+    let v = laheta(&http, a.portti, "koe", "../../x", tavut.clone()).await;
     assert_eq!(v.status(), 200);
     let j: Value = v.json().await.unwrap();
     let polku = PathBuf::from(j["polku"].as_str().unwrap());
@@ -248,7 +278,7 @@ async fn c_nimi_ei_karkaa_hakemistosta() {
     assert!(!a.data().parent().unwrap().join("x").exists());
     // tyhjä, "." ja ".." → "liite"
     for nimi in ["", ".", ".."] {
-        let v = laheta(&http, PORTTI_A, "koe", nimi, b"y".to_vec()).await;
+        let v = laheta(&http, a.portti, "koe", nimi, b"y".to_vec()).await;
         let j: Value = v.json().await.unwrap();
         assert!(
             j["polku"].as_str().unwrap().ends_with("/liite"),
@@ -263,7 +293,7 @@ async fn d_put_vaaralla_tiivisteella_422() {
     let (_tmp, a, http) = yksi("d").await;
     let vaara = sha(b"jotain muuta");
     let v = http
-        .put(osoite(PORTTI_A, &format!("/api/liitteet/{vaara}")))
+        .put(osoite(a.portti, &format!("/api/liitteet/{vaara}")))
         .query(&[("nimi", "a.txt")])
         .bearer_auth(AVAIN)
         .body("tavut")
@@ -279,7 +309,7 @@ async fn d_put_vaaralla_tiivisteella_422() {
     let mut polut = vec![];
     for _ in 0..2 {
         let v = http
-            .put(osoite(PORTTI_A, &format!("/api/liitteet/{oikea}")))
+            .put(osoite(a.portti, &format!("/api/liitteet/{oikea}")))
             .query(&[("nimi", "a.txt")])
             .bearer_auth(AVAIN)
             .body("tavut")
@@ -298,12 +328,12 @@ async fn d_put_vaaralla_tiivisteella_422() {
 #[tokio::test]
 async fn e_get_liite() {
     let _vuoro = LUKKO.lock().await;
-    let (_tmp, _a, http) = yksi("e").await;
+    let (_tmp, a, http) = yksi("e").await;
     let tavut = b"hello liite".to_vec();
     let h = sha(&tavut);
-    laheta(&http, PORTTI_A, "koe", "viesti.txt", tavut.clone()).await;
+    laheta(&http, a.portti, "koe", "viesti.txt", tavut.clone()).await;
     let v = http
-        .get(osoite(PORTTI_A, &format!("/api/liite/{h}")))
+        .get(osoite(a.portti, &format!("/api/liite/{h}")))
         .bearer_auth(AVAIN)
         .send()
         .await
@@ -312,7 +342,7 @@ async fn e_get_liite() {
     assert_eq!(v.headers()["content-type"].to_str().unwrap(), "text/plain");
     assert_eq!(v.bytes().await.unwrap().to_vec(), tavut);
     let v = http
-        .get(osoite(PORTTI_A, &format!("/api/liite/{}", sha(b"ei ole"))))
+        .get(osoite(a.portti, &format!("/api/liite/{}", sha(b"ei ole"))))
         .bearer_auth(AVAIN)
         .send()
         .await
@@ -327,23 +357,25 @@ async fn f_kaksi_solmua_tyonto_ja_vertaisvika() {
     let _vuoro = LUKKO.lock().await;
     let tmp = Tmp::uusi("f");
     let avain = tmp.avain();
-    let a = Solmu::kaynnista(PORTTI_A, &tmp.0.join("a"), &avain, &[PORTTI_B]);
-    let b = Solmu::kaynnista(PORTTI_B, &tmp.0.join("b"), &avain, &[]);
+    let (porttia, porttib) = (vapaa_portti(), vapaa_portti());
+    assert_ne!(porttia, porttib);
+    let mut a = Solmu::kaynnista(porttia, &tmp.0.join("a"), &avain, &[porttib]);
+    let mut b = Solmu::kaynnista(porttib, &tmp.0.join("b"), &avain, &[]);
     let http = reqwest::Client::builder()
         .timeout(Duration::from_secs(100))
         .build()
         .unwrap();
-    odota_valmiiksi(&http, PORTTI_A).await;
-    odota_valmiiksi(&http, PORTTI_B).await;
+    odota_valmiiksi(&http, &mut a).await;
+    odota_valmiiksi(&http, &mut b).await;
 
     let tavut = b"A:lta B:lle".to_vec();
     let h = sha(&tavut);
-    let v = laheta(&http, PORTTI_A, "koe", "siirto.txt", tavut.clone()).await;
+    let v = laheta(&http, porttia, "koe", "siirto.txt", tavut.clone()).await;
     assert_eq!(v.status(), 200);
     let j: Value = v.json().await.unwrap();
     let b_polku = b.data().join("liitteet").join(&h).join("siirto.txt");
     assert_eq!(j["polku"], b_polku.to_string_lossy().as_ref());
-    assert_eq!(j["solmu"], "koe-18798");
+    assert_eq!(j["solmu"], format!("koe-{porttib}").as_str());
     assert_eq!(j["sha256"], h.as_str());
     assert_eq!(sha(&std::fs::read(&b_polku).unwrap()), h);
     // A:lla on paikallinen kopio myös
@@ -359,14 +391,14 @@ async fn f_kaksi_solmua_tyonto_ja_vertaisvika() {
     let tavut2 = b"B on jumissa".to_vec();
     let h2 = sha(&tavut2);
     let alku = Instant::now();
-    let v = laheta(&http, PORTTI_A, "koe", "jumi.txt", tavut2.clone()).await;
+    let v = laheta(&http, porttia, "koe", "jumi.txt", tavut2.clone()).await;
     let kulunut = alku.elapsed();
     b.signaali("CONT");
     assert_eq!(v.status(), 503);
     let j: Value = v.json().await.unwrap();
     assert_eq!(
         j,
-        json!({"virhe": "vertainen", "kohde": format!("http://127.0.0.1:{PORTTI_B}/api/liitteet/{h2}")})
+        json!({"virhe": "vertainen", "kohde": format!("http://127.0.0.1:{porttib}/api/liitteet/{h2}")})
     );
     assert!(kulunut >= Duration::from_secs(55), "{kulunut:?}");
     let paikallinen = a.data().join("liitteet").join(&h2).join("jumi.txt");
@@ -376,9 +408,9 @@ async fn f_kaksi_solmua_tyonto_ja_vertaisvika() {
 #[tokio::test]
 async fn g_ilman_avainta_401() {
     let _vuoro = LUKKO.lock().await;
-    let (_tmp, _a, http) = yksi("g").await;
+    let (_tmp, a, http) = yksi("g").await;
     let v = http
-        .post(osoite(PORTTI_A, "/api/skoopit/koe/liite"))
+        .post(osoite(a.portti, "/api/skoopit/koe/liite"))
         .query(&[("nimi", "x.txt")])
         .body("x")
         .send()
@@ -386,16 +418,43 @@ async fn g_ilman_avainta_401() {
         .unwrap();
     assert_eq!(v.status(), 401);
     let v = http
-        .put(osoite(PORTTI_A, &format!("/api/liitteet/{}", sha(b"x"))))
+        .put(osoite(a.portti, &format!("/api/liitteet/{}", sha(b"x"))))
         .body("x")
         .send()
         .await
         .unwrap();
     assert_eq!(v.status(), 401);
     let v = http
-        .get(osoite(PORTTI_A, &format!("/api/liite/{}", sha(b"x"))))
+        .get(osoite(a.portti, &format!("/api/liite/{}", sha(b"x"))))
         .send()
         .await
         .unwrap();
     assert_eq!(v.status(), 401);
+}
+
+/// Regressio (T-50 ajo 2): vieras prosessi vastaa samasta portista terveyskyselyyn, mutta oma
+/// solmu ei saa porttia ja päättyy. Valmiuden odotus ei saa hyväksyä vierasta vastausta.
+#[tokio::test]
+#[should_panic(expected = "päättyi ennen valmistumista")]
+async fn h_varattu_portti_ei_mene_valmiista() {
+    use std::io::{Read, Write};
+    let _vuoro = LUKKO.lock().await;
+    let vieras = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+    let portti = vieras.local_addr().unwrap().port();
+    std::thread::spawn(move || {
+        for yhteys in vieras.incoming().flatten() {
+            let mut yhteys = yhteys;
+            let mut puskuri = [0u8; 1024];
+            let _ = yhteys.read(&mut puskuri);
+            let _ = yhteys
+                .write_all(b"HTTP/1.1 200 OK\r\ncontent-length: 0\r\nconnection: close\r\n\r\n");
+        }
+    });
+    let tmp = Tmp::uusi("h");
+    let mut solmu = Solmu::kaynnista(portti, &tmp.0.join("a"), &tmp.avain(), &[]);
+    let http = reqwest::Client::builder()
+        .timeout(Duration::from_secs(10))
+        .build()
+        .unwrap();
+    odota_valmiiksi(&http, &mut solmu).await;
 }
