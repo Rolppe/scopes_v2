@@ -1,0 +1,418 @@
+{
+  "yksikot": [
+    {
+      "id": "oneplus-005342",
+      "rekisteri": "scopes/testit/REKISTERI.md",
+      "laji": "otsikko",
+      "osio": "",
+      "jarjestys": "1m",
+      "sisalto": "# scopes/testit/REKISTERI.md\n\n",
+      "versio": {
+        "oneplus": 5342
+      },
+      "muutettu": "2026-10-14T13:48:46.822Z",
+      "muuttaja": "oneplus",
+      "poistettu": false,
+      "lahdeSisalto": "# scopes/testit/REKISTERI.md\n\n",
+      "lahdeVersio": {
+        "oneplus": 5342
+      }
+    },
+    {
+      "id": "oneplus-005343",
+      "rekisteri": "scopes/testit/REKISTERI.md",
+      "laji": "tilanne",
+      "osio": "",
+      "jarjestys": "39",
+      "sisalto": "Tilanne: 13.10.2026\n\n",
+      "versio": {
+        "oneplus": 5343
+      },
+      "muutettu": "2026-10-14T13:48:46.822Z",
+      "muuttaja": "oneplus",
+      "poistettu": false,
+      "lahdeSisalto": "Tilanne: 13.10.2026\n\n",
+      "lahdeVersio": {
+        "oneplus": 5343
+      }
+    },
+    {
+      "id": "oneplus-005344",
+      "rekisteri": "scopes/testit/REKISTERI.md",
+      "laji": "seuraava",
+      "osio": "",
+      "jarjestys": "4w",
+      "sisalto": "SEURAAVA PAKETTI: ei mitään — skooppi luotu 13.10.2026 tarkoituksineen jakamalla `scopes`; ei avointa työtä\n\n",
+      "versio": {
+        "oneplus": 5344
+      },
+      "muutettu": "2026-10-14T13:48:46.822Z",
+      "muuttaja": "oneplus",
+      "poistettu": false,
+      "lahdeSisalto": "SEURAAVA PAKETTI: ei mitään — skooppi luotu 13.10.2026 tarkoituksineen jakamalla `scopes`; ei avointa työtä\n\n",
+      "lahdeVersio": {
+        "oneplus": 5344
+      }
+    },
+    {
+      "id": "oneplus-005345",
+      "rekisteri": "scopes/testit/REKISTERI.md",
+      "laji": "osio",
+      "osio": "Tarkoitus ja raja",
+      "jarjestys": "6j",
+      "sisalto": "## Tarkoitus ja raja\n\n",
+      "versio": {
+        "oneplus": 5345
+      },
+      "muutettu": "2026-10-14T13:48:46.822Z",
+      "muuttaja": "oneplus",
+      "poistettu": false,
+      "lahdeSisalto": "## Tarkoitus ja raja\n\n",
+      "lahdeVersio": {
+        "oneplus": 5345
+      }
+    },
+    {
+      "id": "oneplus-005346",
+      "rekisteri": "scopes/testit/REKISTERI.md",
+      "laji": "tarkoitus",
+      "osio": "Tarkoitus ja raja",
+      "jarjestys": "86",
+      "sisalto": "Testit: UI-testit simulaattorissa (UITests, testi.sh)\n\n",
+      "versio": {
+        "oneplus": 5346
+      },
+      "muutettu": "2026-10-14T13:48:46.822Z",
+      "muuttaja": "oneplus",
+      "poistettu": false,
+      "lahdeSisalto": "Testit: UI-testit simulaattorissa (UITests, testi.sh)\n\n",
+      "lahdeVersio": {
+        "oneplus": 5346
+      }
+    },
+    {
+      "id": "oneplus-005347",
+      "rekisteri": "scopes/testit/REKISTERI.md",
+      "laji": "osio",
+      "osio": "Päätökset",
+      "jarjestys": "9t",
+      "sisalto": "## Päätökset\n\n",
+      "versio": {
+        "oneplus": 5347
+      },
+      "muutettu": "2026-10-14T13:48:46.822Z",
+      "muuttaja": "oneplus",
+      "poistettu": false,
+      "lahdeSisalto": "## Päätökset\n\n",
+      "lahdeVersio": {
+        "oneplus": 5347
+      }
+    },
+    {
+      "id": "oneplus-005348",
+      "rekisteri": "scopes/testit/REKISTERI.md",
+      "laji": "paatos",
+      "osio": "Päätökset",
+      "jarjestys": "bg",
+      "sisalto": "- **Käyttäjä 13.10.2026:** skooppi `scopes testit` luotiin jakamalla `scopes` ominaisuuksittain (luo-skooppi.mjs `scopes testit`.\n\n",
+      "versio": {
+        "oneplus": 5348
+      },
+      "muutettu": "2026-10-14T13:48:46.822Z",
+      "muuttaja": "oneplus",
+      "poistettu": false,
+      "lahdeSisalto": "- **Käyttäjä 13.10.2026:** skooppi `scopes testit` luotiin jakamalla `scopes` ominaisuuksittain (luo-skooppi.mjs `scopes testit`.\n\n",
+      "lahdeVersio": {
+        "oneplus": 5348
+      }
+    },
+    {
+      "id": "oneplus-005349",
+      "rekisteri": "scopes/testit/REKISTERI.md",
+      "laji": "osio",
+      "osio": "Avoimet asiat",
+      "jarjestys": "d3",
+      "sisalto": "## Avoimet asiat\n\n",
+      "versio": {
+        "oneplus": 5349
+      },
+      "muutettu": "2026-10-14T13:48:46.822Z",
+      "muuttaja": "oneplus",
+      "poistettu": false,
+      "lahdeSisalto": "## Avoimet asiat\n\n",
+      "lahdeVersio": {
+        "oneplus": 5349
+      }
+    },
+    {
+      "id": "oneplus-005350",
+      "rekisteri": "scopes/testit/REKISTERI.md",
+      "laji": "taulukko-otsake",
+      "osio": "Avoimet asiat",
+      "jarjestys": "eq",
+      "sisalto": "| Asia | Tila | Seuraava askel |\n|---|---|---|\n\n",
+      "versio": {
+        "oneplus": 5350
+      },
+      "muutettu": "2026-10-14T13:48:46.822Z",
+      "muuttaja": "oneplus",
+      "poistettu": false,
+      "lahdeSisalto": "| Asia | Tila | Seuraava askel |\n|---|---|---|\n\n",
+      "lahdeVersio": {
+        "oneplus": 5350
+      }
+    },
+    {
+      "id": "oneplus-005351",
+      "rekisteri": "scopes/testit/REKISTERI.md",
+      "laji": "osio",
+      "osio": "Viat",
+      "jarjestys": "gd",
+      "sisalto": "## Viat\n\n",
+      "versio": {
+        "oneplus": 5351
+      },
+      "muutettu": "2026-10-14T13:48:46.822Z",
+      "muuttaja": "oneplus",
+      "poistettu": false,
+      "lahdeSisalto": "## Viat\n\n",
+      "lahdeVersio": {
+        "oneplus": 5351
+      }
+    },
+    {
+      "id": "oneplus-005352",
+      "rekisteri": "scopes/testit/REKISTERI.md",
+      "laji": "taulukko-otsake",
+      "osio": "Viat",
+      "jarjestys": "i",
+      "sisalto": "| Vika | Tila |\n|---|---|\n",
+      "versio": {
+        "oneplus": 5352
+      },
+      "muutettu": "2026-10-14T13:48:46.822Z",
+      "muuttaja": "oneplus",
+      "poistettu": false,
+      "lahdeSisalto": "| Vika | Tila |\n|---|---|\n",
+      "lahdeVersio": {
+        "oneplus": 5352
+      }
+    },
+    {
+      "id": "oneplus-005353",
+      "rekisteri": "scopes/testit/REKISTERI.md",
+      "laji": "vika",
+      "osio": "Viat",
+      "jarjestys": "jm",
+      "sisalto": "| V-273 → scopes viat | tiedoksi |\n",
+      "versio": {
+        "oneplus": 5353
+      },
+      "muutettu": "2026-10-14T13:48:46.822Z",
+      "muuttaja": "oneplus",
+      "poistettu": false,
+      "lahdeSisalto": "| V-273 → scopes viat | tiedoksi |\n",
+      "lahdeVersio": {
+        "oneplus": 5353
+      }
+    },
+    {
+      "id": "oneplus-005354",
+      "rekisteri": "scopes/testit/REKISTERI.md",
+      "laji": "vika",
+      "osio": "Viat",
+      "jarjestys": "l9",
+      "sisalto": "| V-274 → scopes viat | tiedoksi |\n",
+      "versio": {
+        "oneplus": 5354
+      },
+      "muutettu": "2026-10-14T13:48:46.822Z",
+      "muuttaja": "oneplus",
+      "poistettu": false,
+      "lahdeSisalto": "| V-274 → scopes viat | tiedoksi |\n",
+      "lahdeVersio": {
+        "oneplus": 5354
+      }
+    },
+    {
+      "id": "oneplus-005355",
+      "rekisteri": "scopes/testit/REKISTERI.md",
+      "laji": "vika",
+      "osio": "Viat",
+      "jarjestys": "mw",
+      "sisalto": "| V-278 → scopes viat | tiedoksi |\n",
+      "versio": {
+        "oneplus": 5355
+      },
+      "muutettu": "2026-10-14T13:48:46.822Z",
+      "muuttaja": "oneplus",
+      "poistettu": false,
+      "lahdeSisalto": "| V-278 → scopes viat | tiedoksi |\n",
+      "lahdeVersio": {
+        "oneplus": 5355
+      }
+    },
+    {
+      "id": "oneplus-005356",
+      "rekisteri": "scopes/testit/REKISTERI.md",
+      "laji": "vika",
+      "osio": "Viat",
+      "jarjestys": "oj",
+      "sisalto": "| V-280 → scopes viat | tiedoksi |\n",
+      "versio": {
+        "oneplus": 5356
+      },
+      "muutettu": "2026-10-14T13:48:46.822Z",
+      "muuttaja": "oneplus",
+      "poistettu": false,
+      "lahdeSisalto": "| V-280 → scopes viat | tiedoksi |\n",
+      "lahdeVersio": {
+        "oneplus": 5356
+      }
+    },
+    {
+      "id": "oneplus-005357",
+      "rekisteri": "scopes/testit/REKISTERI.md",
+      "laji": "vika",
+      "osio": "Viat",
+      "jarjestys": "q6",
+      "sisalto": "| V-283 → scopes viat | tiedoksi |\n",
+      "versio": {
+        "oneplus": 5357
+      },
+      "muutettu": "2026-10-14T13:48:46.822Z",
+      "muuttaja": "oneplus",
+      "poistettu": false,
+      "lahdeSisalto": "| V-283 → scopes viat | tiedoksi |\n",
+      "lahdeVersio": {
+        "oneplus": 5357
+      }
+    },
+    {
+      "id": "oneplus-005358",
+      "rekisteri": "scopes/testit/REKISTERI.md",
+      "laji": "vika",
+      "osio": "Viat",
+      "jarjestys": "rt",
+      "sisalto": "| V-285 → scopes viat | avoin |\n",
+      "versio": {
+        "oneplus": 5358
+      },
+      "muutettu": "2026-10-14T13:48:46.822Z",
+      "muuttaja": "oneplus",
+      "poistettu": false,
+      "lahdeSisalto": "| V-285 → scopes viat | avoin |\n",
+      "lahdeVersio": {
+        "oneplus": 5358
+      }
+    },
+    {
+      "id": "oneplus-005359",
+      "rekisteri": "scopes/testit/REKISTERI.md",
+      "laji": "vika",
+      "osio": "Viat",
+      "jarjestys": "tg",
+      "sisalto": "| V-297 → scopes viat | tiedoksi |\n",
+      "versio": {
+        "oneplus": 5359
+      },
+      "muutettu": "2026-10-14T13:48:46.822Z",
+      "muuttaja": "oneplus",
+      "poistettu": false,
+      "lahdeSisalto": "| V-297 → scopes viat | tiedoksi |\n",
+      "lahdeVersio": {
+        "oneplus": 5359
+      }
+    },
+    {
+      "id": "oneplus-005360",
+      "rekisteri": "scopes/testit/REKISTERI.md",
+      "laji": "vika",
+      "osio": "Viat",
+      "jarjestys": "v3",
+      "sisalto": "| V-292 → scopes viat | tiedoksi |\n",
+      "versio": {
+        "oneplus": 6808
+      },
+      "muutettu": "2026-10-15T16:49:30.107Z",
+      "muuttaja": "oneplus",
+      "poistettu": false,
+      "lahdeSisalto": "| V-292 → scopes viat | tiedoksi |\n",
+      "lahdeVersio": {
+        "oneplus": 6808
+      }
+    },
+    {
+      "id": "oneplus-005361",
+      "rekisteri": "scopes/testit/REKISTERI.md",
+      "laji": "osio",
+      "osio": "Historia",
+      "jarjestys": "wq",
+      "sisalto": "## Historia\n\n",
+      "versio": {
+        "oneplus": 5361
+      },
+      "muutettu": "2026-10-14T13:48:46.822Z",
+      "muuttaja": "oneplus",
+      "poistettu": false,
+      "lahdeSisalto": "## Historia\n\n",
+      "lahdeVersio": {
+        "oneplus": 5361
+      }
+    },
+    {
+      "id": "oneplus-005362",
+      "rekisteri": "scopes/testit/REKISTERI.md",
+      "laji": "kappale",
+      "osio": "Historia",
+      "jarjestys": "yd",
+      "sisalto": "Historia: `scopes/testit/HISTORIA.md` (syntyy ensimmäisessä pakkauksessa), ei lueta purussa.\n",
+      "versio": {
+        "oneplus": 5362
+      },
+      "muutettu": "2026-10-14T13:48:46.822Z",
+      "muuttaja": "oneplus",
+      "poistettu": false,
+      "lahdeSisalto": "Historia: `scopes/testit/HISTORIA.md` (syntyy ensimmäisessä pakkauksessa), ei lueta purussa.\n",
+      "lahdeVersio": {
+        "oneplus": 5362
+      }
+    },
+    {
+      "id": "oneplus-006809",
+      "rekisteri": "scopes/testit/REKISTERI.md",
+      "laji": "vika",
+      "osio": "Viat",
+      "jarjestys": "w",
+      "sisalto": "| V-331 → scopes viat | avoin |\n",
+      "versio": {
+        "oneplus": 6926
+      },
+      "muutettu": "2026-10-15T18:37:13.974Z",
+      "muuttaja": "oneplus",
+      "poistettu": false,
+      "lahdeSisalto": "| V-331 → scopes viat | avoin |\n",
+      "lahdeVersio": {
+        "oneplus": 6926
+      }
+    },
+    {
+      "id": "oneplus-006927",
+      "rekisteri": "scopes/testit/REKISTERI.md",
+      "laji": "vika",
+      "osio": "Viat",
+      "jarjestys": "wd",
+      "sisalto": "| V-489 → scopes viat | avoin |\n\n",
+      "versio": {
+        "oneplus": 6927
+      },
+      "muutettu": "2026-10-15T18:37:13.974Z",
+      "muuttaja": "oneplus",
+      "poistettu": false,
+      "lahdeSisalto": "| V-489 → scopes viat | avoin |\n\n",
+      "lahdeVersio": {
+        "oneplus": 6927
+      }
+    }
+  ]
+}

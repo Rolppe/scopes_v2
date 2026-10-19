@@ -1,0 +1,292 @@
+{
+  "yksikot": [
+    {
+      "id": "oneplus-006461",
+      "rekisteri": "test/REKISTERI.md",
+      "laji": "otsikko",
+      "osio": "",
+      "jarjestys": "2e",
+      "sisalto": "# test/REKISTERI.md\n\n",
+      "versio": {
+        "oneplus": 6461
+      },
+      "muutettu": "2026-10-15T11:21:47.203Z",
+      "muuttaja": "oneplus",
+      "poistettu": false,
+      "lahdeSisalto": "# test/REKISTERI.md\n\n",
+      "lahdeVersio": {
+        "oneplus": 6461
+      }
+    },
+    {
+      "id": "oneplus-006462",
+      "rekisteri": "test/REKISTERI.md",
+      "laji": "tilanne",
+      "osio": "",
+      "jarjestys": "4s",
+      "sisalto": "Tilanne: 15.10.2026\n\n",
+      "versio": {
+        "oneplus": 6462
+      },
+      "muutettu": "2026-10-15T11:21:47.203Z",
+      "muuttaja": "oneplus",
+      "poistettu": false,
+      "lahdeSisalto": "Tilanne: 15.10.2026\n\n",
+      "lahdeVersio": {
+        "oneplus": 6462
+      }
+    },
+    {
+      "id": "oneplus-006463",
+      "rekisteri": "test/REKISTERI.md",
+      "laji": "seuraava",
+      "osio": "",
+      "jarjestys": "77",
+      "sisalto": "SEURAAVA PAKETTI: TEST-MAARITTELY — kirjaa käyttäjän kanssa skoopin tarkoitus, raja ja ensimmäinen työ, ja korvaa tämä rivi ensimmäisellä oikealla paketilla — polut: test/** — aloitus: /pura test\n\n",
+      "versio": {
+        "oneplus": 6463
+      },
+      "muutettu": "2026-10-15T11:21:47.203Z",
+      "muuttaja": "oneplus",
+      "poistettu": false,
+      "lahdeSisalto": "SEURAAVA PAKETTI: TEST-MAARITTELY — kirjaa käyttäjän kanssa skoopin tarkoitus, raja ja ensimmäinen työ, ja korvaa tämä rivi ensimmäisellä oikealla paketilla — polut: test/** — aloitus: /pura test\n\n",
+      "lahdeVersio": {
+        "oneplus": 6463
+      }
+    },
+    {
+      "id": "oneplus-006464",
+      "rekisteri": "test/REKISTERI.md",
+      "laji": "osio",
+      "osio": "Tarkoitus ja raja",
+      "jarjestys": "9l",
+      "sisalto": "## Tarkoitus ja raja\n\n",
+      "versio": {
+        "oneplus": 6464
+      },
+      "muutettu": "2026-10-15T11:21:47.203Z",
+      "muuttaja": "oneplus",
+      "poistettu": false,
+      "lahdeSisalto": "## Tarkoitus ja raja\n\n",
+      "lahdeVersio": {
+        "oneplus": 6464
+      }
+    },
+    {
+      "id": "oneplus-006465",
+      "rekisteri": "test/REKISTERI.md",
+      "laji": "tarkoitus",
+      "osio": "Tarkoitus ja raja",
+      "jarjestys": "c",
+      "sisalto": "Määrittelemättä: skooppi luotiin komennolla `/pura uusi test` 15.10.2026 ilman tarkoitusta; paketti TEST-MAARITTELY kirjaa sen.\n\n",
+      "versio": {
+        "oneplus": 6465
+      },
+      "muutettu": "2026-10-15T11:21:47.203Z",
+      "muuttaja": "oneplus",
+      "poistettu": false,
+      "lahdeSisalto": "Määrittelemättä: skooppi luotiin komennolla `/pura uusi test` 15.10.2026 ilman tarkoitusta; paketti TEST-MAARITTELY kirjaa sen.\n\n",
+      "lahdeVersio": {
+        "oneplus": 6465
+      }
+    },
+    {
+      "id": "oneplus-006466",
+      "rekisteri": "test/REKISTERI.md",
+      "laji": "osio",
+      "osio": "Päätökset",
+      "jarjestys": "ee",
+      "sisalto": "## Päätökset\n\n",
+      "versio": {
+        "oneplus": 6466
+      },
+      "muutettu": "2026-10-15T11:21:47.203Z",
+      "muuttaja": "oneplus",
+      "poistettu": false,
+      "lahdeSisalto": "## Päätökset\n\n",
+      "lahdeVersio": {
+        "oneplus": 6466
+      }
+    },
+    {
+      "id": "oneplus-006467",
+      "rekisteri": "test/REKISTERI.md",
+      "laji": "paatos",
+      "osio": "Päätökset",
+      "jarjestys": "gs",
+      "sisalto": "- **Käyttäjä 15.10.2026:** skooppi `test` luotiin komennolla `/pura uusi test`.\n\n",
+      "versio": {
+        "oneplus": 6467
+      },
+      "muutettu": "2026-10-15T11:21:47.203Z",
+      "muuttaja": "oneplus",
+      "poistettu": false,
+      "lahdeSisalto": "- **Käyttäjä 15.10.2026:** skooppi `test` luotiin komennolla `/pura uusi test`.\n\n",
+      "lahdeVersio": {
+        "oneplus": 6467
+      }
+    },
+    {
+      "id": "oneplus-006468",
+      "rekisteri": "test/REKISTERI.md",
+      "laji": "osio",
+      "osio": "Avoimet asiat",
+      "jarjestys": "j7",
+      "sisalto": "## Avoimet asiat\n\n",
+      "versio": {
+        "oneplus": 6468
+      },
+      "muutettu": "2026-10-15T11:21:47.203Z",
+      "muuttaja": "oneplus",
+      "poistettu": false,
+      "lahdeSisalto": "## Avoimet asiat\n\n",
+      "lahdeVersio": {
+        "oneplus": 6468
+      }
+    },
+    {
+      "id": "oneplus-006469",
+      "rekisteri": "test/REKISTERI.md",
+      "laji": "taulukko-otsake",
+      "osio": "Avoimet asiat",
+      "jarjestys": "ll",
+      "sisalto": "| Asia | Tila | Seuraava askel |\n|---|---|---|\n",
+      "versio": {
+        "oneplus": 6469
+      },
+      "muutettu": "2026-10-15T11:21:47.203Z",
+      "muuttaja": "oneplus",
+      "poistettu": false,
+      "lahdeSisalto": "| Asia | Tila | Seuraava askel |\n|---|---|---|\n",
+      "lahdeVersio": {
+        "oneplus": 6469
+      }
+    },
+    {
+      "id": "oneplus-006471",
+      "rekisteri": "test/REKISTERI.md",
+      "laji": "osio",
+      "osio": "Viat",
+      "jarjestys": "qe",
+      "sisalto": "## Viat\n\n",
+      "versio": {
+        "oneplus": 6471
+      },
+      "muutettu": "2026-10-15T11:21:47.203Z",
+      "muuttaja": "oneplus",
+      "poistettu": false,
+      "lahdeSisalto": "## Viat\n\n",
+      "lahdeVersio": {
+        "oneplus": 6471
+      }
+    },
+    {
+      "id": "oneplus-006472",
+      "rekisteri": "test/REKISTERI.md",
+      "laji": "taulukko-otsake",
+      "osio": "Viat",
+      "jarjestys": "ss",
+      "sisalto": "| Vika | Tila |\n|---|---|\n\n",
+      "versio": {
+        "oneplus": 6472
+      },
+      "muutettu": "2026-10-15T11:21:47.203Z",
+      "muuttaja": "oneplus",
+      "poistettu": false,
+      "lahdeSisalto": "| Vika | Tila |\n|---|---|\n\n",
+      "lahdeVersio": {
+        "oneplus": 6472
+      }
+    },
+    {
+      "id": "oneplus-006473",
+      "rekisteri": "test/REKISTERI.md",
+      "laji": "osio",
+      "osio": "Historia",
+      "jarjestys": "v7",
+      "sisalto": "## Historia\n\n",
+      "versio": {
+        "oneplus": 6473
+      },
+      "muutettu": "2026-10-15T11:21:47.203Z",
+      "muuttaja": "oneplus",
+      "poistettu": false,
+      "lahdeSisalto": "## Historia\n\n",
+      "lahdeVersio": {
+        "oneplus": 6473
+      }
+    },
+    {
+      "id": "oneplus-006474",
+      "rekisteri": "test/REKISTERI.md",
+      "laji": "kappale",
+      "osio": "Historia",
+      "jarjestys": "xl",
+      "sisalto": "Historia: `test/HISTORIA.md` (syntyy ensimmäisessä pakkauksessa), ei lueta purussa.\n",
+      "versio": {
+        "oneplus": 6474
+      },
+      "muutettu": "2026-10-15T11:21:47.203Z",
+      "muuttaja": "oneplus",
+      "poistettu": false,
+      "lahdeSisalto": "Historia: `test/HISTORIA.md` (syntyy ensimmäisessä pakkauksessa), ei lueta purussa.\n",
+      "lahdeVersio": {
+        "oneplus": 6474
+      }
+    },
+    {
+      "id": "oneplus-006791",
+      "rekisteri": "test/REKISTERI.md",
+      "laji": "paatos",
+      "osio": "Päätökset",
+      "jarjestys": "i",
+      "sisalto": "- **15.10.2026:** Käyttäjä 15.10.2026: skooppi `test` luotiin ilman tarkoitusta (`/pura uusi test`); tarkoitus ja raja kirjataan paketissa TEST-MAARITTELY.\n\n",
+      "versio": {
+        "oneplus": 6791
+      },
+      "muutettu": "2026-10-15T14:19:30.389Z",
+      "muuttaja": "oneplus",
+      "poistettu": false,
+      "lahdeSisalto": "- **15.10.2026:** Käyttäjä 15.10.2026: skooppi `test` luotiin ilman tarkoitusta (`/pura uusi test`); tarkoitus ja raja kirjataan paketissa TEST-MAARITTELY.\n\n",
+      "lahdeVersio": {
+        "oneplus": 6791
+      }
+    },
+    {
+      "id": "oneplus-006792",
+      "rekisteri": "test/REKISTERI.md",
+      "laji": "paatos",
+      "osio": "Päätökset",
+      "jarjestys": "j",
+      "sisalto": "- **15.10.2026:** Käyttäjä 15.10.2026: purku keskeytettiin ja keskustelu pakattiin heti luonnin jälkeen.\n\n",
+      "versio": {
+        "oneplus": 6792
+      },
+      "muutettu": "2026-10-15T14:19:30.389Z",
+      "muuttaja": "oneplus",
+      "poistettu": false,
+      "lahdeSisalto": "- **15.10.2026:** Käyttäjä 15.10.2026: purku keskeytettiin ja keskustelu pakattiin heti luonnin jälkeen.\n\n",
+      "lahdeVersio": {
+        "oneplus": 6792
+      }
+    },
+    {
+      "id": "oneplus-006794",
+      "rekisteri": "test/REKISTERI.md",
+      "laji": "avoin",
+      "osio": "Avoimet asiat",
+      "jarjestys": "o",
+      "sisalto": "| Skoopin tarkoitus ja raja | avoin 15.10.2026 (määrittelemättä) | TEST-MAARITTELY käyttäjän kanssa (`/pura test`). |\n\n",
+      "versio": {
+        "oneplus": 6794
+      },
+      "muutettu": "2026-10-15T14:19:30.389Z",
+      "muuttaja": "oneplus",
+      "poistettu": false,
+      "lahdeSisalto": "| Skoopin tarkoitus ja raja | avoin 15.10.2026 (määrittelemättä) | TEST-MAARITTELY käyttäjän kanssa (`/pura test`). |\n\n",
+      "lahdeVersio": {
+        "oneplus": 6794
+      }
+    }
+  ]
+}

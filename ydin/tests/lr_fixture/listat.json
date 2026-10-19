@@ -1,0 +1,425 @@
+{
+  "test/REKISTERI.md": {
+    "meta": {
+      "rekisteri": "test/REKISTERI.md",
+      "versio": {
+        "oneplus": 6475
+      },
+      "poistettu": false,
+      "lahde": {
+        "commit": "e4489b35ac9c90e39acb5cf23437c4048ae1ace6",
+        "sha256": "3bb9c1883178d76169bc72df524142c332e7a1483e9b8e8735b82456c31c4d66"
+      }
+    },
+    "yksikot": [
+      {
+        "id": "oneplus-006461",
+        "versio": {
+          "oneplus": 6461
+        },
+        "rinnakkaiset": []
+      },
+      {
+        "id": "oneplus-006462",
+        "versio": {
+          "oneplus": 6462
+        },
+        "rinnakkaiset": []
+      },
+      {
+        "id": "oneplus-006463",
+        "versio": {
+          "oneplus": 6463
+        },
+        "rinnakkaiset": []
+      },
+      {
+        "id": "oneplus-006464",
+        "versio": {
+          "oneplus": 6464
+        },
+        "rinnakkaiset": []
+      },
+      {
+        "id": "oneplus-006465",
+        "versio": {
+          "oneplus": 6465
+        },
+        "rinnakkaiset": []
+      },
+      {
+        "id": "oneplus-006466",
+        "versio": {
+          "oneplus": 6466
+        },
+        "rinnakkaiset": []
+      },
+      {
+        "id": "oneplus-006467",
+        "versio": {
+          "oneplus": 6467
+        },
+        "rinnakkaiset": []
+      },
+      {
+        "id": "oneplus-006468",
+        "versio": {
+          "oneplus": 6468
+        },
+        "rinnakkaiset": []
+      },
+      {
+        "id": "oneplus-006469",
+        "versio": {
+          "oneplus": 6469
+        },
+        "rinnakkaiset": []
+      },
+      {
+        "id": "oneplus-006471",
+        "versio": {
+          "oneplus": 6471
+        },
+        "rinnakkaiset": []
+      },
+      {
+        "id": "oneplus-006472",
+        "versio": {
+          "oneplus": 6472
+        },
+        "rinnakkaiset": []
+      },
+      {
+        "id": "oneplus-006473",
+        "versio": {
+          "oneplus": 6473
+        },
+        "rinnakkaiset": []
+      },
+      {
+        "id": "oneplus-006474",
+        "versio": {
+          "oneplus": 6474
+        },
+        "rinnakkaiset": []
+      },
+      {
+        "id": "oneplus-006791",
+        "versio": {
+          "oneplus": 6791
+        },
+        "rinnakkaiset": []
+      },
+      {
+        "id": "oneplus-006792",
+        "versio": {
+          "oneplus": 6792
+        },
+        "rinnakkaiset": []
+      },
+      {
+        "id": "oneplus-006794",
+        "versio": {
+          "oneplus": 6794
+        },
+        "rinnakkaiset": []
+      }
+    ],
+    "siivotut": {
+      "oneplus-006470": {
+        "oneplus": 6793
+      }
+    }
+  },
+  "scopes/test1/REKISTERI.md": {
+    "meta": {
+      "rekisteri": "scopes/test1/REKISTERI.md",
+      "versio": {
+        "oneplus": 8458
+      },
+      "poistettu": false,
+      "lahde": {
+        "commit": "591110ebe267d031f2d1e08e73e1710e7bfb2dd6",
+        "sha256": "f251f4e7dff35d8a9c8ab881d88edd37714191e16729b07e5d90cdb55c5e10de"
+      }
+    },
+    "yksikot": [
+      {
+        "id": "oneplus-008444",
+        "versio": {
+          "oneplus": 8444
+        },
+        "rinnakkaiset": []
+      },
+      {
+        "id": "oneplus-008445",
+        "versio": {
+          "oneplus": 8445
+        },
+        "rinnakkaiset": []
+      },
+      {
+        "id": "oneplus-008446",
+        "versio": {
+          "oneplus": 8446
+        },
+        "rinnakkaiset": []
+      },
+      {
+        "id": "oneplus-008447",
+        "versio": {
+          "oneplus": 8447
+        },
+        "rinnakkaiset": []
+      },
+      {
+        "id": "oneplus-008448",
+        "versio": {
+          "oneplus": 8448
+        },
+        "rinnakkaiset": []
+      },
+      {
+        "id": "oneplus-008449",
+        "versio": {
+          "oneplus": 8449
+        },
+        "rinnakkaiset": []
+      },
+      {
+        "id": "oneplus-008450",
+        "versio": {
+          "oneplus": 8450
+        },
+        "rinnakkaiset": []
+      },
+      {
+        "id": "oneplus-008451",
+        "versio": {
+          "oneplus": 8451
+        },
+        "rinnakkaiset": []
+      },
+      {
+        "id": "oneplus-008452",
+        "versio": {
+          "oneplus": 8452
+        },
+        "rinnakkaiset": []
+      },
+      {
+        "id": "oneplus-008453",
+        "versio": {
+          "oneplus": 8453
+        },
+        "rinnakkaiset": []
+      },
+      {
+        "id": "oneplus-008454",
+        "versio": {
+          "oneplus": 8454
+        },
+        "rinnakkaiset": []
+      },
+      {
+        "id": "oneplus-008455",
+        "versio": {
+          "oneplus": 8455
+        },
+        "rinnakkaiset": []
+      },
+      {
+        "id": "oneplus-008456",
+        "versio": {
+          "oneplus": 8456
+        },
+        "rinnakkaiset": []
+      },
+      {
+        "id": "oneplus-008457",
+        "versio": {
+          "oneplus": 8457
+        },
+        "rinnakkaiset": []
+      }
+    ],
+    "siivotut": {}
+  },
+  "scopes/testit/REKISTERI.md": {
+    "meta": {
+      "rekisteri": "scopes/testit/REKISTERI.md",
+      "versio": {
+        "oneplus": 8296
+      },
+      "poistettu": false,
+      "lahde": {
+        "commit": "95b8cc1ce07dca852bab8a748c9e602e819953db",
+        "sha256": "7de48650c713b46f423549c8e3fb89e0f42a7c6332d04898fc8bdc8bf5356f82"
+      }
+    },
+    "yksikot": [
+      {
+        "id": "oneplus-005342",
+        "versio": {
+          "oneplus": 5342
+        },
+        "rinnakkaiset": []
+      },
+      {
+        "id": "oneplus-005343",
+        "versio": {
+          "oneplus": 5343
+        },
+        "rinnakkaiset": []
+      },
+      {
+        "id": "oneplus-005344",
+        "versio": {
+          "oneplus": 5344
+        },
+        "rinnakkaiset": []
+      },
+      {
+        "id": "oneplus-005345",
+        "versio": {
+          "oneplus": 5345
+        },
+        "rinnakkaiset": []
+      },
+      {
+        "id": "oneplus-005346",
+        "versio": {
+          "oneplus": 5346
+        },
+        "rinnakkaiset": []
+      },
+      {
+        "id": "oneplus-005347",
+        "versio": {
+          "oneplus": 5347
+        },
+        "rinnakkaiset": []
+      },
+      {
+        "id": "oneplus-005348",
+        "versio": {
+          "oneplus": 5348
+        },
+        "rinnakkaiset": []
+      },
+      {
+        "id": "oneplus-005349",
+        "versio": {
+          "oneplus": 5349
+        },
+        "rinnakkaiset": []
+      },
+      {
+        "id": "oneplus-005350",
+        "versio": {
+          "oneplus": 5350
+        },
+        "rinnakkaiset": []
+      },
+      {
+        "id": "oneplus-005351",
+        "versio": {
+          "oneplus": 5351
+        },
+        "rinnakkaiset": []
+      },
+      {
+        "id": "oneplus-005352",
+        "versio": {
+          "oneplus": 5352
+        },
+        "rinnakkaiset": []
+      },
+      {
+        "id": "oneplus-005353",
+        "versio": {
+          "oneplus": 5353
+        },
+        "rinnakkaiset": []
+      },
+      {
+        "id": "oneplus-005354",
+        "versio": {
+          "oneplus": 5354
+        },
+        "rinnakkaiset": []
+      },
+      {
+        "id": "oneplus-005355",
+        "versio": {
+          "oneplus": 5355
+        },
+        "rinnakkaiset": []
+      },
+      {
+        "id": "oneplus-005356",
+        "versio": {
+          "oneplus": 5356
+        },
+        "rinnakkaiset": []
+      },
+      {
+        "id": "oneplus-005357",
+        "versio": {
+          "oneplus": 5357
+        },
+        "rinnakkaiset": []
+      },
+      {
+        "id": "oneplus-005358",
+        "versio": {
+          "oneplus": 5358
+        },
+        "rinnakkaiset": []
+      },
+      {
+        "id": "oneplus-005359",
+        "versio": {
+          "oneplus": 5359
+        },
+        "rinnakkaiset": []
+      },
+      {
+        "id": "oneplus-005360",
+        "versio": {
+          "oneplus": 6808
+        },
+        "rinnakkaiset": []
+      },
+      {
+        "id": "oneplus-005361",
+        "versio": {
+          "oneplus": 5361
+        },
+        "rinnakkaiset": []
+      },
+      {
+        "id": "oneplus-005362",
+        "versio": {
+          "oneplus": 5362
+        },
+        "rinnakkaiset": []
+      },
+      {
+        "id": "oneplus-006809",
+        "versio": {
+          "oneplus": 6926
+        },
+        "rinnakkaiset": []
+      },
+      {
+        "id": "oneplus-006927",
+        "versio": {
+          "oneplus": 6927
+        },
+        "rinnakkaiset": []
+      }
+    ],
+    "siivotut": {}
+  }
+}
