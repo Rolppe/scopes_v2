@@ -1,7 +1,7 @@
 use clap::Parser;
 use scopes_ydin::api::{self, Tila};
 use scopes_ydin::varasto::Varasto;
-use scopes_ydin::vertaiset;
+use scopes_ydin::{nakymat, vertaiset};
 use std::path::PathBuf;
 use std::sync::Arc;
 
@@ -78,6 +78,7 @@ async fn main() {
         .expect("portin sidonta epäonnistui");
     eprintln!("scopes-solmu kuuntelee {osoite}");
     let _replikointi = vertaiset::kaynnista(tila.clone());
+    let _nakymat = nakymat::kaynnista(tila.clone());
     axum::serve(kuuntelija, api::router(tila))
         .await
         .expect("palvelin kaatui");
