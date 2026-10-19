@@ -1,0 +1,46 @@
+name: ScopesV2Mac
+options:
+  deploymentTarget:
+    macOS: "14.0"
+settings:
+  base:
+    DEVELOPMENT_TEAM: YOUR_TEAM_ID
+    CODE_SIGN_STYLE: Automatic
+    SWIFT_VERSION: "5.0"
+packages:
+  ScopesCore2:
+    path: ../shared/ScopesCore2
+  ScopesUI2:
+    path: ../shared/ScopesUI2
+targets:
+  ScopesV2Mac:
+    type: application
+    platform: macOS
+    deploymentTarget: "14.0"
+    sources: [Sources]
+    dependencies:
+      - package: ScopesCore2
+      - package: ScopesUI2
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.example.scopes-v2.mac
+    scheme:
+      testTargets: [ScopesV2MacUITests]
+    info:
+      path: Info.plist
+      properties:
+        CFBundleDisplayName: scopes-V2
+        NSLocalNetworkUsageDescription: scopes-V2 käyttää omaa solmuaan laitteella.
+        NSAppTransportSecurity:
+          NSAllowsLocalNetworking: true
+  ScopesV2MacUITests:
+    type: bundle.ui-testing
+    platform: macOS
+    deploymentTarget: "14.0"
+    sources: [UITests]
+    dependencies:
+      - target: ScopesV2Mac
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.example.scopes-v2.mac.uitests
+        GENERATE_INFOPLIST_FILE: YES
