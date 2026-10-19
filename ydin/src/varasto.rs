@@ -4,6 +4,7 @@ use crate::muutosloki::{self, versio_tekstina, versio_tekstista, Result, Tapahtu
 use crate::yksikko::{vertaa, Hlc, Tulos, Vertailu, Yhdistaja, Yksikko};
 use rusqlite::{params, Connection, OptionalExtension, Row, TransactionBehavior};
 use sha2::{Digest, Sha256};
+use std::collections::BTreeSet;
 use std::path::Path;
 use std::sync::{Mutex, MutexGuard};
 
@@ -176,6 +177,25 @@ impl Varasto {
             "SELECT {YKSIKKO_KENTAT} FROM yksikot WHERE polku = ?1 ORDER BY id"
         ))?;
         let rivit = kysely.query_map(params![polku], yksikko_rivilta)?;
+        rivit.collect()
+    }
+
+    /// Polun yksiköt, joiden tunnus on välillä `alku <= id < loppu`, tunnuksen järjestyksessä
+    /// (PRIMARY KEY -indeksin väli, ei polun täyttä läpikäyntiä).
+    pub fn listaa_vali(&self, polku: &str, alku: &str, loppu: &str) -> Result<Vec<Yksikko>> {
+        let c = self.yhteys();
+        let mut kysely = c.prepare(&format!(
+            "SELECT {YKSIKKO_KENTAT} FROM yksikot WHERE polku = ?1 AND id >= ?2 AND id < ?3 ORDER BY id"
+        ))?;
+        let rivit = kysely.query_map(params![polku, alku, loppu], yksikko_rivilta)?;
+        rivit.collect()
+    }
+
+    /// Kaikki erilliset polut (hautakivien polut mukana) lataamatta yksiköitä.
+    pub fn polut(&self) -> Result<BTreeSet<String>> {
+        let c = self.yhteys();
+        let mut kysely = c.prepare("SELECT DISTINCT polku FROM yksikot")?;
+        let rivit = kysely.query_map([], |r| r.get::<_, String>(0))?;
         rivit.collect()
     }
 

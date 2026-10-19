@@ -356,3 +356,50 @@ fn tiiviste_muuttuu_kirjoituksesta() {
     w.kirjoita(&a2, Yhdistaja::Lww).unwrap();
     assert_eq!(w.tiiviste("tila/x").unwrap(), v.tiiviste("tila/x").unwrap());
 }
+
+#[test]
+fn listaa_vali_vain_valin_yksikot() {
+    let tmp = Tmp::uusi();
+    let v = Varasto::avaa(&tmp.0).unwrap();
+    for (polku, id) in [
+        ("peili", "a:0"),
+        ("peili", "a:10"),
+        ("peili", "a:9"),
+        ("peili", "ab:0"),
+        ("peili", "a;0"),
+        ("peili", "9:0"),
+        ("muu", "a:5"),
+    ] {
+        let y = yksikko(polku, id, &[("a", 1)], hlc(1, 0, "a"), "s");
+        v.kirjoita(&y, Yhdistaja::Lww).unwrap();
+    }
+    let idt = |alku: &str, loppu: &str| -> Vec<String> {
+        v.listaa_vali("peili", alku, loppu)
+            .unwrap()
+            .into_iter()
+            .map(|y| y.id)
+            .collect()
+    };
+    // "a" on "ab":n etuliite: väli "a:" … "a;" ei sisällä ab:n eikä toisen polun yksiköitä.
+    assert_eq!(idt("a:", "a;"), vec!["a:0", "a:10", "a:9"]);
+    assert_eq!(idt("ab:", "ab;"), vec!["ab:0"]);
+    assert!(idt("b:", "b;").is_empty());
+}
+
+#[test]
+fn polut_erilliset() {
+    let tmp = Tmp::uusi();
+    let v = Varasto::avaa(&tmp.0).unwrap();
+    assert!(v.polut().unwrap().is_empty());
+    for (polku, id) in [
+        ("peili", "a:0"),
+        ("peili", "a:8"),
+        ("tila/x", "1"),
+        ("lahde", "i"),
+    ] {
+        let y = yksikko(polku, id, &[("a", 1)], hlc(1, 0, "a"), "s");
+        v.kirjoita(&y, Yhdistaja::Lww).unwrap();
+    }
+    let polut: Vec<String> = v.polut().unwrap().into_iter().collect();
+    assert_eq!(polut, vec!["lahde", "peili", "tila/x"]);
+}

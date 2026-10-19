@@ -63,8 +63,16 @@ pub fn offset(varasto: &Varasto, tiedosto: &str) -> Result<u64> {
 
 /// Kaikki tiedoston peiliyksiköiden rivit offset-järjestyksessä yhdistettynä.
 pub fn rivit(varasto: &Varasto, tiedosto: &str) -> Result<Vec<String>> {
+    Ok(rivit_alkaen(varasto, tiedosto, 0)?.0)
+}
+
+/// Tiedoston rivit yksiköistä, joiden offset >= `offset`, offset-järjestyksessä, ja seuraava offset
+/// (viimeisen yksikön loppu; ei yksiköitä = `offset`). Hakee vain tiedoston avainvälin
+/// `<tiedosto>:` … `<tiedosto>;` (';' = ':' + 1); väli voi sisältää tiedoston "a:b" yksiköitä
+/// tiedostolle "a", joten nimi tarkistetaan vielä haun jälkeen.
+pub fn rivit_alkaen(varasto: &Varasto, tiedosto: &str, offset: u64) -> Result<(Vec<String>, u64)> {
     let mut osat: Vec<(u64, Vec<String>)> = Vec::new();
-    for y in varasto.listaa(POLKU)? {
+    for y in varasto.listaa_vali(POLKU, &format!("{tiedosto}:"), &format!("{tiedosto};"))? {
         if y.poistettu {
             continue;
         }
@@ -77,6 +85,9 @@ pub fn rivit(varasto: &Varasto, tiedosto: &str) -> Result<Vec<String>> {
         let Ok(alku) = alku.parse::<u64>() else {
             continue;
         };
+        if alku < offset {
+            continue;
+        }
         let taulukko: Vec<String> = y
             .sisalto
             .as_deref()
@@ -87,7 +98,10 @@ pub fn rivit(varasto: &Varasto, tiedosto: &str) -> Result<Vec<String>> {
         osat.push((alku, taulukko));
     }
     osat.sort_by_key(|(alku, _)| *alku);
-    Ok(osat.into_iter().flat_map(|(_, r)| r).collect())
+    let seuraava = osat.last().map_or(offset, |(alku, r)| {
+        alku + r.iter().map(|x| x.len() as u64 + 1).sum::<u64>()
+    });
+    Ok((osat.into_iter().flat_map(|(_, r)| r).collect(), seuraava))
 }
 
 /// Rivien tiiviste kuten adapterissa: rivit rivinvaihtoineen.

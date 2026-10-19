@@ -4,8 +4,10 @@ use scopes_ydin::api::{self, Tila};
 use scopes_ydin::muutosloki::Tapahtuma;
 use scopes_ydin::peili;
 use scopes_ydin::varasto::Varasto;
+use scopes_ydin::yksikko::{Hlc, Yhdistaja, Yksikko};
 use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
+use std::collections::BTreeMap;
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::Arc;
@@ -237,6 +239,53 @@ async fn rivit_palauttaa_kaikki_jarjestyksessa() {
     assert!(peili::rivit(&p.tila.varasto, "ei.jsonl")
         .unwrap()
         .is_empty());
+}
+
+/// Peiliyksikkö suoraan varastoon (ilman offset-tarkistusta): rivit = [`<tiedosto>/<offset>`].
+fn peiliyksikko(v: &Varasto, tiedosto: &str, offset: u64) {
+    let rivi = format!("{tiedosto}/{offset}");
+    let y = Yksikko {
+        polku: "peili".to_string(),
+        id: format!("{tiedosto}:{offset}"),
+        versio: BTreeMap::from([("koe".to_string(), 1)]),
+        aika: Hlc {
+            ms: 1_800_000_000_000,
+            laskuri: 0,
+            laite: "koe".to_string(),
+        },
+        sisalto: Some(serde_json::to_vec(&[rivi]).unwrap()),
+        poistettu: false,
+    };
+    v.kirjoita(&y, Yhdistaja::Lisays).unwrap();
+}
+
+#[test]
+fn rivit_vain_tiedoston_yksikot_valihaulla() {
+    let tmp = Tmp::uusi();
+    let v = Varasto::avaa(&tmp.0).unwrap();
+    // 3 tiedostoa × 500 yksikköä; offsetit 0..500 ylittävät kymmenpotenssit (9 → 10, 99 → 100).
+    // "a" on "ab":n ja "a:b":n etuliite; "a:b":n yksikkö "a:b:0" osuu "a":n avainväliin.
+    for t in ["a", "ab", "a:b"] {
+        for o in 0..500 {
+            peiliyksikko(&v, t, o);
+        }
+    }
+    for t in ["a", "ab", "a:b"] {
+        let odotettu: Vec<String> = (0..500).map(|o| format!("{t}/{o}")).collect();
+        assert_eq!(peili::rivit(&v, t).unwrap(), odotettu, "{t}");
+    }
+    // rivit_alkaen: vain offsetista k alkaen; seuraava = viimeisen yksikön loppu.
+    let (rivit, seuraava) = peili::rivit_alkaen(&v, "a", 100).unwrap();
+    let odotettu: Vec<String> = (100..500).map(|o| format!("a/{o}")).collect();
+    assert_eq!(rivit, odotettu);
+    assert_eq!(seuraava, 499 + "a/499".len() as u64 + 1);
+    let (rivit, seuraava) = peili::rivit_alkaen(&v, "a", 9).unwrap();
+    assert_eq!(rivit.first().map(String::as_str), Some("a/9"));
+    assert_eq!(rivit.len(), 491);
+    assert_eq!(seuraava, 505);
+    // Offsetin jälkeen ei uusia: tyhjä ja sama offset.
+    assert_eq!(peili::rivit_alkaen(&v, "a", 505).unwrap(), (vec![], 505));
+    assert_eq!(peili::rivit_alkaen(&v, "ei", 0).unwrap(), (vec![], 0));
 }
 
 #[tokio::test]
