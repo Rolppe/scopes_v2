@@ -40,6 +40,7 @@ targets:
     sources: [UITests]
     dependencies:
       - target: ScopesV2Mac
+      - package: ScopesCore2
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.example.scopes-v2.mac.uitests
