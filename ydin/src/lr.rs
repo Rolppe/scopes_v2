@@ -216,6 +216,22 @@ pub fn teksti(varasto: &Varasto, polku: &str) -> String {
         .unwrap_or_default()
 }
 
+/// `lr.mjs vie`:n tiedostosisältö ilman gitiä (`--kuiva`): etuliitteen rekisterit, jotka eivät ole poistettuja ja
+/// joilla on gitin lähde (lr.mjs:521-523), polun mukaan lajiteltuina ja yhteisenä nykytilana (`tulosta`). Vienti
+/// ohittaa lisäksi avoimen riidan, lukon ja työpuun muutokset; ne ovat gitin puolen tilaa, ei tekstiä.
+pub fn vie_kuiva(varasto: &Varasto, etuliite: &str) -> Vec<(String, String)> {
+    let Ok(rv) = lue_kaikki(varasto) else {
+        return Vec::new();
+    };
+    rv.rekisterit
+        .iter()
+        .filter(|(p, rek)| {
+            p.starts_with(etuliite) && !rek.meta.poistettu && rek.meta.lahde.is_some()
+        })
+        .map(|(p, _)| (p.clone(), rv.tulosta(p, false)))
+        .collect()
+}
+
 /// Rekisterin tiiviste, sama kaava kuin `lr.mjs rekisterinTiiviste` (lr.mjs:379-384):
 /// `sha256(["_meta:" + vektori(meta.versio), ...lajitellut(id + ":" + vektori(versio) + ("|" + vektori(r.versio))*)].join("\n"))`,
 /// missä `vektori` = `laite=n` pilkuin avainjärjestyksessä ja rivit sisältävät hautakivet (siivotut eivät).
