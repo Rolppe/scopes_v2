@@ -1,7 +1,8 @@
-use clap::Parser;
+use clap::{Parser, Subcommand};
 use scopes_ydin::api::{self, Tila};
 use scopes_ydin::varasto::Varasto;
 use scopes_ydin::{lr, nakymat, vertaiset};
+use std::io::Write;
 use std::path::PathBuf;
 use std::sync::Arc;
 
@@ -12,7 +13,7 @@ struct Args {
     #[arg(long, default_value_t = 8797)]
     portti: u16,
     /// Datahakemisto
-    #[arg(long, default_value = "~/.local/share/scopes2-ydin")]
+    #[arg(long, global = true, default_value = "~/.local/share/scopes2-ydin")]
     data: PathBuf,
     /// Avaintiedosto
     #[arg(long, default_value = "~/.config/scopes2/avain")]
@@ -29,6 +30,29 @@ struct Args {
     vertainen: Vec<String>,
     #[arg(long)]
     lr_vertainen: Option<String>,
+    #[command(subcommand)]
+    komento: Option<Komento>,
+}
+
+#[derive(Subcommand, Debug)]
+enum Komento {
+    /// LR-työkalut
+    Lr {
+        #[command(subcommand)]
+        lr: LrKomento,
+    },
+}
+
+#[derive(Subcommand, Debug)]
+enum LrKomento {
+    /// Tulostaa `lr.mjs vie`:n tiedostot ilman gitiä: `<polku>\n<teksti>\n\0` per rekisteri
+    Vie {
+        /// Vain kuivaa ajoa tuetaan (ydin ei kirjoita gitiin)
+        #[arg(long)]
+        kuiva: bool,
+        #[arg(long)]
+        etuliite: String,
+    },
 }
 
 /// Laajentaa alun `~/` HOME-hakemistoksi.
@@ -59,6 +83,21 @@ async fn main() {
     let data = kotiin(args.data);
     std::fs::create_dir_all(&data).expect("datahakemiston luonti epäonnistui");
     let varasto = Varasto::avaa(&data.join("ydin.db")).expect("varaston avaus epäonnistui");
+    if let Some(Komento::Lr {
+        lr: LrKomento::Vie { kuiva, etuliite },
+    }) = args.komento
+    {
+        if !kuiva {
+            eprintln!("lr vie: vain --kuiva tuetaan");
+            std::process::exit(2);
+        }
+        let mut ulos = std::io::stdout().lock();
+        for (polku, teksti) in lr::vie_kuiva(&varasto, &etuliite) {
+            write!(ulos, "{polku}\n{teksti}\n\0").expect("stdout-kirjoitus epäonnistui");
+        }
+        ulos.flush().expect("stdout-kirjoitus epäonnistui");
+        return;
+    }
     let avain = api::lataa_avain(&kotiin(args.avain)).expect("avaimen luku tai luonti epäonnistui");
     let (lahetin, _) = tokio::sync::broadcast::channel(1024);
     let tila = Arc::new(Tila {
