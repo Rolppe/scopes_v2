@@ -429,3 +429,23 @@ fn listaa_otsakkeet_ilman_sisaltoa() {
         );
     }
 }
+
+/// R-2: yhdistäjä valitaan yksiköstä — rekisterin sisarusyksikkö (`~` id:ssä) on Lww, muuten polun mukaan.
+#[test]
+fn yhdistaja_valitaan_yksikosta() {
+    use scopes_ydin::yksikko::yhdistaja_yksikolle;
+    let y = |polku: &str, id: &str| yksikko(polku, id, &[("a", 1)], hlc(1, 0, "a"), "x");
+    assert_eq!(
+        yhdistaja_yksikolle(&y("rekisterit/p", "x-1~c")),
+        Yhdistaja::Lww
+    );
+    assert_eq!(
+        yhdistaja_yksikolle(&y("rekisterit/p", "x-1")),
+        Yhdistaja::Lr
+    );
+    assert_eq!(
+        yhdistaja_yksikolle(&y("rekisterit-meta/p", "x~c")),
+        Yhdistaja::Lww
+    );
+    assert_eq!(yhdistaja_yksikolle(&y("peili", "f:0")), Yhdistaja::Lisays);
+}

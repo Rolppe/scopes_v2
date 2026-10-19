@@ -2,7 +2,7 @@
 
 use crate::muutosloki::{Result, Tapahtuma};
 use crate::varasto::Varasto;
-use crate::yksikko::{yhdistaja_polulle, Yhdistaja, Yksikko};
+use crate::yksikko::{yhdistaja_yksikolle, Yhdistaja, Yksikko};
 use crate::{lahde, lr, nakymat, peili, replikointi, silta, tila, virta};
 use axum::{
     extract::{Request, State},
@@ -68,7 +68,7 @@ pub async fn kirjoita_ja_ilmoita(tila: &Tila, y: &Yksikko) -> Result<Option<u64>
     if y.polku == tila::POLKU {
         return tila::kirjoita_tilaan(tila, y);
     }
-    kirjoita_yhdistajalla(tila, y, yhdistaja_polulle(&y.polku))
+    kirjoita_yhdistajalla(tila, y, yhdistaja_yksikolle(y))
 }
 
 /// Vakioaikainen vertailu (jäljittelee palvelin.mjs:n `avainKelpaa`): kulku on salaisuuden pituinen.

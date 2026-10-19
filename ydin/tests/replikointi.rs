@@ -7,7 +7,7 @@ use scopes_ydin::api::{self, Tila};
 use scopes_ydin::replikointi;
 use scopes_ydin::varasto::Varasto;
 use scopes_ydin::vertaiset::Vertainen;
-use scopes_ydin::yksikko::{yhdistaja_polulle, Hlc, Yksikko};
+use scopes_ydin::yksikko::{yhdistaja_polulle, yhdistaja_yksikolle, Hlc, Yksikko};
 use std::collections::BTreeMap;
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, AtomicU32, AtomicU64, AtomicUsize, Ordering};
@@ -380,9 +380,8 @@ fn versioitu(polku: &str, id: &str, versio: &[(&str, u64)], laite: &str, ms: u64
 }
 
 /// R-1: `rekisterit-meta/<p>` yhdistetään Lww:llä, joten uudempi meta korvaa vanhan replikoinnissa
-/// (Lisays jättäisi B:lle vanhan). Samalla havainto: `rekisterit/<p>`:n sisarusyksikkö `<id>~<laite>`
-/// saa Lr-yhdistäjällä uuden sisaruksen `<id>~<laite>~<laite>`, jos solmujen sisarversiot ovat rinnakkaiset;
-/// samalla versiolla ei synny mitään.
+/// (Lisays jättäisi B:lle vanhan). R-2: `rekisterit/<p>`:n sisarusyksikkö `<id>~<laite>` yhdistetään
+/// Lww:llä, joten rinnakkaiset sisarversiot konvergoituvat eikä sisaruksen sisaruksia synny.
 #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
 async fn rekisterit_meta_lww_korvaa_vanhan() {
     let a = solmu("a");
@@ -444,12 +443,17 @@ async fn rekisterit_meta_lww_korvaa_vanhan() {
     );
     assert_eq!(b.tila.varasto.listaa(meta).unwrap().len(), 2);
 
-    // Havainto (lr.rs on R-1:ssä must not, ei korjata): rinnakkaiset sisarversiot tuottavat sisaruksen sisaruksen.
-    odota("rinnakkaiset sisarukset ~c~<laite>", || {
-        b.tila.varasto.lue(r, "x~c~a").unwrap().is_some()
-            && a.tila.varasto.lue(r, "x~c~b").unwrap().is_some()
+    // R-2: sisarusyksikkö yhdistetään Lww:llä → rinnakkaiset `x~c`-versiot konvergoituvat samaan
+    // yksikköön (B:n HLC 1_200 voittaa), eikä `x~c~<laite>`-yksiköitä synny.
+    let odotettu_x = b.tila.varasto.lue(r, "x~c").unwrap().unwrap();
+    assert_eq!(odotettu_x.versio, BTreeMap::from([("c".to_string(), 2)]));
+    odota("rinnakkaiset sisarversiot x~c konvergoituvat", || {
+        a.tila.varasto.lue(r, "x~c").unwrap().as_ref() == Some(&odotettu_x)
+            && b.tila.varasto.lue(r, "x~c").unwrap().as_ref() == Some(&odotettu_x)
     })
     .await;
+    // Annetaan replikoinnin käydä vielä läpi, ettei sisaruksen sisaruksia ilmaannu myöhemmin.
+    tokio::time::sleep(Duration::from_millis(1_500)).await;
     for s in [&a, &b] {
         let idt: Vec<String> = s
             .tila
@@ -460,10 +464,73 @@ async fn rekisterit_meta_lww_korvaa_vanhan() {
             .map(|y| y.id)
             .collect();
         assert!(
-            !idt.iter().any(|i| i.starts_with("y~c~")),
-            "sama sisarversio ei tuota uutta: {idt:?}"
+            !idt.iter()
+                .any(|i| i.starts_with("x~c~") || i.starts_with("y~c~")),
+            "sisarukselle ei synny sisaruksia: {idt:?}"
+        );
+        assert_eq!(
+            s.tila.varasto.lue(r, "x~c").unwrap().as_ref(),
+            Some(&odotettu_x)
         );
     }
+    sa.abort();
+    sb.abort();
+}
+
+/// R-2: kahden solmun rinnakkaiset rivit tuottavat sisarukset `r-1~a` ja `r-1~b`; sisarus päivittyy
+/// molemmilla solmuilla rinnakkain, ja silmukan jälkeen rekisterin polku on sama (lista ja tiiviste).
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn rekisterin_sisarukset_konvergoituvat_rinnakkaisella_paivityksella() {
+    let a = solmu("a");
+    let b = solmu("b");
+    let r = "rekisterit/r2";
+    let kirjoita_y = |s: &Solmu, y: &Yksikko| {
+        api::kirjoita_yhdistajalla(&s.tila, y, yhdistaja_yksikolle(y)).unwrap();
+    };
+    // Rinnakkaiset rivit.
+    kirjoita_y(&a, &versioitu(r, "r-1", &[("a", 1)], "a", 1_000));
+    kirjoita_y(&b, &versioitu(r, "r-1", &[("b", 1)], "b", 1_100));
+
+    let pa = kaynnista(a.tila.clone(), 0, None);
+    let pb = kaynnista(b.tila.clone(), 0, None);
+    let sa = tokio::spawn(replikointi::silmukka(a.tila.clone(), pb.vertainen()));
+    let sb = tokio::spawn(replikointi::silmukka(b.tila.clone(), pa.vertainen()));
+
+    // Sisarukset r-1~a ja r-1~b molemmilla (Lr tuottaa ne, sisarukset replikoituvat Lww:llä).
+    odota("sisarukset r-1~a ja r-1~b molemmilla", || {
+        [&a, &b].iter().all(|s| {
+            s.tila.varasto.lue(r, "r-1~a").unwrap().is_some()
+                && s.tila.varasto.lue(r, "r-1~b").unwrap().is_some()
+        })
+    })
+    .await;
+    // Sisarus r-1~a päivittyy molemmilla solmuilla rinnakkain (rinnakkaiset versiot, B:n HLC suurempi).
+    kirjoita_y(&a, &versioitu(r, "r-1~a", &[("a", 2)], "a", 3_000));
+    kirjoita_y(
+        &b,
+        &versioitu(r, "r-1~a", &[("a", 1), ("b", 1)], "b", 3_500),
+    );
+    let voittaja = b.tila.varasto.lue(r, "r-1~a").unwrap().unwrap();
+    // Rivi ratkaistaan: A kirjoittaa kummankin ohittavan version, joka replikoituu B:lle uudempana.
+    kirjoita_y(&a, &versioitu(r, "r-1", &[("a", 2), ("b", 1)], "a", 4_000));
+    let ratkaistu = a.tila.varasto.lue(r, "r-1").unwrap().unwrap();
+
+    odota("rekisterin polku konvergoituu", || {
+        [&a, &b].iter().all(|s| {
+            s.tila.varasto.lue(r, "r-1~a").unwrap().as_ref() == Some(&voittaja)
+                && s.tila.varasto.lue(r, "r-1").unwrap().as_ref() == Some(&ratkaistu)
+        })
+    })
+    .await;
+    tokio::time::sleep(Duration::from_millis(1_500)).await;
+    let lista_a = a.tila.varasto.listaa(r).unwrap();
+    let idt: Vec<&str> = lista_a.iter().map(|y| y.id.as_str()).collect();
+    assert_eq!(idt, ["r-1", "r-1~a", "r-1~b"], "ei sisaruksen sisaruksia");
+    assert_eq!(lista_a, b.tila.varasto.listaa(r).unwrap());
+    assert_eq!(
+        a.tila.varasto.tiiviste(r).unwrap(),
+        b.tila.varasto.tiiviste(r).unwrap()
+    );
     sa.abort();
     sb.abort();
 }

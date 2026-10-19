@@ -227,6 +227,16 @@ pub fn yhdistaja_polulle(polku: &str) -> Yhdistaja {
     }
 }
 
+/// Yksikön yhdistäjä: rekisterin sisarusyksikkö (`rekisterit/<p>`, id sisältää `~`) yhdistetään
+/// Lww:llä, jotta rinnakkaiset sisarversiot konvergoituvat samaan `<id>~<laite>`-yksikköön eikä
+/// sisaruksen sisaruksia synny (R-2). Muut yksiköt yhdistetään polun mukaan.
+pub fn yhdistaja_yksikolle(y: &Yksikko) -> Yhdistaja {
+    if y.polku.starts_with("rekisterit/") && y.id.contains('~') {
+        return Yhdistaja::Lww;
+    }
+    yhdistaja_polulle(&y.polku)
+}
+
 // ---- Rekisterin rivitason tuonti ---------------------------------------------------------------------
 
 /// LR-rekisterien kaksoiskappale riviyksiköinä (lr.mjs). Varasto on muistissa; tiedostohakemisto
