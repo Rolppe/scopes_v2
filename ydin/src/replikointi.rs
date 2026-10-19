@@ -161,7 +161,8 @@ async fn listat(State(t): State<Arc<Tila>>, Query(k): Query<PolkuKysely>) -> Res
     let Some(p) = k.polku else {
         return virhe(StatusCode::BAD_REQUEST, "polku puuttuu");
     };
-    match t.varasto.listaa(&p) {
+    // Vain otsakkeet: koko polun sisältö (peili: gigatavuja) ei mahdu muistiin.
+    match t.varasto.listaa_otsakkeet(&p) {
         Ok(ys) => {
             let rivit: Vec<ListaRivi> = ys
                 .into_iter()
@@ -266,7 +267,8 @@ async fn tasaa(tila: &Tila, v: &Vertainen, http: &reqwest::Client) -> Result<u64
     let eta: Tiivisteet = json_vastaus(v, http.get(osoite(v, "/api/tiiviste"))).await?;
     let (_, omat) = tiivisteet(tila)?;
     let polut: BTreeSet<&String> = eta.tiivisteet.keys().chain(omat.keys()).collect();
-    let mut lahetettavat: Vec<Yksikko> = Vec::new();
+    // (polku, id): sisältö luetaan vasta lähetyserässä, jotta muistissa on enintään ERA yksikköä.
+    let mut lahetettavat: Vec<(String, String)> = Vec::new();
     for p in polut {
         if eta.tiivisteet.get(p) == omat.get(p) {
             continue;
@@ -285,7 +287,7 @@ async fn tasaa(tila: &Tila, v: &Vertainen, http: &reqwest::Client) -> Result<u64
         // Headless-solmu ei lähetä UI-avaimiaan.
         let omat_yksikot: Vec<Yksikko> = tila
             .varasto
-            .listaa(p)?
+            .listaa_otsakkeet(p)?
             .into_iter()
             .filter(|y| crate::tila::nakyy(tila, y))
             .collect();
@@ -302,11 +304,17 @@ async fn tasaa(tila: &Tila, v: &Vertainen, http: &reqwest::Client) -> Result<u64
             omat_yksikot
                 .iter()
                 .filter(|y| eta_kartta.get(y.id.as_str()).is_none_or(|r| suunta(y, r).1))
-                .cloned(),
+                .map(|y| (y.polku.clone(), y.id.clone())),
         );
         hae_erissa(tila, v, http, p, &haettavat).await?;
     }
-    for pala in lahetettavat.chunks(ERA) {
+    for era in lahetettavat.chunks(ERA) {
+        let mut pala: Vec<Yksikko> = Vec::with_capacity(era.len());
+        for (polku, id) in era {
+            if let Some(y) = tila.varasto.lue(polku, id)? {
+                pala.push(y);
+            }
+        }
         let _: serde_json::Value = json_vastaus(
             v,
             http.post(osoite(v, "/api/laheta"))

@@ -180,6 +180,17 @@ impl Varasto {
         rivit.collect()
     }
 
+    /// Polun yksiköiden otsakkeet (hautakivet mukana, `sisalto` = None) tunnuksen järjestyksessä;
+    /// sisältöjä ei lueta, joten muisti ei kasva polun datan mukana (esim. `peili`).
+    pub fn listaa_otsakkeet(&self, polku: &str) -> Result<Vec<Yksikko>> {
+        let c = self.yhteys();
+        let mut kysely = c.prepare(
+            "SELECT polku, id, versio, aika, NULL, poistettu FROM yksikot WHERE polku = ?1 ORDER BY id",
+        )?;
+        let rivit = kysely.query_map(params![polku], yksikko_rivilta)?;
+        rivit.collect()
+    }
+
     /// Polun yksiköt, joiden tunnus on välillä `alku <= id < loppu`, tunnuksen järjestyksessä
     /// (PRIMARY KEY -indeksin väli, ei polun täyttä läpikäyntiä).
     pub fn listaa_vali(&self, polku: &str, alku: &str, loppu: &str) -> Result<Vec<Yksikko>> {
