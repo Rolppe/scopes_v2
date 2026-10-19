@@ -11,11 +11,81 @@ html, body { height: 100%; margin: 0; }
 
 /* sivupalkki */
 .sivupalkki { width: 240px; border-right: 1px solid #8884; overflow: auto; padding: 8px; }
+.sivupalkki-sisalto { display: flex; flex-direction: column; gap: 6px; }
+.sivupalkki-suodatin { width: 100%; box-sizing: border-box; padding: 6px 8px; font: inherit; }
+.sivupalkki-yhteys { margin: 0; padding: 4px 6px; font-size: 0.85em; border: 1px solid #c33a; border-radius: 4px; }
+.sivupalkki-lista { display: flex; flex-direction: column; gap: 2px; }
+.skooppi-rivi { display: flex; flex-direction: column; gap: 2px; width: 100%; padding: 6px 8px; text-align: left; font: inherit; color: inherit; background: transparent; border: 1px solid transparent; border-radius: 6px; cursor: pointer; }
+.skooppi-rivi:hover { background: #8882; }
+.skooppi-rivi[aria-current="true"] { background: #4a8cff33; border-color: #4a8cff88; }
+.skooppi-ylempi { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.skooppi-nimi { flex: 1; min-width: 0; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.skooppi-merkki { flex: none; min-width: 1.4em; padding: 0 6px; border-radius: 999px; font-size: 0.75em; text-align: center; color: #fff; background: #c2410c; }
+.skooppi-tila { flex: none; font-size: 0.75em; opacity: 0.7; }
+.skooppi-seuraava { font-size: 0.8em; opacity: 0.75; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 /* viestit */
+.alue:has(> .viestit) { display: flex; flex-direction: column; overflow: hidden; }
+.viestit { flex: 1; min-height: 0; overflow: auto; display: flex; flex-direction: column; gap: 8px; }
+.viestit-ilmoitus, .viestit-ei-istuntoa { margin: 0; padding: 6px 8px; font-size: 0.9em; opacity: 0.8; }
+.viestit-ilmoitus[hidden], .viestit-ei-istuntoa[hidden] { display: none; }
+.viestit-rivit { display: flex; flex-direction: column; gap: 8px; }
+.viesti { max-width: 80ch; padding: 8px 10px; border: 1px solid #8884; border-radius: 8px; }
+.viesti.kayttaja { align-self: flex-end; background: #4a8cff22; }
+.viesti.agentti { align-self: flex-start; background: #8881; }
+.viesti.tyokalu { align-self: flex-start; font-family: ui-monospace, monospace; font-size: 0.85em; opacity: 0.8; }
+.viesti.muu { align-self: flex-start; font-style: italic; opacity: 0.8; }
+.viesti.kysymys { align-self: stretch; max-width: none; border-style: dashed; }
+.viesti.kysymykset { display: flex; flex-direction: column; gap: 8px; border: none; padding: 0; }
+.viesti-meta { display: flex; gap: 8px; margin-bottom: 4px; font-size: 0.75em; opacity: 0.7; }
+.viesti-teksti { white-space: pre-wrap; overflow-wrap: anywhere; }
+.kysymyskortti { display: flex; flex-direction: column; gap: 8px; padding: 12px; border: 1px solid #8884; border-radius: 12px; }
+.kortti-otsikko { font-size: 0.75em; font-weight: 700; text-transform: uppercase; opacity: 0.7; }
+.kortti-kysymys { font-weight: 600; }
+.kortti-vaihtoehto { display: flex; flex-direction: column; gap: 2px; padding: 8px 10px; text-align: left; font: inherit; color: inherit; background: #8881; border: 1px solid #8884; border-radius: 8px; cursor: pointer; }
+.kortti-vaihtoehto[aria-checked="true"] { background: #4a8cff33; border-color: #4a8cff; }
+.kortti-vaihtoehto:disabled, .kortti-vahvista:disabled { cursor: default; opacity: 0.6; }
+.vaihtoehto-nimi { font-weight: 600; }
+.vaihtoehto-kuvaus { font-size: 0.85em; opacity: 0.75; }
+.kortti-vahvista { align-self: flex-start; padding: 6px 12px; font: inherit; cursor: pointer; }
+.kortti-tila { margin: 0; font-size: 0.85em; opacity: 0.7; }
+.kortti-virhe, .lahetys-virhe { margin: 0; font-size: 0.85em; color: #c2410c; }
+.lahetys { flex: none; display: flex; flex-direction: column; gap: 4px; padding-top: 8px; border-top: 1px solid #8884; }
+.lahetys-rivi { display: flex; gap: 8px; align-items: flex-end; }
+.lahetys-kentta { flex: 1; min-width: 0; box-sizing: border-box; padding: 8px; font: inherit; resize: vertical; }
+.lahetys-laheta { padding: 8px 14px; font: inherit; cursor: pointer; }
+.lahetys-virhe[hidden] { display: none; }
 
 /* chat */
+.chat { display: flex; flex-direction: column; gap: 8px; height: 100%; }
+.chat-palkki { display: flex; gap: 8px; flex-wrap: wrap; }
+.chat-lista { flex: 1; overflow: auto; display: flex; flex-direction: column; gap: 6px; min-height: 120px; }
+.chat-viesti { white-space: pre-wrap; overflow-wrap: anywhere; padding: 6px 10px; border-radius: 8px; max-width: 85%; }
+.chat-viesti.kayttaja { align-self: flex-end; background: #3b82f633; }
+.chat-viesti.agentti { align-self: flex-start; background: #8883; }
+.chat-virhe { color: #c62828; padding: 4px 0; }
+.chat-virhe[hidden] { display: none; }
+.chat-lomake { display: flex; gap: 8px; align-items: flex-end; }
+.chat-lomake textarea { flex: 1; font: inherit; resize: vertical; }
 
 /* infra */
+.infra-taulukko { border-collapse: collapse; width: 100%; font-size: 0.9em; }
+.infra-taulukko th, .infra-taulukko td { text-align: left; padding: 4px 8px; border-bottom: 1px solid #8884; }
+.infra-taulukko td:first-child { overflow-wrap: anywhere; }
+.infra-taulukko tbody tr { cursor: pointer; }
+.infra-taulukko tbody tr.valittu { background: #3b82f622; }
+.infra-taulukko tbody tr.yli td { color: #c62828; font-weight: 600; }
+.infra-osat { margin: 8px 0; }
+.infra-osat[hidden], .infra-virhe[hidden] { display: none; }
+.infra-osat pre { white-space: pre-wrap; overflow-wrap: anywhere; background: #8882; padding: 6px; border-radius: 6px; max-height: 40vh; overflow: auto; }
+.infra-virhe { color: #c62828; padding: 4px 0; }
+.lahde { font-size: 0.75em; opacity: 0.7; }
 
 /* asetukset */
+.asetukset { max-width: 40em; }
+.asetukset-osa { margin-bottom: 16px; }
+.asetukset-osa input[type="password"] { font: inherit; margin-right: 6px; }
+.kytkimet { display: flex; flex-direction: column; gap: 6px; }
+.kytkin { display: flex; gap: 8px; align-items: center; }
+.asetus-virhe { color: #c62828; padding: 4px 0; }
+.asetus-virhe[hidden] { display: none; }
