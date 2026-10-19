@@ -1,0 +1,9 @@
+{
+ "testi": "järjestysavaimet: tasaväli ja väliin lisäys",
+ "n": 1000,
+ "alku": [
+  "m"
+ ],
+ "lisayksia": 300,
+ "kerroin": 7919
+}

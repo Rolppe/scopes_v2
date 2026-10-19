@@ -1,0 +1,87 @@
+{
+ "testi": "vienti LR → git: äpin muutokset commitiksi, paluu ei ole riita eikä kahdenna, muut etuliitteet ennallaan (LOCALREGISTER-VIENTI)",
+ "rek": "# x/REKISTERI.md\n\nTilanne: 14.10.2026\n\nSEURAAVA PAKETTI: A — tee jotain\n\n## Päätökset\n\n- **Käyttäjä:** yksi\n  jatkorivi\n- kaksi\n\n## Avoimet asiat\n\n| Asia | Tila |\n|---|---|\n| a | b |\n| c | d |\n\n```\n- ei lista\n\n## ei otsikko\n```\nvapaa kappale\ntoinen rivi",
+ "laite": "oneplus",
+ "S": "scopes/x/REKISTERI.md",
+ "M": "muu/REKISTERI.md",
+ "etuliite": "scopes/",
+ "appiS": [
+  "- kaksi\n\n",
+  "- kaksi äpistä\n\n"
+ ],
+ "ankkuri": "| a | b |\n",
+ "uusi": {
+  "id": "iphone-000009",
+  "laji": "avoin",
+  "osio": "Avoimet asiat",
+  "sisalto": "| u | v |\n",
+  "versio": {
+   "iphone": 9
+  }
+ },
+ "pois": {
+  "sisalto": "vapaa kappale\ntoinen rivi",
+  "iphone": 10
+ },
+ "appiM": [
+  "- kaksi\n\n",
+  "- muu äpistä\n\n"
+ ],
+ "odotettu": [
+  [
+   "- kaksi",
+   "- kaksi äpistä"
+  ],
+  [
+   "| a | b |\n",
+   "| a | b |\n| u | v |\n"
+  ],
+  [
+   "vapaa kappale\ntoinen rivi",
+   ""
+  ]
+ ],
+ "commitViesti": "chore(lr): vienti scopes/x/REKISTERI.md äpistä",
+ "siivotut": 1,
+ "pakkaus": [
+  [
+   "- **Käyttäjä:** yksi",
+   "- **Käyttäjä:** yksi gitistä"
+  ]
+ ],
+ "appiPakkaus": [
+  "| c | d |\n\n",
+  "| c | e |\n\n"
+ ],
+ "pakkausHead": [
+  [
+   "| c | d |",
+   "| c | e |"
+  ]
+ ],
+ "taas": {
+  "rivi": "- kaksi äpistä\n\n",
+  "sisalto": "- kaksi taas\n\n",
+  "iphone": 11
+ },
+ "istunto": "istunto\n",
+ "syyMuokattu": "tiedostoa muokattu työpuussa",
+ "syyLukko": "pakkauslukko",
+ "syyJuuri": "juurirepon pakkauslukko",
+ "riita": [
+  [
+   "- kaksi äpistä",
+   "- kaksi gitistä"
+  ]
+ ],
+ "syyRiita": "avoin riita (K4)",
+ "riitaHead": "- kaksi gitistä",
+ "R": "scopes/y/REKISTERI.md",
+ "etuliiteR": "scopes/y/",
+ "appiR": [
+  "- kaksi\n\n",
+  "- kaksi y\n\n"
+ ],
+ "hook": "hylätty",
+ "syyCommit": "commit epäonnistui: hylätty"
+}

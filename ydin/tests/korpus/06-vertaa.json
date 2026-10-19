@@ -1,0 +1,45 @@
+{
+ "testi": "vertaa: versiovektorit",
+ "tapaukset": [
+  [
+   {
+    "a": 1
+   },
+   {
+    "a": 1
+   },
+   "sama"
+  ],
+  [
+   {
+    "a": 2,
+    "b": 1
+   },
+   {
+    "a": 1,
+    "b": 1
+   },
+   "uudempi"
+  ],
+  [
+   {
+    "a": 1
+   },
+   {
+    "a": 1,
+    "b": 1
+   },
+   "vanhempi"
+  ],
+  [
+   {
+    "a": 2
+   },
+   {
+    "a": 1,
+    "b": 1
+   },
+   "rinnakkainen"
+  ]
+ ]
+}

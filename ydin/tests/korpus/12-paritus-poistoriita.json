@@ -1,0 +1,19 @@
+{
+ "testi": "paritus: äpin muokkaama rivi, jonka git korvaa eri rivillä, on poistoriita eikä vieras rinnakkainen",
+ "rek": "# x/REKISTERI.md\n\nTilanne: 14.10.2026\n\nSEURAAVA PAKETTI: A — tee jotain\n\n## Päätökset\n\n- **Käyttäjä:** yksi\n  jatkorivi\n- kaksi\n\n## Avoimet asiat\n\n| Asia | Tila |\n|---|---|\n| a | b |\n| c | d |\n\n```\n- ei lista\n\n## ei otsikko\n```\nvapaa kappale\ntoinen rivi",
+ "laite": "oneplus",
+ "polku": "x/REKISTERI.md",
+ "rivi": "| c | d |\n\n",
+ "appiSisalto": "| c | äppi |\n\n",
+ "git": [
+  [
+   "| c | d |\n",
+   "| uusi asia | avoin |\n"
+  ]
+ ],
+ "luvut": [
+  1,
+  1,
+  1
+ ]
+}

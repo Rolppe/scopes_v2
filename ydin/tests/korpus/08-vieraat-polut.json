@@ -1,0 +1,24 @@
+{
+ "testi": "vastaanota hylkää vieraat polut ja tunnukset",
+ "vieraatPolut": [
+  "../../etc/REKISTERI.md",
+  "x/muu.md"
+ ],
+ "virhePolku": "virheellinen rekisteripolku",
+ "meta": {
+  "rekisteri": "y/REKISTERI.md",
+  "versio": {
+   "iphone": 1
+  },
+  "poistettu": false
+ },
+ "vieras": {
+  "id": "../x",
+  "rekisteri": "y/REKISTERI.md"
+ },
+ "virheTunnus": "virheellinen tunnus",
+ "haePolku": "/etc/REKISTERI.md",
+ "haeIdt": [
+  "a-1"
+ ]
+}

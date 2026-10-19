@@ -1,0 +1,9 @@
+{
+ "testi": "alkuun tyhjät rivit ja rivinvaihdoton loppu säilyvät",
+ "tekstit": [
+  "\n\nteksti",
+  "a\n\n\n",
+  "",
+  "|x|\n"
+ ]
+}
