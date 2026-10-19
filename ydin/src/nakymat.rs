@@ -5,13 +5,18 @@
 //! uudet peilirivit. Jokainen pyyntö ajaa ensin lokin kiinni, joten vastaus ei odota broadcast-tilaajaa;
 //! `kaynnista` pitää näkymän ajan tasalla taustalla.
 //!
-//! Rekisterikentät (seuraava, avoimia, vikoja, rekisterit, avoimet, viat, konteksti, jonossa) tulevat sillasta,
-//! kunnes rekisterit ovat ytimessä (ARK-12, T-33). Ytimen lähteestä johdetaan istuntokentät.
+//! Rekisterikentät (R-1): `seuraava`, `avoimet`, `viat` (yksityiskohta) ja `seuraava`, `avoimia`, `vikoja` (lista)
+//! sekä `/api/rekisterit/<p>`:n osat johdetaan ytimen `rekisterit/<p>`-yksiköistä (`lr::teksti`), kun päärekisteri
+//! `p` on ytimessä; muuten sillasta. Skooppi→rekisteri-kartta ja kontekstikentät (rekisterit, konteksti, jonossa)
+//! tulevat yhä sillasta. Ytimen lähteestä johdetaan istuntokentät.
 //! Lähde puuttuu (ei yhtään laitetta `lahde/istunnot`- tai `lahde/agy`-polussa) → koko vastaus sillasta.
+//!
+//! Sillan `/api/skoopit`- ja `/api/rekisterit`-vastaukset pidetään välimuistissa, jota `kaynnista` päivittää
+//! taustalla (`SILTAVALI`); `GET /api/skoopit` hakee siltaa synkronisesti vain tyhjällä välimuistilla.
 
 use crate::api::Tila;
 use crate::varasto::Varasto;
-use crate::{lahde, peili, silta};
+use crate::{lahde, lr, peili, silta};
 use axum::{
     body::Body,
     extract::{Path, Query, Request, State},
@@ -23,6 +28,7 @@ use axum::{
 use serde_json::{json, Map, Value};
 use std::collections::{BTreeMap, HashMap, VecDeque};
 use std::sync::{Arc, Mutex, RwLock, Weak};
+use std::time::Duration;
 
 /// Viestejä enintään (viestit.keskustelu: 120 viimeisintä).
 const MAARA: usize = 120;
@@ -30,6 +36,8 @@ const MAARA: usize = 120;
 const POISTOMUISTI: usize = 1000;
 /// Sillan vastauksen enimmäiskoko.
 const SILTA_RAJA: usize = 64 << 20;
+/// Siltavälimuistin (`/api/skoopit`, `/api/rekisterit`) taustapäivityksen väli.
+pub const SILTAVALI: Duration = Duration::from_secs(15);
 
 // ---- vastaus -----------------------------------------------------------------------------------------------------
 
@@ -391,6 +399,320 @@ fn komento(teksti: &str) -> Option<String> {
     None
 }
 
+// ---- rekisterin jäsennys (lahteet.mjs) ---------------------------------------------------------------------------
+
+/// JS:n `\s` ja `trim()`: Unicode White_Space ilman U+0085, lisäksi U+FEFF.
+fn js_ws(c: char) -> bool {
+    (c.is_whitespace() && c != '\u{85}') || c == '\u{feff}'
+}
+
+/// JS:n `.` ei osu rivinvaihtoihin.
+fn js_rivinvaihto(c: char) -> bool {
+    matches!(c, '\n' | '\r' | '\u{2028}' | '\u{2029}')
+}
+
+fn js_trim(s: &str) -> &str {
+    s.trim_matches(js_ws)
+}
+
+/// `tokeneiksi(merkit)`: `Math.ceil(merkit / 1.8)`, merkit UTF-16-yksikköinä.
+fn tokeneiksi(teksti: &str) -> u64 {
+    (teksti.encode_utf16().count() as f64 / 1.8).ceil() as u64
+}
+
+/// `\**\s*(.+)$` merkkijonon alusta: kaappaus tai None (ahne `\**\s*` antaa periksi, jotta `.+` saa merkin).
+fn tahdet_valit_loput(r: &str) -> Option<&str> {
+    let tahdet = r.len() - r.trim_start_matches('*').len();
+    let valit = r[tahdet..].len() - r[tahdet..].trim_start_matches(js_ws).len();
+    let mut alku = tahdet + valit;
+    if alku == r.len() {
+        // Kaappaus on viimeinen merkki.
+        alku = r.char_indices().last()?.0;
+    }
+    let kaappaus = &r[alku..];
+    if kaappaus.chars().any(js_rivinvaihto) {
+        return None;
+    }
+    Some(kaappaus)
+}
+
+/// `/^\**SEURAAVA PAKETTI(?: \[([^\]]+)\])?:\**\s*(.+)$/` → (leima, loput).
+fn seuraava_osuma(rivi: &str) -> Option<(Option<&str>, &str)> {
+    let r = rivi
+        .trim_start_matches('*')
+        .strip_prefix("SEURAAVA PAKETTI")?;
+    let (leima, r) = match r.strip_prefix(" [") {
+        Some(x) => {
+            let i = x.find(']')?;
+            if i == 0 {
+                return None;
+            }
+            (Some(&x[..i]), &x[i + 1..])
+        }
+        None => (None, r),
+    };
+    let r = r.strip_prefix(':')?;
+    Some((leima, tahdet_valit_loput(r)?))
+}
+
+/// `jasennaSeuraava(teksti)`.
+fn jasenna_seuraava(teksti: &str) -> Value {
+    let mut osat = teksti.split(" — ");
+    let id = js_trim(osat.next().unwrap_or(""));
+    let mut polut: Vec<Value> = Vec::new();
+    let mut aloitus = Value::Null;
+    let mut kuvaus: Vec<&str> = Vec::new();
+    for osa in osat {
+        if let Some(p) = osa.strip_prefix("polut:") {
+            polut = p
+                .split(',')
+                .map(js_trim)
+                .filter(|p| !p.is_empty())
+                .map(|p| Value::String(p.to_string()))
+                .collect();
+        } else if let Some(a) = osa.strip_prefix("aloitus:") {
+            aloitus = Value::String(js_trim(a).to_string());
+        } else if !osa.starts_with("automaattinen:") {
+            kuvaus.push(osa);
+        }
+    }
+    let id = if id.to_lowercase() == "ei mitään" {
+        Value::Null
+    } else {
+        Value::String(id.to_string())
+    };
+    json!({"id": id, "kuvaus": kuvaus.join(" — "), "polut": polut, "aloitus": aloitus, "teksti": teksti})
+}
+
+/// `taulukko(rekisteri, otsikko)`: otsikon (myös "## 6. Otsikko") alla oleva ensimmäinen taulukko riveinä.
+fn taulukko(teksti: &str, otsikko: &str) -> Vec<Value> {
+    let otsikko_osuu = |r: &str| -> bool {
+        let Some(r) = r.strip_prefix("##") else {
+            return false;
+        };
+        let loput = r.trim_start_matches(js_ws);
+        if loput.len() == r.len() {
+            return false;
+        }
+        let nimi_osuu = |s: &str| -> bool {
+            let n = otsikko.chars().count();
+            let alku: String = s.chars().take(n).collect();
+            alku.to_lowercase() == otsikko.to_lowercase() && s[alku.len()..].chars().all(js_ws)
+        };
+        let numero = loput.len() - loput.trim_start_matches(|c: char| c.is_ascii_digit()).len();
+        if numero > 0 {
+            if let Some(x) = loput[numero..].strip_prefix('.') {
+                if nimi_osuu(x.trim_start_matches(js_ws)) {
+                    return true;
+                }
+            }
+        }
+        nimi_osuu(loput)
+    };
+    let rivit: Vec<&str> = teksti.split('\n').collect();
+    let Some(alku) = rivit.iter().position(|r| otsikko_osuu(r)) else {
+        return Vec::new();
+    };
+    let solut = |rivi: &str| -> Vec<String> {
+        let t = js_trim(rivi);
+        let t = t.strip_prefix('|').unwrap_or(t);
+        let t = t.strip_suffix('|').unwrap_or(t);
+        t.split('|').map(|s| js_trim(s).to_string()).collect()
+    };
+    let erotin = |s: &str| {
+        let s = s.strip_prefix(':').unwrap_or(s);
+        let s = s.strip_suffix(':').unwrap_or(s);
+        !s.is_empty() && s.chars().all(|c| c == '-')
+    };
+    let mut tulos = Vec::new();
+    let mut avaimet: Option<Vec<String>> = None;
+    for rivi in &rivit[alku + 1..] {
+        if rivi.starts_with("##") && rivi[2..].starts_with(js_ws) {
+            break;
+        }
+        if !js_trim(rivi).starts_with('|') {
+            if avaimet.is_some() {
+                break;
+            }
+            continue;
+        }
+        let s = solut(rivi);
+        let Some(a) = &avaimet else {
+            avaimet = Some(s);
+            continue;
+        };
+        if s.iter().all(|x| erotin(x)) {
+            continue;
+        }
+        let mut m = Map::new();
+        for (i, k) in a.iter().enumerate() {
+            m.insert(
+                k.clone(),
+                Value::String(s.get(i).cloned().unwrap_or_default()),
+            );
+        }
+        tulos.push(Value::Object(m));
+    }
+    tulos
+}
+
+/// `^#{taso}\s+(.+?)\s*#*\s*$` → otsikko.
+fn otsikko_tasolla(rivi: &str, taso: usize) -> Option<String> {
+    let c: Vec<char> = rivi.chars().collect();
+    if c.len() <= taso || c[..taso].iter().any(|x| *x != '#') {
+        return None;
+    }
+    let valit = c[taso..].iter().take_while(|x| js_ws(**x)).count();
+    for w in (1..=valit).rev() {
+        let runko = &c[taso + w..];
+        if runko.is_empty() {
+            continue;
+        }
+        // Suurin loppu, joka on muotoa \s*#*\s*.
+        let mut j = runko.len();
+        while j > 0 && js_ws(runko[j - 1]) {
+            j -= 1;
+        }
+        while j > 0 && runko[j - 1] == '#' {
+            j -= 1;
+        }
+        while j > 0 && js_ws(runko[j - 1]) {
+            j -= 1;
+        }
+        let kaappaus = &runko[..j.max(1)];
+        if kaappaus.iter().any(|x| js_rivinvaihto(*x)) {
+            continue;
+        }
+        return Some(kaappaus.iter().collect());
+    }
+    None
+}
+
+/// `otsikoittain(teksti, taso, alkuOtsikko)` → [(otsikko, teksti, tokenit)].
+fn otsikoittain(teksti: &str, taso: usize, alku: &str) -> Vec<(String, String, u64)> {
+    let mut osat: Vec<(String, Vec<&str>)> = Vec::new();
+    let mut nykyinen: (String, Vec<&str>) = (alku.to_string(), Vec::new());
+    let mut aidattu = false;
+    for rivi in teksti.split('\n') {
+        let t = rivi.trim_start_matches(js_ws);
+        if t.starts_with("```") || t.starts_with("~~~") {
+            aidattu = !aidattu;
+        }
+        match (!aidattu).then(|| otsikko_tasolla(rivi, taso)).flatten() {
+            Some(o) => osat.push(std::mem::replace(&mut nykyinen, (o, vec![rivi]))),
+            None => nykyinen.1.push(rivi),
+        }
+    }
+    osat.push(nykyinen);
+    osat.into_iter()
+        .map(|(o, r)| (o, js_trim(&r.join("\n")).to_string()))
+        .filter(|(_, t)| !t.is_empty())
+        .map(|(o, t)| {
+            let n = tokeneiksi(&t);
+            (o, t, n)
+        })
+        .collect()
+}
+
+/// Yli `ISO_OSA` tokenin luku pilkotaan `###`-otsikoittain.
+const ISO_OSA: u64 = 3000;
+
+/// `osiin(teksti)`: [{otsikko, teksti, tokenit}].
+fn osiin(teksti: &str) -> Vec<Value> {
+    let osa = |o: String, t: String, n: u64| json!({"otsikko": o, "teksti": t, "tokenit": n});
+    let mut ulos = Vec::new();
+    for (o, t, n) in otsikoittain(teksti, 2, "Alku") {
+        if n <= ISO_OSA {
+            ulos.push(osa(o, t, n));
+            continue;
+        }
+        let ala = otsikoittain(&t, 3, &o);
+        if ala.len() <= 1 {
+            ulos.push(osa(o, t, n));
+            continue;
+        }
+        for (i, (ao, at, an)) in ala.into_iter().enumerate() {
+            let otsikko = if i == 0 { ao } else { format!("{o} › {ao}") };
+            ulos.push(osa(otsikko, at, an));
+        }
+    }
+    ulos
+}
+
+/// `/^(valmis|todennettu|korjattu)$/i.test(r.Tila ?? '')` ei osu.
+fn auki(rivi: &Value) -> bool {
+    let tila = match rivi.get("Tila") {
+        None | Some(Value::Null) => String::new(),
+        Some(v) => js_teksti(v),
+    };
+    !matches!(
+        tila.to_lowercase().as_str(),
+        "valmis" | "todennettu" | "korjattu"
+    )
+}
+
+/// Ytimessä olevan rekisterin jäsennetty teksti.
+#[derive(Debug)]
+pub struct Jasennetty {
+    teksti: String,
+    /// SEURAAVA PAKETTI -rivit järjestyksessä: (leima, loput).
+    seuraavat: Vec<(Option<String>, String)>,
+    avoimet: Vec<Value>,
+    viat: Vec<Value>,
+}
+
+impl Jasennetty {
+    fn jasenna(teksti: String) -> Jasennetty {
+        let seuraavat = teksti
+            .split('\n')
+            .filter_map(seuraava_osuma)
+            .map(|(l, r)| (l.map(str::to_string), r.to_string()))
+            .collect();
+        Jasennetty {
+            avoimet: taulukko(&teksti, "Avoimet asiat"),
+            viat: taulukko(&teksti, "Viat"),
+            seuraavat,
+            teksti,
+        }
+    }
+
+    /// `seuraavaRivi(teksti, skooppi)`: leimattu `[skooppi]` voittaa, muuten ensimmäinen leimaton; ei riviä → null.
+    fn seuraava(&self, skooppi: &str) -> Value {
+        let mut leimaton = None;
+        for (l, r) in &self.seuraavat {
+            match l {
+                Some(l) if l == skooppi => return jasenna_seuraava(r),
+                None if leimaton.is_none() => leimaton = Some(r),
+                _ => {}
+            }
+        }
+        leimaton.map_or(Value::Null, |r| jasenna_seuraava(r))
+    }
+
+    fn kentat_yksityiskohtaan(&self, skooppi: &str, runko: &mut Value) {
+        if let Value::Object(o) = runko {
+            o.insert("seuraava".into(), self.seuraava(skooppi));
+            o.insert("avoimet".into(), Value::Array(self.avoimet.clone()));
+            o.insert("viat".into(), Value::Array(self.viat.clone()));
+        }
+    }
+
+    fn kentat_listaan(&self, skooppi: &str, rivi: &mut Value) {
+        if let Value::Object(o) = rivi {
+            let id = self.seuraava(skooppi).get("id").cloned();
+            o.insert("seuraava".into(), id.unwrap_or(Value::Null));
+            o.insert(
+                "avoimia".into(),
+                json!(self.avoimet.iter().filter(|r| auki(r)).count()),
+            );
+            o.insert(
+                "vikoja".into(),
+                json!(self.viat.iter().filter(|r| auki(r)).count()),
+            );
+        }
+    }
+}
+
 // ---- keskustelu (viestit.keskustelu lisäyksittäin) ------------------------------------------------------------
 
 #[derive(Clone, Debug)]
@@ -675,9 +997,111 @@ struct Sisa {
     rekisterit_seq: u64,
 }
 
+/// Sillan vastaukset, joita `GET /api/skoopit` käyttää (taustapäivitys, `SILTAVALI`).
+#[derive(Default)]
+struct Siltavalimuisti {
+    skoopit: Option<Value>,
+    rekisterit: Option<Value>,
+    /// Skoopin rivin viimeisin muutos sillan listassa: näkymän seq havaintohetkellä.
+    muutettu: HashMap<String, u64>,
+    /// `/api/rekisterit`-vastauksen (skooppi→rekisteri-kartta) viimeisin muutos.
+    kartta_muutettu: Option<u64>,
+}
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum Siltalaji {
+    Skoopit,
+    Rekisterit,
+}
+
+impl Siltalaji {
+    fn polku(self) -> &'static str {
+        match self {
+            Siltalaji::Skoopit => "/api/skoopit",
+            Siltalaji::Rekisterit => "/api/rekisterit",
+        }
+    }
+}
+
+impl Siltavalimuisti {
+    fn hae(&self, laji: Siltalaji) -> Option<&Value> {
+        match laji {
+            Siltalaji::Skoopit => self.skoopit.as_ref(),
+            Siltalaji::Rekisterit => self.rekisterit.as_ref(),
+        }
+    }
+
+    /// Asettaa uuden vastauksen; eroava JSON kirjaa muutoksen näkymän seq:iin `seq`.
+    fn aseta(&mut self, laji: Siltalaji, uusi: Value, seq: u64) {
+        match laji {
+            Siltalaji::Skoopit => {
+                if let Some(vanha) = &self.skoopit {
+                    if *vanha != uusi {
+                        let vanhat: HashMap<&str, &Value> = vanha
+                            .as_array()
+                            .into_iter()
+                            .flatten()
+                            .filter_map(|r| Some((r.get("nimi")?.as_str()?, r)))
+                            .collect();
+                        for r in uusi.as_array().into_iter().flatten() {
+                            let Some(nimi) = r.get("nimi").and_then(Value::as_str) else {
+                                continue;
+                            };
+                            if vanhat.get(nimi) != Some(&r) {
+                                self.muutettu.insert(nimi.to_string(), seq);
+                            }
+                        }
+                    }
+                }
+                self.skoopit = Some(uusi);
+            }
+            Siltalaji::Rekisterit => {
+                if self.rekisterit.as_ref().is_some_and(|v| *v != uusi) {
+                    self.kartta_muutettu = Some(seq);
+                }
+                self.rekisterit = Some(uusi);
+            }
+        }
+    }
+
+    /// Muuttuiko skoopin rivi sillassa `since`-arvon `x` jälkeen. Havainto tehdään näkymän seq:ssä, jonka
+    /// asiakas on voinut jo saada ennen muutosta, joten `>=`: rivi palaa, kunnes muutosloki etenee.
+    fn muuttui(&self, nimi: &str, x: u64) -> bool {
+        self.muutettu.get(nimi).is_some_and(|s| *s >= x)
+            || self.kartta_muutettu.is_some_and(|s| s >= x)
+    }
+
+    /// Skooppi → päärekisteri: ensimmäinen merkintä, jonka laji on "rekisteri" ja skoopit sisältää skoopin.
+    fn kartta(&self) -> HashMap<String, String> {
+        let mut k = HashMap::new();
+        for e in self.rekisterit.iter().filter_map(Value::as_array).flatten() {
+            if e.get("laji").and_then(Value::as_str) != Some("rekisteri") {
+                continue;
+            }
+            let Some(p) = e.get("polku").and_then(Value::as_str) else {
+                continue;
+            };
+            for s in e
+                .get("skoopit")
+                .and_then(Value::as_array)
+                .into_iter()
+                .flatten()
+                .filter_map(Value::as_str)
+            {
+                k.entry(s.to_string()).or_insert_with(|| p.to_string());
+            }
+        }
+        k
+    }
+}
+
 /// Johdetut näkymät muistissa (rakennetaan varastosta ensimmäisellä käytöllä).
 pub struct Nakymat {
     sisa: RwLock<Sisa>,
+    /// Ytimen rekisterit jäsennettyinä: polku → Some (ytimessä) tai None (ei ytimessä). Mitätöidään, kun
+    /// `rekisterit/<p>` tai `rekisterit-meta/<p>` muuttuu.
+    rekisterit: Mutex<HashMap<String, Option<Arc<Jasennetty>>>>,
+    silta: Mutex<Siltavalimuisti>,
 }
 
 type Rekisteri = Mutex<Vec<(Weak<Varasto>, Arc<Nakymat>)>>;
@@ -693,6 +1117,8 @@ pub fn nakyma(tila: &Tila) -> Arc<Nakymat> {
     }
     let n = Arc::new(Nakymat {
         sisa: RwLock::new(Sisa::default()),
+        rekisterit: Mutex::new(HashMap::new()),
+        silta: Mutex::new(Siltavalimuisti::default()),
     });
     r.push((oma, n.clone()));
     n
@@ -817,6 +1243,7 @@ impl Nakymat {
             };
             let mut lahteet = false;
             let mut tiedostot: Vec<String> = Vec::new();
+            let mut rekisterit: Vec<&str> = Vec::new();
             for t in &era {
                 if t.polku == "lahde/istunnot" || t.polku == "lahde/agy" {
                     lahteet = true;
@@ -829,6 +1256,19 @@ impl Nakymat {
                 } else if t.polku == "rekisterit" || t.polku.starts_with("rekisterit/") {
                     s.rekisterit_seq = viimeinen;
                 }
+                if let Some(p) = t
+                    .polku
+                    .strip_prefix("rekisterit/")
+                    .or_else(|| t.polku.strip_prefix("rekisterit-meta/"))
+                {
+                    rekisterit.push(p);
+                }
+            }
+            if !rekisterit.is_empty() {
+                let mut r = self.rekisterit.lock().unwrap_or_else(|e| e.into_inner());
+                for p in rekisterit {
+                    r.remove(p);
+                }
             }
             if lahteet {
                 s.paivita_lahteet(v, viimeinen)?;
@@ -839,6 +1279,74 @@ impl Nakymat {
                 }
             }
             s.seq_viimeisin = viimeinen;
+        }
+    }
+
+    /// Rekisteri `p` ytimestä: None, jos polulla `rekisterit/<p>` ei ole yhtään ei-poistettua yksikköä.
+    /// Jäsennys tehdään lukon alla, joten samanaikainen mitätöinti ei jätä vanhaa tulosta voimaan.
+    pub fn rekisteri(&self, v: &Varasto, p: &str) -> Option<Arc<Jasennetty>> {
+        let mut r = self.rekisterit.lock().unwrap_or_else(|e| e.into_inner());
+        if let Some(x) = r.get(p) {
+            return x.clone();
+        }
+        let ytimessa = v
+            .listaa(&format!("rekisterit/{p}"))
+            .ok()?
+            .iter()
+            .any(|y| !y.poistettu);
+        let x = ytimessa.then(|| Arc::new(Jasennetty::jasenna(lr::teksti(v, p))));
+        r.insert(p.to_string(), x.clone());
+        x
+    }
+
+    fn silta_lue<T>(&self, f: impl FnOnce(&Siltavalimuisti) -> T) -> T {
+        f(&self.silta.lock().unwrap_or_else(|e| e.into_inner()))
+    }
+
+    fn silta_aseta(&self, laji: Siltalaji, uusi: Value, seq: u64) {
+        self.silta
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .aseta(laji, uusi, seq);
+    }
+}
+
+/// Sillan JSON-vastaus; virhe tai ei-JSON → sillan vastaus sellaisenaan.
+async fn silta_json(tila: &Tila, laji: Siltalaji) -> Result<Value, Vastaus> {
+    let v = silta_hae(tila, laji.polku()).await;
+    if v.koodi.is_success() && v.tyyppi.is_none() && v.runko.is_array() {
+        Ok(v.runko)
+    } else {
+        Err(v)
+    }
+}
+
+/// Välimuistista; tyhjä välimuisti → synkroninen siltahaku, joka täyttää sen.
+async fn valimuistista(tila: &Tila, n: &Nakymat, laji: Siltalaji) -> Result<Value, Vastaus> {
+    if let Some(v) = n.silta_lue(|m| m.hae(laji).cloned()) {
+        return Ok(v);
+    }
+    let v = silta_json(tila, laji).await?;
+    n.silta_aseta(laji, v.clone(), n.seq());
+    Ok(v)
+}
+
+/// Päivittää siltavälimuistin; virhe → vanha jää voimaan, virhe lokiin.
+async fn paivita_silta(tila: &Tila, n: &Nakymat) {
+    for laji in [Siltalaji::Skoopit, Siltalaji::Rekisterit] {
+        match silta_json(tila, laji).await {
+            Ok(v) => {
+                if let Err(e) = n.paivita(tila) {
+                    eprintln!("nakymat: {e}");
+                }
+                n.silta_aseta(laji, v, n.seq());
+            }
+            Err(v) => eprintln!(
+                "nakymat: siltahaku {} epäonnistui ({}): {}",
+                laji.polku(),
+                v.koodi,
+                v.runko
+            ),
         }
     }
 }
@@ -1041,22 +1549,34 @@ pub async fn skoopit(tila: &Tila, since: Option<u64>) -> Vastaus {
         let s = n.sisa.read().unwrap_or_else(|e| e.into_inner());
         (s.lahteet_ytimessa(), s.seq_viimeisin)
     };
-    let silta = silta_hae(tila, "/api/skoopit").await;
-    if !ytimessa {
-        return match since {
-            Some(_) => silta_nollauksena(silta, seq),
-            None => silta,
-        };
-    }
-    let Value::Array(rivit) = silta.runko else {
-        return silta;
+    let rivit = match valimuistista(tila, &n, Siltalaji::Skoopit).await {
+        Ok(v) => v,
+        Err(v) if ytimessa => return v,
+        Err(v) => {
+            return match since {
+                Some(_) => silta_nollauksena(v, seq),
+                None => v,
+            }
+        }
     };
-    if !silta.koodi.is_success() {
-        return Vastaus {
-            runko: Value::Array(rivit),
-            ..silta
+    if !ytimessa {
+        let v = Vastaus {
+            runko: rivit,
+            lahde: Lahde::Silta,
+            koodi: StatusCode::OK,
+            tyyppi: None,
+        };
+        return match since {
+            Some(_) => silta_nollauksena(v, seq),
+            None => v,
         };
     }
+    let Value::Array(rivit) = rivit else {
+        return Vastaus::virhe(StatusCode::BAD_GATEWAY, "silta");
+    };
+    // Kartta on vain rekisterikentille: puuttuva tai virheellinen /api/rekisterit → kentät sillasta.
+    let _ = valimuistista(tila, &n, Siltalaji::Rekisterit).await;
+    let kartta = n.silta_lue(Siltavalimuisti::kartta);
     let s = n.sisa.read().unwrap_or_else(|e| e.into_inner());
     let nollaus = match since {
         Some(x) => match s.nollaus(&tila.varasto, x) {
@@ -1067,14 +1587,29 @@ pub async fn skoopit(tila: &Tila, since: Option<u64>) -> Vastaus {
     };
     let mut ulos = Vec::with_capacity(rivit.len());
     for rivi in rivit {
-        let nimi = rivi.get("nimi").and_then(Value::as_str).unwrap_or("");
-        let sk = s.skooppi(nimi);
+        let nimi = rivi
+            .get("nimi")
+            .and_then(Value::as_str)
+            .unwrap_or("")
+            .to_string();
+        let sk = s.skooppi(&nimi);
         if let Some(x) = since {
-            if !nollaus && sk.muutettu <= x && s.rekisterit_seq <= x {
+            if !nollaus
+                && sk.muutettu <= x
+                && s.rekisterit_seq <= x
+                && !n.silta_lue(|m| m.muuttui(&nimi, x))
+            {
                 continue;
             }
         }
-        ulos.push(listarivi(rivi, &sk));
+        let mut rivi = listarivi(rivi, &sk);
+        if let Some(r) = kartta
+            .get(&nimi)
+            .and_then(|p| n.rekisteri(&tila.varasto, p))
+        {
+            r.kentat_listaan(&nimi, &mut rivi);
+        }
+        ulos.push(rivi);
     }
     Vastaus::ydin(match since {
         None => Value::Array(ulos),
@@ -1115,6 +1650,15 @@ pub async fn skooppi(tila: &Tila, nimi: &str, since: Option<u64>) -> Vastaus {
     let sk = s.skooppi(nimi);
     let istunnot = istuntolista(&sk, runko.get("istunnot"));
     runko["istunnot"] = Value::Array(istunnot);
+    // Päärekisteri = sillan rekisterit[0]; ytimessä → rekisterikentät ytimestä.
+    let paa = runko
+        .get("rekisterit")
+        .and_then(|r| r.get(0))
+        .and_then(Value::as_str)
+        .map(str::to_string);
+    if let Some(r) = paa.and_then(|p| n.rekisteri(&tila.varasto, &p)) {
+        r.kentat_yksityiskohtaan(nimi, &mut runko);
+    }
     match since {
         None => Vastaus::ydin(runko),
         Some(x) => {
@@ -1230,7 +1774,28 @@ pub async fn viestit(tila: &Tila, nimi: &str, since: Option<u64>) -> Vastaus {
     Vastaus::ydin(since_runko(s.seq_viimeisin, muuttuneet, poistetut, nollaus))
 }
 
-/// Reitti, jonka lähde ei ole ytimessä (agentit; rekisterit ennen T-33): silta, `since` nollauksena.
+/// `GET /api/rekisterit/<p>`: ytimessä `{polku, osat}` (lahteet.mjs `rekisterinOsat`), muuten silta.
+pub async fn rekisterin_osat(
+    tila: &Tila,
+    polku: &str,
+    sillan_polku: &str,
+    since: Option<u64>,
+) -> Vastaus {
+    let n = match tasalle(tila) {
+        Ok(n) => n,
+        Err(v) => return v,
+    };
+    let Some(r) = n.rekisteri(&tila.varasto, polku) else {
+        return sillasta(tila, sillan_polku, since).await;
+    };
+    let v = Vastaus::ydin(json!({"polku": polku, "osat": osiin(&r.teksti)}));
+    match since {
+        None => v,
+        Some(_) => silta_nollauksena(v, n.seq()),
+    }
+}
+
+/// Reitti, jonka lähde ei ole ytimessä (agentit, rekisterilista): silta, `since` nollauksena.
 pub async fn sillasta(tila: &Tila, polku: &str, since: Option<u64>) -> Vastaus {
     let v = silta_hae(tila, polku).await;
     match since {
@@ -1320,6 +1885,20 @@ async fn r_sillasta(
     }
 }
 
+async fn r_rekisteri(
+    State(t): State<Arc<Tila>>,
+    Path(polku): Path<String>,
+    uri: axum::http::Uri,
+    Query(q): Query<HashMap<String, String>>,
+) -> Vastaus {
+    match lue_since(&q) {
+        Ok(since) => {
+            rekisterin_osat(&t, polku.trim_start_matches('/'), &ilman_since(&uri), since).await
+        }
+        Err(v) => v,
+    }
+}
+
 pub fn reitit(tila: Arc<Tila>) -> Router {
     Router::new()
         .route("/api/skoopit", get(r_skoopit))
@@ -1327,24 +1906,48 @@ pub fn reitit(tila: Arc<Tila>) -> Router {
         .route("/api/skoopit/:nimi/viestit", get(r_viestit))
         .route("/api/agentit", get(r_sillasta))
         .route("/api/rekisterit", get(r_sillasta))
-        .route("/api/rekisterit/*polku", get(r_sillasta))
+        .route("/api/rekisterit/*polku", get(r_rekisteri))
         .with_state(tila)
 }
 
-/// Tilaa muutosten broadcastin ja pitää näkymän ajan tasalla (peili → rivit, lahde → skoopit, rekisterit → kentät).
+/// Tilaa muutosten broadcastin ja pitää näkymän ajan tasalla (peili → rivit, lahde → skoopit, rekisterit → kentät)
+/// sekä päivittää siltavälimuistin `SILTAVALI`n välein.
 pub fn kaynnista(tila: Arc<Tila>) -> tokio::task::JoinHandle<()> {
+    kaynnista_valilla(tila, SILTAVALI)
+}
+
+/// `kaynnista` annetulla siltavälimuistin päivitysvälillä (testit).
+pub fn kaynnista_valilla(tila: Arc<Tila>, vali: Duration) -> tokio::task::JoinHandle<()> {
     let mut rx = tila.lahetin.subscribe();
     tokio::spawn(async move {
         let n = nakyma(&tila);
         if let Err(e) = n.paivita(&tila) {
             eprintln!("nakymat: {e}");
         }
-        // Lagged: loki luetaan seq:stä, joten väliin jääneet tapahtumat eivät katoa.
-        while let Ok(_) | Err(tokio::sync::broadcast::error::RecvError::Lagged(_)) = rx.recv().await
-        {
-            if let Err(e) = n.paivita(&tila) {
-                eprintln!("nakymat: {e}");
+        let seuraa = async {
+            // Lagged: loki luetaan seq:stä, joten väliin jääneet tapahtumat eivät katoa.
+            while let Ok(_) | Err(tokio::sync::broadcast::error::RecvError::Lagged(_)) =
+                rx.recv().await
+            {
+                if let Err(e) = n.paivita(&tila) {
+                    eprintln!("nakymat: {e}");
+                }
             }
+        };
+        let silta = async {
+            if tila.vanha.is_none() {
+                return std::future::pending::<()>().await;
+            }
+            let mut ajastin = tokio::time::interval(vali);
+            ajastin.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Delay);
+            loop {
+                ajastin.tick().await;
+                paivita_silta(&tila, &n).await;
+            }
+        };
+        tokio::select! {
+            _ = seuraa => {}
+            _ = silta => {}
         }
     })
 }

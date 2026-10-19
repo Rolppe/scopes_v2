@@ -221,7 +221,8 @@ pub fn yhdistaja_polulle(polku: &str) -> Yhdistaja {
     }
     match laji {
         "rekisterit" => Yhdistaja::Lr,
-        "tila" | "asetukset" | "lahde" => Yhdistaja::Lww,
+        // rekisterit-meta: metan ja rivien lisäkenttien uusin versio korvaa vanhan (R-1).
+        "tila" | "asetukset" | "lahde" | "rekisterit-meta" => Yhdistaja::Lww,
         _ => Yhdistaja::Lisays,
     }
 }
