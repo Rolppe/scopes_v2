@@ -45,7 +45,11 @@ pub fn nakyy(tila: &Tila, y: &Yksikko) -> bool {
 
 /// Polun tiiviste headless-suodatus huomioiden. Headless-solmun "tila"-polulle lasketaan vain
 /// näkyvistä yksiköistä (kuten `Varasto::tiiviste`); `None` = polulla ei ole yhtään näkyvää yksikköä.
+/// Ikkunoidun solmun peili ei kuulu tiivisteisiin (S-9b): `None`.
 pub fn tiiviste(tila: &Tila, polku: &str) -> Result<Option<String>> {
+    if tila.peili.ikkuna_vrk.is_some() && polku == crate::peili::POLKU {
+        return Ok(None);
+    }
     if !(tila.headless && polku == POLKU) {
         return tila.varasto.tiiviste(polku).map(Some);
     }

@@ -7,8 +7,9 @@
 
 use crate::api::{kirjoita_ja_ilmoita, Tila};
 use crate::muutosloki::Tapahtuma;
+use crate::peili;
 use crate::vertaiset::Vertainen;
-use crate::yksikko::{vertaa, Versio, Vertailu, Yksikko};
+use crate::yksikko::{vertaa, Hlc, Versio, Vertailu, Yksikko};
 use axum::{
     extract::{Query, State},
     http::StatusCode,
@@ -32,8 +33,11 @@ pub const ERA: usize = 300;
 pub const HAE_TAVUT: usize = 8 * 1024 * 1024;
 /// `/api/laheta`-pyynnön sisältöjen enimmäistavut: vastaanottajan runkoraja on axumin oletus 2 Mt JSONina.
 pub const LAHETA_TAVUT: usize = 400 * 1024;
-/// Sisäinen yksikkö (S-5), ei replikoida.
-const SISAINEN: &str = "peili-offset";
+/// Sisäiset polut (S-5 "peili-offset", S-9b "peili-karsinta"): ei tiivisteeseen, listaan, lähetykseen
+/// eikä virran soveltamiseen.
+const SISAINEN: [&str; 2] = ["peili-offset", peili::KARSINTA_POLKU];
+/// Vuorokausi millisekunteina (S-9b:n ikkunaraja).
+const PAIVA_MS: u64 = 86_400_000;
 /// Virran hiljaisuus, jonka jälkeen kerätty erä sovelletaan.
 const HILJAISUUS: Duration = Duration::from_millis(100);
 /// Uudelleenyrityksen enimmäisväli sekunteina.
@@ -82,6 +86,9 @@ pub struct ListaRivi {
 struct Tiivisteet {
     seq: u64,
     tiivisteet: BTreeMap<String, String>,
+    /// S-9b: vertaisen ikkunoidut polut (puuttuu = täysi solmu tai vanha vastaus).
+    #[serde(default)]
+    ikkunoidut: Vec<String>,
 }
 
 #[derive(Deserialize)]
@@ -124,6 +131,25 @@ struct LahetaPyynto {
 
 // ---- Palvelinpuoli -----------------------------------------------------------------------------------
 
+/// Onko polku sisäinen (ei replikoida)?
+fn on_sisainen(polku: &str) -> bool {
+    SISAINEN.contains(&polku)
+}
+
+/// S-9b: solmun ikkunoidut polut; täysi solmu = tyhjä.
+pub fn ikkunoidut(tila: &Tila) -> Vec<String> {
+    if tila.peili.ikkuna_vrk.is_some() {
+        vec![peili::POLKU.to_string()]
+    } else {
+        Vec::new()
+    }
+}
+
+/// S-9b korjaus 1: ikkunoitu solmu ei ole ikkunoidun polkunsa lähde (ei listaa, ei hae).
+fn ei_lahde(tila: &Tila, polku: &str) -> bool {
+    tila.peili.ikkuna_vrk.is_some() && polku == peili::POLKU
+}
+
 pub fn reitit(tila: Arc<Tila>) -> Router {
     Router::new()
         .route("/api/tiiviste", get(tiiviste))
@@ -148,11 +174,12 @@ pub fn tiivisteet(tila: &Tila) -> crate::muutosloki::Result<(u64, BTreeMap<Strin
         .varasto
         .polut()?
         .into_iter()
-        .filter(|p| p != SISAINEN)
+        .filter(|p| !on_sisainen(p))
         .collect();
     let mut kartta = BTreeMap::new();
     for p in polut {
         // Headless-solmun UI-avaimet eivät kuulu tiivisteeseen; polku ilman näkyviä yksiköitä jää pois.
+        // Ikkunoidun solmun peili jää pois (S-9b, `tila::tiiviste`).
         if let Some(h) = crate::tila::tiiviste(tila, &p)? {
             kartta.insert(p, h);
         }
@@ -168,7 +195,14 @@ async fn tiiviste(State(t): State<Arc<Tila>>, Query(k): Query<PolkuKysely>) -> R
             Err(e) => sisainen(e),
         },
         None => match tiivisteet(&t) {
-            Ok((seq, kartta)) => Json(json!({"seq": seq, "tiivisteet": kartta})).into_response(),
+            // Täysi solmu ei lähetä "ikkunoidut"-kenttää (S-9b).
+            Ok((seq, kartta)) => match ikkunoidut(&t) {
+                ik if ik.is_empty() => {
+                    Json(json!({"seq": seq, "tiivisteet": kartta})).into_response()
+                }
+                ik => Json(json!({"seq": seq, "tiivisteet": kartta, "ikkunoidut": ik}))
+                    .into_response(),
+            },
             Err(e) => sisainen(e),
         },
     }
@@ -178,6 +212,9 @@ async fn listat(State(t): State<Arc<Tila>>, Query(k): Query<PolkuKysely>) -> Res
     let Some(p) = k.polku else {
         return virhe(StatusCode::BAD_REQUEST, "polku puuttuu");
     };
+    if ei_lahde(&t, &p) {
+        return Json(json!({"polku": p, "yksikot": []})).into_response();
+    }
     // Vain otsakkeet: koko polun sisältö (peili: gigatavuja) ei mahdu muistiin.
     match t.varasto.listaa_otsakkeet(&p) {
         Ok(ys) => {
@@ -202,6 +239,13 @@ async fn hae(State(t): State<Arc<Tila>>, Json(p): Json<HaePyynto>) -> Response {
     }
     let mut ys = Vec::new();
     let mut tavut = 0usize;
+    if ei_lahde(&t, &p.polku) {
+        return Json(YksikotUlos {
+            yksikot: &ys,
+            jatko: &[],
+        })
+        .into_response();
+    }
     for (i, id) in p.idt.iter().enumerate() {
         match t.varasto.lue(&p.polku, id) {
             Ok(Some(y)) if crate::tila::nakyy(&t, &y) => {
@@ -233,7 +277,7 @@ async fn laheta(State(t): State<Arc<Tila>>, Json(p): Json<LahetaPyynto>) -> Resp
         return virhe(StatusCode::BAD_REQUEST, "enintään 300 yksikköä");
     }
     let mut hyvaksytty = 0u64;
-    for y in p.yksikot.iter().filter(|y| y.polku != SISAINEN) {
+    for y in p.yksikot.iter().filter(|y| !on_sisainen(&y.polku)) {
         match kirjoita_ja_ilmoita(&t, y).await {
             Ok(Some(_)) => hyvaksytty += 1,
             Ok(None) => {}
@@ -314,17 +358,82 @@ fn suunta(oma: &Yksikko, rivi: &ListaRivi) -> (bool, bool) {
     }
 }
 
+/// Yhden tasaa-kierroksen tulos.
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct Tasaus {
+    /// Vertaisen `seq` ennen tiivisteiden laskentaa.
+    pub seq: u64,
+    /// Vertaisen tiivistevastauksen "ikkunoidut"-polut (S-9b).
+    pub ikkunoidut: BTreeSet<String>,
+    /// Vertaiselta pyydettyjen peili-yksiköiden määrä.
+    pub peili_haettu: usize,
+}
+
+/// S-9b korjaus 2: ikkunoidun solmun vetohaun alaraja max(nyt − n vrk, karsintaraja); täysi = `None`.
+fn vetoraja(tila: &Tila) -> Result<Option<u64>> {
+    let Some(n) = tila.peili.ikkuna_vrk else {
+        return Ok(None);
+    };
+    let ikkuna = crate::api::kello_ms().saturating_sub(u64::from(n) * PAIVA_MS);
+    Ok(Some(ikkuna.max(peili::karsintaraja(&tila.varasto)?)))
+}
+
+/// Ikkunoidun solmun peili-polku (S-9b): haetaan vain vertaisen otsakkeet, joiden aika ≥ `alaraja` ja
+/// joiden id puuttuu paikallisesti; ei lähetetä mitään. Palauttaa haettujen määrän.
+async fn veda_ikkunaan(
+    tila: &Tila,
+    v: &Vertainen,
+    http: &reqwest::Client,
+    p: &str,
+    alaraja: u64,
+) -> Result<usize> {
+    let l: Lista =
+        json_vastaus(v, http.get(osoite(v, "/api/listat")).query(&[("polku", p)])).await?;
+    let omat: BTreeSet<String> = tila
+        .varasto
+        .listaa_otsakkeet(p)?
+        .into_iter()
+        .map(|y| y.id)
+        .collect();
+    let haettavat: Vec<String> = l
+        .yksikot
+        .into_iter()
+        .filter(|r| Hlc::parse(&r.aika).is_some_and(|h| h.ms >= alaraja))
+        .filter(|r| !omat.contains(&r.id))
+        .map(|r| r.id)
+        .collect();
+    hae_erissa(tila, v, http, p, &haettavat).await?;
+    Ok(haettavat.len())
+}
+
+/// Yksi tasaa-kierros vertaista vastaan (vaiheet 1–2 ilman virtaa).
+pub async fn tasaa_kerran(tila: &Tila, v: &Vertainen) -> Result<Tasaus> {
+    let http = asiakas()?;
+    tasaa(tila, v, &http).await
+}
+
 /// Vaiheet 1–2: tiivisteet, eroavista poluista listat, puuttuvat/vanhemmat haetaan ja omat uudemmat
-/// lähetetään erissä. Palauttaa vertaisen `seq`:n ennen tiivisteiden laskentaa.
-async fn tasaa(tila: &Tila, v: &Vertainen, http: &reqwest::Client) -> Result<u64> {
+/// lähetetään erissä. Vertaisen ikkunoituja polkuja ei verrata, haeta eikä lähetetä; ikkunoitu solmu
+/// vain vetää peilin ikkunaansa (S-9b).
+async fn tasaa(tila: &Tila, v: &Vertainen, http: &reqwest::Client) -> Result<Tasaus> {
     let eta: Tiivisteet = json_vastaus(v, http.get(osoite(v, "/api/tiiviste"))).await?;
     let (_, omat) = tiivisteet(tila)?;
     let polut: BTreeSet<&String> = eta.tiivisteet.keys().chain(omat.keys()).collect();
+    let eta_ikkunoidut: BTreeSet<String> = eta.ikkunoidut.iter().cloned().collect();
+    let mut peili_haettu = 0usize;
     // (polku, id): sisältö luetaan vasta lähetyserässä, jotta muistissa on enintään ERA yksikköä.
     let mut lahetettavat: Vec<(String, String)> = Vec::new();
     for p in polut {
-        if eta.tiivisteet.get(p) == omat.get(p) {
+        if eta_ikkunoidut.contains(p) || eta.tiivisteet.get(p) == omat.get(p) {
             continue;
+        }
+        if p == peili::POLKU {
+            if let Some(alaraja) = vetoraja(tila)? {
+                if eta.tiivisteet.contains_key(p) {
+                    peili_haettu += veda_ikkunaan(tila, v, http, p, alaraja).await?;
+                }
+                continue;
+            }
         }
         let eta_rivit = if eta.tiivisteet.contains_key(p) {
             let l: Lista = json_vastaus(
@@ -359,6 +468,9 @@ async fn tasaa(tila: &Tila, v: &Vertainen, http: &reqwest::Client) -> Result<u64
                 .filter(|y| eta_kartta.get(y.id.as_str()).is_none_or(|r| suunta(y, r).1))
                 .map(|y| (y.polku.clone(), y.id.clone())),
         );
+        if p == peili::POLKU {
+            peili_haettu += haettavat.len();
+        }
         hae_erissa(tila, v, http, p, &haettavat).await?;
     }
     // Erä: enintään ERA yksikköä ja LAHETA_TAVUT sisältöä (vähintään yksi yksikkö).
@@ -380,23 +492,30 @@ async fn tasaa(tila: &Tila, v: &Vertainen, http: &reqwest::Client) -> Result<u64
     if !pala.is_empty() {
         laheta_era(v, http, &pala).await?;
     }
-    Ok(eta.seq)
+    Ok(Tasaus {
+        seq: eta.seq,
+        ikkunoidut: eta_ikkunoidut,
+        peili_haettu,
+    })
 }
 
 /// Soveltaa kerätyn erän: jo samassa versiossa olevat ohitetaan, muut haetaan polkuittain erissä.
+/// Täysi solmu ohittaa `ohitettavat`-polut (vertaisen ikkunoidut, S-9b korjaus 1).
 /// Kursori asetetaan erän viimeiseen `seq`:iin vasta, kun kaikki on kirjoitettu.
 async fn sovella(
     tila: &Tila,
     v: &Vertainen,
     http: &reqwest::Client,
     era: &mut Vec<Tapahtuma>,
+    ohitettavat: &BTreeSet<String>,
 ) -> Result<Option<u64>> {
     let Some(viimeinen) = era.last().map(|t| t.seq) else {
         return Ok(None);
     };
+    let taysi = tila.peili.ikkuna_vrk.is_none();
     let mut ryhmat: BTreeMap<String, BTreeSet<String>> = BTreeMap::new();
     for t in era.drain(..) {
-        if t.polku == SISAINEN {
+        if on_sisainen(&t.polku) || (taysi && ohitettavat.contains(&t.polku)) {
             continue;
         }
         if let Some(y) = tila.varasto.lue(&t.polku, &t.id)? {
@@ -441,7 +560,12 @@ fn asiakas() -> Result<reqwest::Client> {
 async fn istunto(tila: &Tila, v: &Vertainen, yhdistetty: &mut bool) -> Result<u64> {
     let http = asiakas()?;
     // Täysi tasaus kattaa kaiken vertaisen `seq`:iin asti; vertaisen pienempi `seq` = vaihtunut varasto.
-    let mut kursori = tasaa(tila, v, &http).await?;
+    let tasaus = tasaa(tila, v, &http).await?;
+    if tila.peili.ikkuna_vrk.is_some() {
+        eprintln!("PEILI_HAETTU: {}", tasaus.peili_haettu);
+    }
+    let ohitettavat = tasaus.ikkunoidut;
+    let mut kursori = tasaus.seq;
     tila.varasto.aseta_kursori(&v.id, kursori)?;
     let vastaus = http
         .get(osoite(v, "/api/virta"))
@@ -463,13 +587,13 @@ async fn istunto(tila: &Tila, v: &Vertainen, yhdistetty: &mut bool) -> Result<u6
         let pala = match seuraava {
             // Hiljaisuus: kerätty erä sovelletaan.
             None => {
-                if let Some(n) = sovella(tila, v, &http, &mut era).await? {
+                if let Some(n) = sovella(tila, v, &http, &mut era, &ohitettavat).await? {
                     kursori = n;
                 }
                 continue;
             }
             Some(None) => {
-                if let Some(n) = sovella(tila, v, &http, &mut era).await? {
+                if let Some(n) = sovella(tila, v, &http, &mut era, &ohitettavat).await? {
                     kursori = n;
                 }
                 return Ok(kursori);
@@ -485,7 +609,7 @@ async fn istunto(tila: &Tila, v: &Vertainen, yhdistetty: &mut bool) -> Result<u6
                 "muutos" => {
                     era.push(serde_json::from_str(&data)?);
                     if era.len() >= ERA {
-                        if let Some(n) = sovella(tila, v, &http, &mut era).await? {
+                        if let Some(n) = sovella(tila, v, &http, &mut era, &ohitettavat).await? {
                             kursori = n;
                         }
                     }

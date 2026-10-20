@@ -347,8 +347,56 @@ pub fn ikkunoi(tila: &Tila, y: &Yksikko, nyt_ms: u64) -> Option<Yksikko> {
     Some(uusi)
 }
 
+/// S-9b/S-9c: karsintarajan sisäinen polku (id "raja", `{"ms":n}`); ei replikoida eikä virtaan.
+pub const KARSINTA_POLKU: &str = "peili-karsinta";
+const KARSINTA_ID: &str = "raja";
+
+/// S-9b: viimeksi katon takia karsitun UTC-vuorokauden loppu (ms); ei karsittu = 0.
+pub fn karsintaraja(varasto: &Varasto) -> Result<u64> {
+    let Some(y) = varasto.lue(KARSINTA_POLKU, KARSINTA_ID)? else {
+        return Ok(0);
+    };
+    if y.poistettu {
+        return Ok(0);
+    }
+    let arvo: Value = y
+        .sisalto
+        .as_deref()
+        .map(serde_json::from_slice)
+        .transpose()
+        .map_err(|e| muunnosvirhe(e.to_string()))?
+        .unwrap_or(Value::Null);
+    arvo.get("ms")
+        .and_then(Value::as_u64)
+        .ok_or_else(|| muunnosvirhe("virheellinen karsintaraja".to_string()))
+}
+
+/// Nostaa karsintarajan (kasvaa vain). Sisäinen yksikkö: suoraan varastoon, ei broadcast-ilmoitusta.
+fn nosta_karsintaraja(tila: &Tila, ms: u64) -> Result<()> {
+    if ms <= karsintaraja(&tila.varasto)? {
+        return Ok(());
+    }
+    let edellinen = tila.varasto.lue(KARSINTA_POLKU, KARSINTA_ID)?;
+    let mut versio = edellinen
+        .as_ref()
+        .map(|y| y.versio.clone())
+        .unwrap_or_default();
+    *versio.entry(tila.laite.clone()).or_insert(0) += 1;
+    let raja = Yksikko {
+        polku: KARSINTA_POLKU.to_string(),
+        id: KARSINTA_ID.to_string(),
+        versio,
+        aika: Hlc::nyt(&tila.laite, edellinen.as_ref().map(|y| &y.aika), kello_ms()),
+        sisalto: Some(serde_json::to_vec(&json!({"ms": ms})).unwrap_or_default()),
+        poistettu: false,
+    };
+    tila.varasto.kirjoita(&raja, Yhdistaja::Lww)?;
+    Ok(())
+}
+
 /// S-9c: poistaa paikallisesti ikkunan ulkopuoliset peili-yksiköt ja pitää sisältötavut katon alla
 /// (vanhin UTC-vuorokausi kerrallaan). Täysi solmu ei koskaan poista mitään. Ei muutoslokia, ei tapahtumaa.
+/// Katon takia karsittu vuorokausi nostaa karsintarajan sen loppuun (S-9b korjaus 2).
 pub fn karsi(tila: &Tila) -> Result<Karsinta> {
     let Some(n) = tila.peili.ikkuna_vrk else {
         return Ok(Karsinta {
@@ -388,6 +436,7 @@ pub fn karsi(tila: &Tila) -> Result<Karsinta> {
     }
     // Katto: vanhin UTC-vuorokausi kerrallaan.
     let vuorokaudet: BTreeSet<u64> = jaljella.iter().map(|(ms, _, _)| ms / PAIVA_MS).collect();
+    let mut uusi_raja = None;
     for vrk in vuorokaudet {
         if jalkeen <= katto {
             break;
@@ -397,6 +446,10 @@ pub fn karsi(tila: &Tila) -> Result<Karsinta> {
                 poista(id, *tavut, &mut jalkeen)?;
             }
         }
+        uusi_raja = Some((vrk + 1) * PAIVA_MS);
+    }
+    if let Some(ms) = uusi_raja {
+        nosta_karsintaraja(tila, ms)?;
     }
     Ok(Karsinta {
         poistetut,
