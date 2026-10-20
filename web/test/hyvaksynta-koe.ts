@@ -1,6 +1,6 @@
 // T-44-koe: ajaa hyvaksynta.ts:n koeytimelle (koeportti 18797, mock-vanha 18796, tilapäinen --data, kertakäyttöavain).
 // Ei kosketa tuotannon 8797:ää, 8787:ää eikä target/release-binääriä. Binääri: $CARGO_TARGET_DIR/release/scopes-solmu (gate: rust).
-import { spawn } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
 import type { ChildProcess } from 'node:child_process';
 import { randomBytes } from 'node:crypto';
 import { existsSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
@@ -16,8 +16,27 @@ const YDIN = `http://127.0.0.1:${YDIN_PORTTI}`;
 const DIST = join(WEB, 'dist');
 const BINAARI = join(process.env['CARGO_TARGET_DIR'] ?? join(WEB, '../ydin/target/web-koe'), 'release/scopes-solmu');
 
+const MUISTIRAJA_KIB = 1572864;
+const MAC = process.platform === 'darwin';
+
 let ydin: ChildProcess | null = null;
 let mock: Mock | null = null;
+let vahti: ReturnType<typeof setInterval> | undefined;
+let rssHuippu = -1;
+let ylitys = false;
+
+function rssVahti(): void {
+  const pid = ydin?.pid;
+  if (pid === undefined || ydin?.exitCode !== null) return;
+  const kib = Number(spawnSync('ps', ['-o', 'rss=', '-p', String(pid)], { encoding: 'utf8' }).stdout?.trim());
+  if (!(kib > 0)) return;
+  rssHuippu = Math.max(rssHuippu, kib);
+  if (kib > MUISTIRAJA_KIB && !ylitys) {
+    ylitys = true;
+    console.error(`VIRHE: ytimen RSS ${kib} kB > ${MUISTIRAJA_KIB} kB, ydin tapetaan`);
+    try { process.kill(-pid, 'SIGKILL'); } catch { /* jo poissa */ }
+  }
+}
 
 function portinVaraus(portti: number): Promise<boolean> {
   return new Promise((ok) => {
@@ -28,6 +47,7 @@ function portinVaraus(portti: number): Promise<boolean> {
 }
 
 async function siivoa(): Promise<void> {
+  clearInterval(vahti);
   if (ydin?.pid !== undefined && ydin.exitCode === null) {
     const valmis = new Promise<void>((ok) => ydin!.once('exit', () => ok()));
     try { process.kill(-ydin.pid, 'SIGTERM'); } catch { /* jo poissa */ }
@@ -59,7 +79,9 @@ async function main(): Promise<number> {
 
   mock = await kaynnistaMock(VANHA_PORTTI, DIST, ['--rooli', 'vanha']);
   // RLIMIT_DATA kuten kaynnista.sh (T-37); oma prosessiryhmä, jotta siivoa sammuttaa koko ryhmän. exec → pid = ytimen pid.
-  ydin = spawn('bash', ['-c', 'ulimit -d 1572864; exec "$@"', 'ydin', BINAARI,
+  // macOS (27) hylkää RLIMIT_DATA:n ja RLIMIT_AS:n (EINVAL): raja korvataan RSS-vahdilla, joka tappaa ytimen rajan ylittyessä.
+  const rajoitus = MAC ? '' : `ulimit -d ${MUISTIRAJA_KIB} || { echo 'VIRHE: ulimit -d epäonnistui' >&2; exit 97; }; `;
+  ydin = spawn('bash', ['-c', `${rajoitus}exec "$@"`, 'ydin', BINAARI,
     '--portti', String(YDIN_PORTTI), '--data', join(KOE, 'data'), '--avain', join(KOE, 'avain'), '--web', DIST,
     '--vanha', `http://127.0.0.1:${VANHA_PORTTI}`, '--vanha-avain', join(KOE, 'vanha-avain')], {
     detached: true,
@@ -67,6 +89,7 @@ async function main(): Promise<number> {
   });
   let kuollut = false;
   ydin.once('exit', () => { kuollut = true; });
+  if (MAC) vahti = setInterval(rssVahti, 500);
   for (let i = 0; ; i++) {
     if (kuollut) { console.error('VIRHE: ydin päättyi ennen valmistumista'); return 1; }
     try { if ((await fetch(`${YDIN}/api/terveys`)).ok) break; } catch { /* ei vielä */ }
@@ -80,7 +103,9 @@ async function main(): Promise<number> {
     stdio: 'inherit',
     env: { ...process.env, SCOPES2_AVAIN: avain },
   });
-  return await new Promise<number>((ok) => lapsi.once('exit', (koodi) => ok(koodi ?? 1)));
+  const koodi = await new Promise<number>((ok) => lapsi.once('exit', (k) => ok(k ?? 1)));
+  if (MAC) console.log(`ytimen RSS-huippu (vahti 0,5 s): ${rssHuippu} kB, raja ${MUISTIRAJA_KIB} kB`);
+  return ylitys ? 1 : koodi;
 }
 
 let rc = 1;
