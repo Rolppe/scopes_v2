@@ -210,7 +210,8 @@ async fn laheta(State(t): State<Arc<Tila>>, runko: Bytes) -> Response {
     }
 }
 
-/// `GET /api/peili/<tiedosto>/offset` (S-5a) ja `GET /api/peili/<tiedosto>/rivi?offset=<tavu>` (S-9d).
+/// `GET /api/peili/<tiedosto>/offset` (S-5a), `GET /api/peili/<tiedosto>/rivi?offset=<tavu>` (S-9d) ja
+/// `GET /api/peili/<tiedosto>/raaka?rivi=&maara=` (S-9f).
 async fn hae_tiedostosta(
     State(t): State<Arc<Tila>>,
     Path(polku): Path<String>,
@@ -228,6 +229,9 @@ async fn hae_tiedostosta(
             Ok(Err(e)) => virhe(StatusCode::INTERNAL_SERVER_ERROR, &e.to_string()),
             Err(e) => virhe(StatusCode::INTERNAL_SERVER_ERROR, &e.to_string()),
         };
+    }
+    if let Some(tiedosto) = polku.strip_suffix("/raaka").filter(|s| !s.is_empty()) {
+        return raaka_reitti(t, tiedosto.to_string(), &q).await;
     }
     let Some(tiedosto) = polku.strip_suffix("/offset").filter(|s| !s.is_empty()) else {
         return virhe(StatusCode::NOT_FOUND, "tuntematon polku");
@@ -831,4 +835,176 @@ pub async fn hae_edeltavat(tila: &Tila, tiedosto: &str) -> Haku<usize> {
         kirjoita_yhdistajalla(tila, &riisuttu(y), Yhdistaja::Lisays).map_err(|e| e.to_string())?;
     }
     Ok(saadut.len())
+}
+
+// ---- Raakarivit pyynnöstä (S-9f) -------------------------------------------------------------------------
+
+/// S-9f: `maara` oletus ja yläraja.
+const RAAKA_OLETUS: u64 = 50;
+const RAAKA_MAX: u64 = 200;
+
+/// S-9f: tiedoston alkuperäiset rivit (riisumatta) ja jatkokohta.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Raaka {
+    pub rivit: Vec<String>,
+    /// Seuraavan palauttamatta jääneen rivin numero (Viesti.id:n rivinro, 1-pohjainen); `None` = tiedoston loppu.
+    pub seuraava: Option<u64>,
+}
+
+/// Tiedoston yksiköt (alku, rivien määrä) offset-järjestyksessä; SQL (`json_array_length`) kuten `rivi`:
+/// rivejä ei ladata. Ei yksiköitä = tuntematon tiedosto.
+fn yksikoiden_rivimaarat(varasto: &Varasto, tiedosto: &str) -> Result<Vec<(u64, u64)>> {
+    let data = varasto
+        .data()
+        .ok_or_else(|| muunnosvirhe("varaston hakemisto puuttuu".to_string()))?;
+    let c = Connection::open_with_flags(
+        data.join("ydin.db"),
+        OpenFlags::SQLITE_OPEN_READ_ONLY | OpenFlags::SQLITE_OPEN_NO_MUTEX,
+    )?;
+    c.busy_timeout(Duration::from_secs(5))?;
+    let mut kysely = c.prepare(
+        "SELECT id, COALESCE(json_array_length(CAST(sisalto AS TEXT)), 0) FROM yksikot \
+         WHERE polku = ?1 AND id >= ?2 AND id < ?3 AND poistettu = 0",
+    )?;
+    let mut rivit = kysely.query(params![
+        POLKU,
+        format!("{tiedosto}:"),
+        format!("{tiedosto};")
+    ])?;
+    let mut ulos = Vec::new();
+    while let Some(r) = rivit.next()? {
+        let id: String = r.get(0)?;
+        let n: i64 = r.get(1)?;
+        if let Some(a) = tiedoston_alku(&id, tiedosto) {
+            ulos.push((a, n.max(0) as u64));
+        }
+    }
+    ulos.sort();
+    Ok(ulos)
+}
+
+/// S-9f: tiedoston rivit `rivi`…`rivi+maara-1` (1-pohjainen numerointi kuten Viesti.id) riisumatta.
+/// Vain rivejä peittävät yksiköt luetaan. Vastaus enintään `HAKU_TAVUT`: rivejä lisätään, kunnes seuraava
+/// ylittäisi rajan (vähintään yksi rivi), ja `seuraava` kertoo jatkokohdan. `None` = tuntematon tiedosto.
+pub fn raaka(varasto: &Varasto, tiedosto: &str, rivi: u64, maara: u64) -> Result<Option<Raaka>> {
+    let yksikot = yksikoiden_rivimaarat(varasto, tiedosto)?;
+    if yksikot.is_empty() {
+        return Ok(None);
+    }
+    let kaikki: u64 = yksikot.iter().map(|(_, n)| n).sum();
+    let alku = rivi.saturating_sub(1);
+    let loppu = alku.saturating_add(maara);
+    let mut rivit: Vec<String> = Vec::new();
+    let mut tavut = 0u64;
+    let mut seuraava = (loppu < kaikki).then(|| loppu + 1);
+    let mut c = 0u64;
+    'yksikot: for (a, n) in yksikot {
+        let (y_alku, y_loppu) = (c, c + n);
+        c = y_loppu;
+        if y_loppu <= alku {
+            continue;
+        }
+        if y_alku >= loppu {
+            break;
+        }
+        let Some(y) = varasto
+            .lue(POLKU, &format!("{tiedosto}:{a}"))?
+            .filter(|y| !y.poistettu)
+        else {
+            continue;
+        };
+        let taulukko: Vec<String> = y
+            .sisalto
+            .as_deref()
+            .map(serde_json::from_slice)
+            .transpose()
+            .map_err(|e| muunnosvirhe(e.to_string()))?
+            .unwrap_or_default();
+        for (i, r) in taulukko.into_iter().enumerate() {
+            let nro = y_alku + i as u64;
+            if nro < alku {
+                continue;
+            }
+            if nro >= loppu {
+                break 'yksikot;
+            }
+            if !rivit.is_empty() && tavut + r.len() as u64 > HAKU_TAVUT {
+                seuraava = Some(nro + 1);
+                break 'yksikot;
+            }
+            tavut += r.len() as u64;
+            rivit.push(r);
+        }
+    }
+    Ok(Some(Raaka { rivit, seuraava }))
+}
+
+/// S-9f: ikkunoitu solmu välittää pyynnön täydelle vertaiselle ja palauttaa vastauksen sellaisenaan;
+/// ei kirjoita varastoon eikä tuota tapahtumaa.
+async fn valita_raaka(t: &Tila, tiedosto: &str, q: &HashMap<String, String>) -> Haku<(u16, Bytes)> {
+    let http = asiakas()?;
+    let v = taysi_vertainen(t, &http).await?;
+    let polku = format!("/api/peili/{}/raaka", koodaa_polku(tiedosto));
+    let kysely: Vec<(&str, &str)> = ["rivi", "maara"]
+        .into_iter()
+        .filter_map(|k| q.get(k).map(|a| (k, a.as_str())))
+        .collect();
+    let vastaus = http
+        .get(osoite(&v, &polku))
+        .query(&kysely)
+        .bearer_auth(&v.avain)
+        .send()
+        .await
+        .map_err(|e| format!("{}: {e}", v.id))?;
+    let koodi = vastaus.status().as_u16();
+    let runko = vastaus
+        .bytes()
+        .await
+        .map_err(|e| format!("{}: {e}", v.id))?;
+    Ok((koodi, runko))
+}
+
+async fn raaka_reitti(t: Arc<Tila>, tiedosto: String, q: &HashMap<String, String>) -> Response {
+    if t.peili.ikkuna_vrk.is_some() {
+        return match valita_raaka(&t, &tiedosto, q).await {
+            Ok((koodi, runko)) => (
+                StatusCode::from_u16(koodi).unwrap_or(StatusCode::BAD_GATEWAY),
+                [(axum::http::header::CONTENT_TYPE, "application/json")],
+                runko,
+            )
+                .into_response(),
+            Err(e) => {
+                eprintln!("peili: raakarivit: {e}");
+                (
+                    StatusCode::SERVICE_UNAVAILABLE,
+                    Json(json!({"haettavissa": true})),
+                )
+                    .into_response()
+            }
+        };
+    }
+    let Some(rivi) = q
+        .get("rivi")
+        .and_then(|s| s.parse::<u64>().ok())
+        .filter(|n| *n >= 1)
+    else {
+        return virhe(StatusCode::BAD_REQUEST, "rivi puuttuu tai ei ole >= 1");
+    };
+    let maara = match q.get("maara") {
+        None => RAAKA_OLETUS,
+        Some(s) => match s.parse::<u64>() {
+            Ok(m) if (1..=RAAKA_MAX).contains(&m) => m,
+            _ => return virhe(StatusCode::BAD_REQUEST, "maara ei ole 1...200"),
+        },
+    };
+    let tulos =
+        tokio::task::spawn_blocking(move || raaka(&t.varasto, &tiedosto, rivi, maara)).await;
+    match tulos {
+        Ok(Ok(Some(r))) => {
+            Json(json!({"rivi": rivi, "rivit": r.rivit, "seuraava": r.seuraava})).into_response()
+        }
+        Ok(Ok(None)) => virhe(StatusCode::NOT_FOUND, "tuntematon tiedosto"),
+        Ok(Err(e)) => virhe(StatusCode::INTERNAL_SERVER_ERROR, &e.to_string()),
+        Err(e) => virhe(StatusCode::INTERNAL_SERVER_ERROR, &e.to_string()),
+    }
 }
