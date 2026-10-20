@@ -72,8 +72,10 @@ public enum Yhteys: Sendable, Equatable {
     public private(set) var skoopit: [SkooppiYhteenveto] = []
     public private(set) var viestit: [String: SkooppiViestit] = [:]
     public private(set) var yhteys: Yhteys = .katki
-    /// T-52 synkkaa tila-avaimeen; tässä vain muistissa.
+    /// Valittu skooppi (UI-tila synkataan `tila`-synkalla, T-52).
     public var valittu: String?
+    /// UI-tila ja kuittaus ytimen tilavarastossa (S-4).
+    public let tila: Tilasynkka
 
     @ObservationIgnored private var asiakas: Asiakas?
     @ObservationIgnored private var virta: Virta?
@@ -82,8 +84,9 @@ public enum Yhteys: Sendable, Equatable {
     @ObservationIgnored private var viestiTyo: Task<Void, Never>?
     @ObservationIgnored private let yhdistysViive: UInt64
 
-    public init(yhdistysViiveMs: UInt64 = 200) {
+    public init(yhdistysViiveMs: UInt64 = 200, tila: Tilasynkka? = nil) {
         self.yhdistysViive = yhdistysViiveMs * 1_000_000
+        self.tila = tila ?? Tilasynkka()
     }
 
     private struct Terveys: Decodable { let seq: Int? }
@@ -92,6 +95,7 @@ public enum Yhteys: Sendable, Equatable {
     public func kaynnista(asiakas: Asiakas) async {
         pysayta()
         self.asiakas = asiakas
+        await tila.kaynnista(asiakas: asiakas, headless: UserDefaults.standard.bool(forKey: "scopes2.headless"))
         let alku = await terveysSeq()
         skooppiSeq = nil
         await paivitaSkoopit(alkuSeq: alku)
@@ -156,7 +160,7 @@ public enum Yhteys: Sendable, Equatable {
     public func paivitaViestit(_ nimi: String) async {
         guard let a = asiakas else { return }
         do {
-            let (v, _): (SkooppiViestit, lahde: String?) = try await a.hae("/api/skoopit/\(Asiakas.koodaa(nimi))/viestit")
+            let (v, _): (SkooppiViestit, lahde: String?) = try await a.hae("/api/skoopit/\(Asiakas.koodaa(nimi))/viestit", aikaraja: 60)
             viestit[nimi] = v
             yhteys = .auki
         } catch {
@@ -177,14 +181,17 @@ public enum Yhteys: Sendable, Equatable {
                     await self.paivitaSkoopit()
                 }
             }
+        case "tila":
+            let tilaSynkka = tila
+            Task { await tilaSynkka.sovella(m) }
         case "peili", "viestit":
-            if viestiTyo == nil, valittu != nil {
+            if viestiTyo == nil, valittu != nil || !seurattavat.isEmpty {
                 let viive = yhdistysViive
                 viestiTyo = Task { [weak self] in
                     try? await Task.sleep(nanoseconds: viive)
                     guard !Task.isCancelled, let self else { return }
                     self.viestiTyo = nil
-                    if let v = self.valittu { await self.paivitaViestit(v) }
+                    for n in self.paivitettavat { await self.paivitaViestit(n) }
                 }
             }
         default:
@@ -196,7 +203,57 @@ public enum Yhteys: Sendable, Equatable {
     func paivitaKaikki() async {
         skooppiSeq = nil
         await paivitaSkoopit()
-        if let v = valittu { await paivitaViestit(v) }
+        for n in paivitettavat { await paivitaViestit(n) }
+    }
+
+    /// Valittu skooppi ja sivupalkissa näkyvät rivit (lukemattomien merkki), kukin kerran.
+    private var paivitettavat: [String] {
+        var nimet: [String] = []
+        if let v = valittu { nimet.append(v) }
+        for n in seurattavat.sorted() where n != valittu { nimet.append(n) }
+        return nimet
+    }
+
+    /// Sivupalkin näkyvät rivit; niiden viestit pidetään ajan tasalla lukemattomien laskentaa varten.
+    @ObservationIgnored private var seurattavat: Set<String> = []
+
+    /// Viestihaut ovat raskaita (sillan kautta sekunteja ja ne jonottavat ytimessä): seuranta hakee yhden skoopin kerrallaan eikä
+    /// kilpaile valitun skoopin viestien kanssa, jotta käyttäjän avaama skooppi latautuu ensin.
+    @ObservationIgnored private var lukemattomienHaut = 0
+
+    public func seuraaLukemattomia(_ nimi: String) async {
+        seurattavat.insert(nimi)
+        guard viestit[nimi] == nil else { return }
+        let raja = Date().addingTimeInterval(90)
+        while lukemattomienHaut >= 1 || valitunLataus {
+            try? await Task.sleep(nanoseconds: 200_000_000)
+            if Task.isCancelled || viestit[nimi] != nil || Date() > raja { break }
+        }
+        guard viestit[nimi] == nil else { return }
+        lukemattomienHaut += 1
+        defer { lukemattomienHaut -= 1 }
+        // Kylmä silta voi ylittää pyynnön aikarajan: yritä uudelleen muutaman kerran.
+        for yritys in 0..<3 {
+            await paivitaViestit(nimi)
+            if viestit[nimi] != nil || Task.isCancelled { return }
+            try? await Task.sleep(nanoseconds: UInt64(yritys + 1) * 2_000_000_000)
+        }
+    }
+
+    /// Valittu skooppi, jonka viestejä ei ole vielä ladattu.
+    private var valitunLataus: Bool {
+        if let v = valittu { return viestit[v] == nil }
+        return false
+    }
+
+    public func lopetaSeuranta(_ nimi: String) {
+        seurattavat.remove(nimi)
+    }
+
+    /// Lukemattomat = viestit, joiden rivinro > kuittaus; nil kunnes skoopin viestit on ladattu.
+    public func lukemattomia(_ nimi: String) -> Int? {
+        guard let v = viestit[nimi] else { return nil }
+        return TilaAvain.lukemattomia(v.viestit, kuittaus: tila.luku(TilaAvain.kuittaus(nimi)))
     }
 
     private func virranTila(_ auki: Bool) {

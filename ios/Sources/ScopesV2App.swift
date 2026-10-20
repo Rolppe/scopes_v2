@@ -14,7 +14,7 @@ struct ScopesV2App: App {
         WindowGroup {
             Group {
                 if nakyvissa {
-                    JuuriNakyma().id(sukupolvi)
+                    JuuriNakyma(solmuUudelleen: { await Self.kaynnistaUudelleen() }).id(sukupolvi)
                 } else {
                     Color.clear
                 }
@@ -44,6 +44,12 @@ struct ScopesV2App: App {
         await Solmu.jaettu.pysayta()
     }
 
+    /// Headless-kytkimen muutos (T-52): solmu pysäytetään ja käynnistetään uusilla asetuksilla.
+    static func kaynnistaUudelleen() async {
+        await Solmu.jaettu.pysayta()
+        if let asetukset = solmunAsetukset() { _ = try? await Solmu.jaettu.kaynnista(asetukset) }
+    }
+
     /// Avain puuttuu → ei solmua; JuuriNakyma avaa asetukset.
     static func solmunAsetukset() -> SolmuAsetukset? {
         guard let avain = Avain.hae() else { return nil }
@@ -59,10 +65,11 @@ struct ScopesV2App: App {
         return SolmuAsetukset(
             data: data,
             avain: avain,
-            vertaiset: [vertainen],
+            vertaiset: [vertainen] + Oletukset.testiVertaiset(),
             vanha: vertainen,
             headless: UserDefaults.standard.bool(forKey: "scopes2.headless"),
-            laite: Oletukset.laite()
+            laite: Oletukset.laite(),
+            portti: Oletukset.testiPortti()
         )
     }
 }

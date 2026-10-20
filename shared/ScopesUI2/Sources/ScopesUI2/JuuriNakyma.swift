@@ -21,8 +21,12 @@ public struct JuuriNakyma: View {
     @State private var valinta: String?
     @State private var valilehti: Valilehti = .viestit
     @State private var tila = "Yhdistetään…"
+    /// Headless-kytkimen muutos: äppi pysäyttää ja käynnistää solmun uudelleen (T-52); oletus ei tee mitään.
+    let solmuUudelleen: () async -> Void
 
-    public init() {}
+    public init(solmuUudelleen: @escaping () async -> Void = {}) {
+        self.solmuUudelleen = solmuUudelleen
+    }
 
     public var body: some View {
         NavigationSplitView {
@@ -37,7 +41,20 @@ public struct JuuriNakyma: View {
             }
         }
         .task { await yhdista() }
-        .onChange(of: valinta) { _, uusi in varasto.valittu = uusi }
+        .overlay(alignment: .bottomTrailing) {
+            // Testikoukku: tilasynkan lähetykset ja viimeisin virhe.
+            Color.clear.frame(width: 1, height: 1)
+                .accessibilityElement()
+                .accessibilityIdentifier("tila-diag")
+                .accessibilityLabel("lahetetty=\(varasto.tila.lahetetty) virhe=\(varasto.tila.viimeinenVirhe ?? "-")")
+        }
+        .onChange(of: valinta) { _, uusi in
+            varasto.valittu = uusi
+            if let uusi { varasto.tila.kirjoita(TilaAvain.valittu, .teksti(uusi)) }
+        }
+        .onChange(of: varasto.tila.teksti(TilaAvain.valittu)) { _, uusi in
+            if let uusi, uusi != valinta { valinta = uusi }
+        }
     }
 
     @ViewBuilder private var viestit: some View {
@@ -57,7 +74,13 @@ public struct JuuriNakyma: View {
     }
 
     private var asetukset: some View {
-        AsetuksetNakyma(varasto: varasto, asiakas: asiakas) { Task { await yhdista() } }
+        AsetuksetNakyma(varasto: varasto, asiakas: asiakas, avainMuuttui: { Task { await yhdista() } }, headlessMuuttui: {
+            Task {
+                varasto.pysayta()
+                await solmuUudelleen()
+                await yhdista()
+            }
+        })
     }
 
     private func tyhja(_ teksti: String) -> some View {
@@ -85,5 +108,6 @@ public struct JuuriNakyma: View {
         asiakas = uusi
         tila = "Yhdistetty"
         await varasto.kaynnista(asiakas: uusi)
+        if valinta == nil, let tallennettu = varasto.tila.teksti(TilaAvain.valittu) { valinta = tallennettu }
     }
 }

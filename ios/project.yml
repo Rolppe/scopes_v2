@@ -39,7 +39,9 @@ targets:
     type: bundle.ui-testing
     platform: iOS
     deploymentTarget: "18.0"
-    sources: [UITests]
+    sources:
+      - UITests
+      - path: ../shared/testit/KaksiLaitettaUITests.swift
     dependencies:
       - target: ScopesV2
     settings:

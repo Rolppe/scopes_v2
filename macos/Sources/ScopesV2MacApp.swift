@@ -50,7 +50,7 @@ struct Kuori: View {
     var body: some View {
         Group {
             if valmis {
-                JuuriNakyma().id(kierros)
+                JuuriNakyma(solmuUudelleen: { await SolmunElinkaari.uudelleen() }).id(kierros)
             } else {
                 ProgressView("Käynnistetään solmua…")
             }

@@ -12,14 +12,17 @@ public struct SolmuAsetukset: Codable, Sendable {
     public var vanha: URL?
     public var headless: Bool
     public var laite: String
+    /// 0 = järjestelmän valitsema; kiinteä portti vain testeille (kaksi-laitetta.sh: solmut ovat toistensa vertaisia).
+    public var portti: Int
 
-    public init(data: URL, avain: String, vertaiset: [URL] = [], vanha: URL? = nil, headless: Bool = false, laite: String) {
+    public init(data: URL, avain: String, vertaiset: [URL] = [], vanha: URL? = nil, headless: Bool = false, laite: String, portti: Int = 0) {
         self.data = data
         self.avain = avain
         self.vertaiset = vertaiset
         self.vanha = vanha
         self.headless = headless
         self.laite = laite
+        self.portti = portti
     }
 }
 
@@ -47,7 +50,7 @@ public actor Solmu {
         let asetukset: [String: Any] = [
             "data": a.data.path,
             "avain": a.avain,
-            "portti": 0,
+            "portti": a.portti,
             "vertaiset": a.vertaiset.map { $0.absoluteString },
             "vanha": vanha,
             "vanha_avain": a.avain,
@@ -84,6 +87,18 @@ public actor Solmu {
 }
 
 public enum Oletukset {
+    /// Testikoukku (T-52): SCOPES2_PORTTI = solmun kiinteä portti; SCOPES2_VERTAISET = pilkuilla erotetut lisävertaiset.
+    /// Tuotannossa ei asetettu. Tarvitaan, koska replikointi vetää vain vertaisen virrasta: kaksi laitetta näkevät toistensa
+    /// tilamuutokset vain, jos ne ovat toistensa vertaisia (palvelimen koeydin ei tunne äppien osoitteita).
+    public static func testiPortti() -> Int {
+        ProcessInfo.processInfo.environment["SCOPES2_PORTTI"].flatMap(Int.init) ?? 0
+    }
+
+    public static func testiVertaiset() -> [URL] {
+        (ProcessInfo.processInfo.environment["SCOPES2_VERTAISET"] ?? "")
+            .split(separator: ",").compactMap { URL(string: $0.trimmingCharacters(in: .whitespaces)) }
+    }
+
     /// Macin tilapäinen tunneli koeytimeen (P-14); ei tuotannon 8797:ää. Ympäristö SCOPES2_VERTAINEN ohittaa.
     public static var vertainen: URL {
         if let s = ProcessInfo.processInfo.environment["SCOPES2_VERTAINEN"], !s.isEmpty, let u = URL(string: s) { return u }

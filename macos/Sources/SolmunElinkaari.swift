@@ -20,8 +20,9 @@ enum SolmunElinkaari {
             }
             return Oletukset.dataHakemisto()
         }()
-        return SolmuAsetukset(data: data, avain: avain, vertaiset: [vertainen], vanha: vertainen,
-                              headless: UserDefaults.standard.bool(forKey: "scopes2.headless"), laite: Oletukset.laite())
+        return SolmuAsetukset(data: data, avain: avain, vertaiset: [vertainen] + Oletukset.testiVertaiset(), vanha: vertainen,
+                              headless: UserDefaults.standard.bool(forKey: "scopes2.headless"), laite: Oletukset.laite(),
+                              portti: Oletukset.testiPortti())
     }
 
     /// Käynnistää solmun, jos se ei ole käynnissä; puuttuva avain ei ole virhe (asetusnäkymä avautuu).
@@ -33,6 +34,12 @@ enum SolmunElinkaari {
         } catch {
             NSLog("scopes-V2: solmun käynnistys epäonnistui: \(error)")
         }
+    }
+
+    /// Headless-kytkimen muutos (T-52): pysäytys ja käynnistys uusilla asetuksilla.
+    static func uudelleen() async {
+        await Solmu.jaettu.pysayta()
+        await kaynnista()
     }
 
     static func asiakas() async -> Asiakas? {

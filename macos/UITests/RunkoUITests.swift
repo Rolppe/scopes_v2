@@ -17,21 +17,94 @@ final class RunkoUITests: XCTestCase {
         let app = XCUIApplication()
         app.launchEnvironment["SCOPES2_AVAIN"] = try avain()
         app.launchEnvironment["SCOPES2_VERTAINEN"] = osoite
+        app.launchEnvironment["SCOPES2_KUITTAUS"] = "pois"   // T-52: ei kuluta koeytimen lukemattomia kuittaustarkistukselta
         app.launchEnvironment["SCOPES2_DATA"] = NSTemporaryDirectory() + "scopes2-ui-" + UUID().uuidString
         app.launch()
         return app
     }
 
     private func palvelin<T: Decodable>(_ polku: String, _ tyyppi: T.Type) async throws -> T {
-        var req = URLRequest(url: URL(string: osoite + polku)!)
+        var req = URLRequest(url: URL(string: osoite + polku)!, timeoutInterval: 240)   // kylmä silta: skooppilista ja viestit voivat kestää minuutin
         req.setValue("Bearer " + (try avain()), forHTTPHeaderField: "Authorization")
-        let (data, _) = try await URLSession.shared.data(for: req)
-        return try JSONDecoder().decode(T.self, from: data)
+        // silta 8787:ään voi vastata hetkellisesti 502/503 ({"virhe":"silta"}): 5xx uusitaan 4 kertaa 10 s välein; muu kuin 200
+        // heittää tilan ja rungon alun, jotta syy näkyy testituloksessa (T-52:n ajossa keyNotFound 'viestit' ilman syytä)
+        var yritys = 1
+        while true {
+            let (data, vastaus) = try await URLSession.shared.data(for: req)
+            let koodi = (vastaus as? HTTPURLResponse)?.statusCode ?? 0
+            if koodi == 200 { return try JSONDecoder().decode(T.self, from: data) }
+            guard koodi >= 500, yritys < 5 else {
+                throw ApiVirhe(description: "\(polku): HTTP \(koodi) \(String(decoding: data.prefix(300), as: UTF8.self))")
+            }
+            yritys += 1
+            try await Task.sleep(nanoseconds: 10_000_000_000)
+        }
     }
+
+    private struct ApiVirhe: Error, CustomStringConvertible { let description: String }
 
     private struct Nimi: Decodable { let nimi: String }
     private struct Tyhja: Decodable {}
     private struct Viestit: Decodable { let viestit: [Tyhja] }
+    private struct ViestiAika: Decodable { let aika: String? }
+    private struct ViestitAjalla: Decodable { let viestit: [ViestiAika] }
+
+    /// Testi vaatii vähintään yhden palvelimella avoimen istunnon: /viestit palauttaa viestejä vain niille (muille viestit=[]).
+    /// Elävän istunnon viestit kasvavat testin aikana, joten testiskooppeina ovat skoopit, joilla on viestejä, vanhin viimeisin viesti
+    /// ensin (ei kovaa ikärajaa: ympäristö ei ole aina hiljaa); määrävertailu: vertaaAikavaliin.
+    private func vakaat(_ skoopit: [String]) async throws -> [(nimi: String, maara: Int)] {
+        let iso = ISO8601DateFormatter()
+        iso.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        var tulos: [(String, Int, Date)] = []
+        for n in skoopit {
+            let koodattu = n.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? n
+            let v = try await palvelin("/api/skoopit/\(koodattu)/viestit", ViestitAjalla.self)
+            guard let viimeinen = v.viestit.last else { continue }
+            tulos.append((n, v.viestit.count, viimeinen.aika.flatMap { iso.date(from: $0) } ?? .distantPast))
+        }
+        return tulos.sorted { $0.2 < $1.2 }.map { ($0.0, $0.1) }
+    }
+
+    /// Kylmä koeydin: odota terveys ja yksi skooppilistan kierros sillan läpi ennen ensimmäistä liitekutsua.
+    private func lampiaKoeydin() async throws -> Int {
+        struct Terveys: Decodable { let ok: Bool? }
+        for _ in 0..<60 {
+            if let t = try? await palvelin("/api/terveys", Terveys.self), t.ok == true { break }
+            try await Task.sleep(nanoseconds: 1_000_000_000)
+        }
+        return try await palvelin("/api/skoopit", [Nimi].self).count
+    }
+
+    /// /viestit on 120 viimeisimmän viestin liukuva ikkuna: elävässä istunnossa vanhimmat putoavat ja uusia tulee laskennan aikana, joten
+    /// pelkät määrät eivät ole vertailukelpoisia. Verrataan UI:n ensimmäisen ja viimeisen aikaleimallisen viestirivin välisiä rivejä (niiden
+    /// kanssa, työkalurivit mukaan lukien, UI-järjestyksessä) API:n samojen kahden viestin välisiin. Reunojen ulkopuoliset työkalurivit eivät
+    /// kuulu vertailuun; viestiriviltä puuttuva aika kaataa testin. Reunaviesti, jota API-ikkunassa ei ole, kaataa testin (UI näyttää pudonneen).
+    private func vertaaAikavaliin(_ nimi: String, _ avaimet: [String], ennen: [ViestiAika]) async throws {
+        let viestit = avaimet.indices.filter { avaimet[$0].hasPrefix("viesti|") }
+        guard let a = viestit.first, let b = viestit.last else { return XCTFail("UI:ssa ei viestirivejä: \(nimi)") }
+        var ajat: [String] = []
+        for i in [a, b] {
+            guard let r = avaimet[i].range(of: #"\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d(\.\d+)?Z"#, options: [.regularExpression, .backwards]) else {
+                return XCTFail("viestiriviltä puuttuu aika skoopissa \(nimi): \(avaimet[i].prefix(80))")
+            }
+            ajat.append(String(avaimet[i][r]))
+        }
+        for i in viestit where avaimet[i].range(of: #"\d{4}-\d\d-\d\dT\d\d:\d\d"#, options: .regularExpression) == nil {
+            return XCTFail("viestiriviltä puuttuu aika skoopissa \(nimi): \(avaimet[i].prefix(80))")
+        }
+        let koodattu = nimi.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? nimi
+        // ikkuna liukuu laskennan aikana: ennen avausta haettu lista + jälkeen-listan viestit, jotka ovat ennen-listan viimeistä myöhempiä
+        let jalkeen = try await palvelin("/api/skoopit/\(koodattu)/viestit", ViestitAjalla.self).viestit
+        let iso = ISO8601DateFormatter()
+        iso.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        let raja = ennen.last?.aika.flatMap { iso.date(from: $0) } ?? .distantPast
+        let api = ennen + jalkeen.filter { ($0.aika.flatMap { iso.date(from: $0) } ?? .distantPast) > raja }
+        guard let ia = api.firstIndex(where: { $0.aika == ajat[0] }), let ib = api.firstIndex(where: { $0.aika == ajat[1] }) else {
+            return XCTFail("UI:n reunaviesti puuttuu API-ikkunasta skoopissa \(nimi) (\(ajat[0]), \(ajat[1]); API \(api.first?.aika ?? "-") … \(api.last?.aika ?? "-"))")
+        }
+        let ui = b - a + 1, odotus = abs(ib - ia) + 1
+        XCTAssertEqual(ui, odotus, "rivimäärä skoopissa \(nimi) viestien \(ajat.min()!) … \(ajat.max()!) välillä: UI \(ui), API \(odotus) (ikkunassa \(api.count))")
+    }
 
     private func skooppiRivit(_ app: XCUIApplication) -> XCUIElementQuery {
         app.descendants(matching: .any).matching(NSPredicate(format: "identifier BEGINSWITH 'skooppi-' AND identifier != 'skooppi-suodatin'"))
@@ -105,69 +178,80 @@ final class RunkoUITests: XCTestCase {
 
     func testViestitVastaavatPalvelinta() async throws {
         let skoopit = try await palvelin("/api/skoopit", [Nimi].self).map(\.nimi)
-        var maarat: [(String, Int)] = []
-        for n in skoopit {
-            let koodattu = n.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? n
-            maarat.append((n, try await palvelin("/api/skoopit/\(koodattu)/viestit", Viestit.self).viestit.count))
-        }
-        let kaksi = maarat.sorted { $0.1 > $1.1 }.prefix(2)
+        let kaksi = Array(try await vakaat(skoopit).prefix(2))
+        XCTAssertFalse(kaksi.isEmpty, "ei skooppia, jolla on viestejä (tarvitaan vähintään yksi palvelimella avoin istunto)")
         let app = try kaynnista()
-        for (nimi, maara) in kaksi {
+        for (nimi, _) in kaksi {
             let rivi = etsiRivi(app, nimi)
             XCTAssertTrue(rivi.exists, "skooppi \(nimi) ei listalla")
+            let koodattu = nimi.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? nimi
+            let ennen = try await palvelin("/api/skoopit/\(koodattu)/viestit", ViestitAjalla.self).viestit
             rivi.click()
-            XCTAssertTrue(app.descendants(matching: .any).matching(NSPredicate(format: "identifier IN {'viesti','tyokalu-rivi'}")).firstMatch.waitForExistence(timeout: 30), "viestejä ei näy: \(nimi)")
+            XCTAssertTrue(app.descendants(matching: .any).matching(NSPredicate(format: "identifier IN {'viesti','tyokalu-rivi'}")).firstMatch.waitForExistence(timeout: 90), "viestejä ei näy: \(nimi)")
             let tulos = try laske(app) { $0.identifier == "viesti" || $0.identifier == "tyokalu-rivi" }   // macOS: työkalurivi on yksi elementti (tyyppi any), ei kolmea kuten iOS:llä
             XCTAssertEqual(tulos.aukkoja, 0, "limitys katkesi \(tulos.aukkoja) kertaa skoopissa \(nimi)")
-            XCTAssertEqual(tulos.maara, maara, "viestimäärä skoopissa \(nimi)")
+            try await vertaaAikavaliin(nimi, tulos.avaimet, ennen: ennen)
         }
     }
 
     /// LazyVStack luo rivit vain näkyvälle alueelle: vieritetään alkuun ja alas puoli ruutua kerrallaan, ja yhdistetään peräkkäiset ikkunat
     /// limityksen mukaan; limitys hyväksytään vain, jos kaikkien limittyvien rivien siirtymä on sama (identtiset rivit eivät sekoita laskentaa).
-    private func laske(_ app: XCUIApplication, _ kelpaa: (XCUIElementSnapshot) -> Bool) throws -> (maara: Int, aukkoja: Int) {
+    private func laske(_ app: XCUIApplication, _ kelpaa: (XCUIElementSnapshot) -> Bool) throws -> (maara: Int, aukkoja: Int, avaimet: [String]) {
         // näkymä alkaa alareunasta ja vanhempia viestejä ladataan ylös vieritettäessä: lasketaan alhaalta ylös (ikkunat peilataan)
         let lista = app.scrollViews.containing(NSPredicate(format: "identifier IN {'viesti','tyokalu-rivi'}")).firstMatch
-        let askel = lista.frame.height * 0.45
+        let askel = lista.frame.height * 0.45, maksimiSiirtyma = lista.frame.height * 0.75
         var edellinen: [Rivi] = []
         var maara = 0, aukkoja = 0, paikallaan = 0, siirtyma = askel
-        var loki: [String] = []
+        var loki: [String] = [], avaimet: [String] = []   // avaimet: lasketut rivit UI-järjestyksessä (vertaaAikavaliin)
         defer { let l = XCTAttachment(string: loki.joined(separator: "\n")); l.name = "laskenta"; l.lifetime = .keepAlways; add(l) }
         for _ in 0..<2000 {
             let nyt = try ikkuna(app, kelpaa).reversed().map { Rivi(avain: $0.avain, y: -$0.y) }
             if edellinen.isEmpty {
                 maara = nyt.count
+                avaimet = nyt.map(\.avain)
                 loki.append("alku \(nyt.count)")
+            } else if nyt.map(\.avain) == edellinen.map(\.avain) && zip(nyt, edellinen).allSatisfy({ abs($0.y - $1.y) < 2 }) {
+                // paikallaan ennen limityshakua: muuten identtisten työkalurivien pari antaa paikallaan olevalle ikkunalle näennäisen
+                // limityksen (T-49 ajo 3: k=2 s=896 583 kertaa, 11780 vs API 120)
+                paikallaan += 1
+                if paikallaan >= 2 { break }
             } else {
+                // rivit, joiden avain on kummassakin ikkunassa täsmälleen kerran (y edellisessä, y nyt): niiden on siirryttävä limityksen
+                // siirtymällä; pelkkien työkalurivien alueella (ei yksilöllisiä avaimia) riittävät paikallaan- ja ylärajaehdot
+                let yhteiset: [(CGFloat, CGFloat)] = edellinen.compactMap { r in
+                    guard edellinen.filter({ $0.avain == r.avain }).count == 1, let m = nyt.first(where: { $0.avain == r.avain }),
+                          nyt.filter({ $0.avain == r.avain }).count == 1 else { return nil }
+                    return (r.y, m.y)
+                }
                 var paras: (k: Int, s: CGFloat)?
                 for k in 1...max(1, min(edellinen.count, nyt.count)) where k <= min(edellinen.count, nyt.count) {
                     let a = edellinen.suffix(k), b = nyt.prefix(k)
                     guard zip(a, b).allSatisfy({ $0.avain == $1.avain }) else { continue }
                     let ero = zip(a, b).map { $0.y - $1.y }
-                    guard let lo = ero.min(), let hi = ero.max(), hi - lo < 6, lo > 4 else { continue }
+                    guard let lo = ero.min(), let hi = ero.max(), hi - lo < 6, lo > 4, hi < maksimiSiirtyma else { continue }
                     let s = (lo + hi) / 2
+                    guard yhteiset.allSatisfy({ abs($0.0 - $0.1 - s) < 6 }) else { continue }
                     if paras == nil || abs(s - siirtyma) < abs(paras!.s - siirtyma) { paras = (k, s) }
                 }
                 if let p = paras {
                     maara += nyt.count - p.k
+                    avaimet += nyt.dropFirst(p.k).map(\.avain)
                     loki.append("k=\(p.k) s=\(Int(p.s)) uusia=\(nyt.count - p.k) yht=\(maara)")
                     siirtyma = p.s
                     paikallaan = 0
-                } else if nyt.map(\.avain) == edellinen.map(\.avain) && zip(nyt, edellinen).allSatisfy({ abs($0.y - $1.y) < 2 }) {
-                    paikallaan += 1
-                    if paikallaan >= 2 { break }
                 } else {
-                    maara += nyt.count; aukkoja += 1; paikallaan = 0; loki.append("AUKKO \(nyt.count)")   // ei luotettavaa limitystä
+                    maara += nyt.count; avaimet += nyt.map(\.avain); aukkoja += 1; paikallaan = 0; loki.append("AUKKO \(nyt.count)")   // ei luotettavaa limitystä
                 }
             }
             edellinen = nyt
             lista.scroll(byDeltaX: 0, deltaY: askel)
         }
-        return (maara, aukkoja)
+        return (maara, aukkoja, avaimet)
     }
 
     /// Liite macOS:ltä: fileImporter-polun sijaan Asiakas.liite väliaikaistiedostolla; sha256:n tarkistaa valvoja T-51-ajossa palvelimella.
     func testLiiteMacilta() async throws {
+        _ = try await lampiaKoeydin()
         let skoopit = try await palvelin("/api/skoopit", [Nimi].self).map(\.nimi)
         let kohde = skoopit.contains("test") ? "test" : try XCTUnwrap(skoopit.first, "palvelimella ei skoopteja")
         let sisalto = Data("scopes-V2 liite \(UUID().uuidString)".utf8)

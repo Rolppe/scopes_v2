@@ -7,15 +7,19 @@ public struct Lahetys: View {
     let skooppi: String
     let voiLahettaa: Bool
     let jalkeen: () async -> Void
-    /// Luonnos on @State; T-52 vie sen tilaan.
+    /// Luonnos synkataan tilaan (luonnos/<skooppi>, 1 s viive) kun `tila` annetaan.
+    let tila: Tilasynkka?
     @State private var luonnos = ""
 
-    public init(asiakas: Asiakas, skooppi: String, voiLahettaa: Bool = true, jalkeen: @escaping () async -> Void = {}) {
+    public init(asiakas: Asiakas, skooppi: String, voiLahettaa: Bool = true, tila: Tilasynkka? = nil, jalkeen: @escaping () async -> Void = {}) {
         self.asiakas = asiakas
         self.skooppi = skooppi
         self.voiLahettaa = voiLahettaa
+        self.tila = tila
         self.jalkeen = jalkeen
     }
+
+    private var avain: String { TilaAvain.luonnos(skooppi) }
 
     public var body: some View {
         Syottokentta(
@@ -29,5 +33,10 @@ public struct Lahetys: View {
                 await jalkeen()
             }
         )
+        .onAppear { if let t = tila?.teksti(avain), t != luonnos { luonnos = t } }
+        .onChange(of: tila?.teksti(avain)) { _, uusi in
+            if let uusi, uusi != luonnos { luonnos = uusi }
+        }
+        .onChange(of: luonnos) { _, uusi in tila?.kirjoita(avain, .teksti(uusi)) }
     }
 }
