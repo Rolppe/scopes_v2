@@ -2,6 +2,7 @@
 //! `scopes-solmu`-binääri ja C-rajapinta (`ffi`) käyttävät samaa polkua.
 
 use crate::api::{self, Tila};
+use crate::peili::{self, PeiliIkkuna};
 use crate::varasto::Varasto;
 use crate::{lr, nakymat, vertaiset, web};
 use std::fmt;
@@ -9,7 +10,7 @@ use std::io::Write;
 use std::os::unix::fs::{OpenOptionsExt, PermissionsExt};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 use tokio::sync::oneshot;
 use tokio::task::JoinHandle;
 
@@ -39,6 +40,10 @@ pub struct Asetukset {
     pub laite: String,
     pub lr_vertainen: Option<String>,
     pub web: Option<PathBuf>,
+    /// S-9: transkriptipeilin ikkuna vuorokausina; `None` = täysi solmu (oletus).
+    pub peili_ikkuna_vrk: Option<u32>,
+    /// S-9: peilin katto megatavuina (oletus 38); käytössä vain ikkunan kanssa.
+    pub peili_katto_mt: u32,
 }
 
 /// Käynnistysvirhe: `koodi` on C-rajapinnan virhekoodi, `teksti` ei sisällä avaimia.
@@ -76,6 +81,43 @@ fn kirjoita_vanha_avain(data: &Path, arvo: &str) -> std::io::Result<PathBuf> {
     f.set_permissions(std::fs::Permissions::from_mode(0o600))?;
     f.write_all(arvo.as_bytes())?;
     Ok(polku)
+}
+
+/// Ajaa karsinnan erillisessä säikeessä (SQLite on synkroninen).
+async fn karsi_kerran(tila: &Arc<Tila>) {
+    let t = tila.clone();
+    match tokio::task::spawn_blocking(move || peili::karsi(&t)).await {
+        Ok(Ok(k)) if k.poistetut > 0 => eprintln!(
+            "peilin karsinta: {} yksikköä pois, {} -> {} tavua",
+            k.poistetut, k.tavut_ennen, k.tavut_jalkeen
+        ),
+        Ok(Err(e)) => eprintln!("peilin karsinta epäonnistui: {e}"),
+        _ => {}
+    }
+}
+
+/// S-9c: karsinta käynnistyksessä ja kirjoituserän jälkeen, enintään kerran `KARSINTAVALI`ssä.
+/// Tehtävä päättyy, kun solmu keskeyttää sen (`Kaynnissa::sammuta`).
+fn karsinta_tehtava(tila: Arc<Tila>) -> JoinHandle<()> {
+    tokio::spawn(async move {
+        let mut rx = tila.lahetin.subscribe();
+        karsi_kerran(&tila).await;
+        let mut viimeksi = Instant::now();
+        loop {
+            if let Err(tokio::sync::broadcast::error::RecvError::Closed) = rx.recv().await {
+                break;
+            }
+            // Erä: odota minuutti edellisestä karsinnasta ja tyhjennä sillä välin kertyneet tapahtumat.
+            tokio::time::sleep(peili::KARSINTAVALI.saturating_sub(viimeksi.elapsed())).await;
+            while !matches!(
+                rx.try_recv(),
+                Err(tokio::sync::broadcast::error::TryRecvError::Empty
+                    | tokio::sync::broadcast::error::TryRecvError::Closed)
+            ) {}
+            karsi_kerran(&tila).await;
+            viimeksi = Instant::now();
+        }
+    })
 }
 
 /// Käynnistää solmun: varasto, `Tila`, sidonta `127.0.0.1:<portti>`, vertaiset, näkymät, LR ja palvelin.
@@ -120,12 +162,16 @@ pub async fn kaynnista(a: Asetukset) -> Result<Kaynnissa, Virhe> {
         vertaiset: a.vertaiset,
         lr_vertainen: a.lr_vertainen,
         lahetin,
+        peili: PeiliIkkuna::uusi(a.peili_ikkuna_vrk, a.peili_katto_mt),
     });
-    let tehtavat = vec![
+    let mut tehtavat = vec![
         vertaiset::kaynnista(tila.clone()),
         nakymat::kaynnista(tila.clone()),
         lr::kaynnista(tila.clone()),
     ];
+    if tila.peili.ikkuna_vrk.is_some() {
+        tehtavat.push(karsinta_tehtava(tila.clone()));
+    }
     let reitit = api::router(tila).merge(web::reitit(a.web));
     let (sammuta, pysayta) = oneshot::channel::<()>();
     let palvelin = tokio::spawn(async move {

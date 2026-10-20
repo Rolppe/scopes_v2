@@ -34,6 +34,12 @@ struct Args {
     /// Web-asiakkaan hakemisto (tarjoillaan polusta /web/)
     #[arg(long)]
     web: Option<PathBuf>,
+    /// Transkriptipeilin ikkuna vuorokausina (ei annettu = täysi solmu)
+    #[arg(long)]
+    peili_ikkuna_vrk: Option<u32>,
+    /// Transkriptipeilin katto megatavuina (käytössä vain ikkunan kanssa)
+    #[arg(long, default_value_t = 38)]
+    peili_katto_mt: u32,
     #[command(subcommand)]
     komento: Option<Komento>,
 }
@@ -114,6 +120,8 @@ async fn main() {
         laite: laite_id(),
         lr_vertainen: args.lr_vertainen,
         web: args.web.map(kotiin),
+        peili_ikkuna_vrk: args.peili_ikkuna_vrk,
+        peili_katto_mt: args.peili_katto_mt,
     };
     let kaynnissa = solmu::kaynnista(asetukset)
         .await

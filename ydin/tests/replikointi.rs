@@ -59,6 +59,7 @@ fn solmu(laite: &str) -> Solmu {
         vertaiset: vec![],
         lr_vertainen: None,
         lahetin,
+        peili: Default::default(),
     });
     Solmu { _tmp: tmp, tila }
 }
