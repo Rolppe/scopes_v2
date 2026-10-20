@@ -31,6 +31,8 @@ pub struct Tila {
     pub vertaiset: Vec<String>,
     pub lr_vertainen: Option<String>,
     pub lahetin: broadcast::Sender<Tapahtuma>,
+    /// Transkriptipeilin aikaikkuna ja katto (S-9); oletus = täysi solmu.
+    pub peili: peili::PeiliIkkuna,
 }
 
 /// Keep-alive-väli tuotannossa (S-1).
@@ -67,6 +69,15 @@ pub fn kirjoita_yhdistajalla(tila: &Tila, y: &Yksikko, yh: Yhdistaja) -> Result<
 pub async fn kirjoita_ja_ilmoita(tila: &Tila, y: &Yksikko) -> Result<Option<u64>> {
     if y.polku == tila::POLKU {
         return tila::kirjoita_tilaan(tila, y);
+    }
+    if y.polku == peili::POLKU && tila.peili.ikkuna_vrk.is_some() {
+        // S-9a: ikkunoitu solmu hylkää ikkunaa vanhemman yksikön hiljaa ja riisuu muun.
+        return match peili::ikkunoi(tila, y, kello_ms()) {
+            Some(riisuttu) => {
+                kirjoita_yhdistajalla(tila, &riisuttu, yhdistaja_yksikolle(&riisuttu))
+            }
+            None => Ok(None),
+        };
     }
     kirjoita_yhdistajalla(tila, y, yhdistaja_yksikolle(y))
 }

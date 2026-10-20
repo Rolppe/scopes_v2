@@ -56,6 +56,7 @@ impl Palvelin {
             vertaiset: vec![],
             lr_vertainen: None,
             lahetin,
+            peili: Default::default(),
         });
         let app = api::router_valilla(tila.clone(), Duration::from_millis(100));
         let kuuntelija = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();

@@ -51,6 +51,12 @@ struct AsetuksetJson {
     headless: bool,
     #[serde(default)]
     laite: Option<String>,
+    /// S-9: puuttuva avain tai null = täysi solmu.
+    #[serde(default)]
+    peili_ikkuna_vrk: Option<u32>,
+    /// S-9: puuttuva avain tai null = 38.
+    #[serde(default)]
+    peili_katto_mt: Option<u32>,
 }
 
 fn onnistui_json(portti: u16) -> String {
@@ -116,6 +122,8 @@ unsafe fn kaynnista_sisa(json: *const c_char, ulos: *mut c_char, koko: usize) ->
             .unwrap_or_else(|| "solmu".to_string()),
         lr_vertainen: None,
         web: None,
+        peili_ikkuna_vrk: j.peili_ikkuna_vrk,
+        peili_katto_mt: j.peili_katto_mt.unwrap_or(38),
     };
 
     let mut lukko = lukitse();

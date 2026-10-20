@@ -13,7 +13,10 @@ extern "C" {
  * Kaynnistaa solmun ja palaa, kun portti kuuntelee.
  * asetukset_json: {"data":"<hakemisto>","avain":"<Bearer>","portti":0,
  *                  "vertaiset":["http://127.0.0.1:8797"],"vanha":"http://127.0.0.1:8797"|null,
- *                  "vanha_avain":"<Bearer>"|null,"headless":false,"laite":"<laite-id>"}
+ *                  "vanha_avain":"<Bearer>"|null,"headless":false,"laite":"<laite-id>",
+ *                  "peili_ikkuna_vrk":<n>|null,"peili_katto_mt":<n>}
+ * peili_ikkuna_vrk: transkriptipeilin ikkuna vuorokausina; puuttuva avain tai null = taysi solmu.
+ * peili_katto_mt: peilin katto megatavuina (oletus 38; kaytossa vain ikkunan kanssa).
  * ulos: puskuri, johon kirjoitetaan NUL-paatteinen JSON; ulos_koko on sen koko tavuina.
  * Palauttaa kuunnellun portin (>= 1); ulos = {"portti":<n>,"versio":"<crate-versio>"}.
  * Virheessa < 0: -1 JSON, -2 data-hakemisto, -3 portti, -4 jo kaynnissa, -5 ulos liian pieni,

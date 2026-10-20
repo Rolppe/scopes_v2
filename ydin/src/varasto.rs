@@ -224,6 +224,33 @@ impl Varasto {
         rivit.collect()
     }
 
+    /// Polun elävien (ei hautakivien) yksiköiden `(id, aika, sisalto-tavut)`; sisältöjä ei lueta muistiin
+    /// (SQL `length(sisalto)`). Karsinnan (S-9c) ja `GET /api/peili/koko`:n summat.
+    pub fn sisalto_koot(&self, polku: &str) -> Result<Vec<(String, String, u64)>> {
+        let c = self.yhteys();
+        let mut kysely = c.prepare(
+            "SELECT id, aika, COALESCE(length(sisalto), 0) FROM yksikot WHERE polku = ?1 AND poistettu = 0",
+        )?;
+        let rivit = kysely.query_map(params![polku], |r| {
+            Ok((
+                r.get::<_, String>(0)?,
+                r.get::<_, String>(1)?,
+                r.get::<_, i64>(2)?.max(0) as u64,
+            ))
+        })?;
+        rivit.collect()
+    }
+
+    /// S-9c: poistaa rivin fyysisesti (ei hautakiveä, ei muutoslokiriviä). Palauttaa oliko rivi olemassa.
+    pub fn poista_paikallisesti(&self, polku: &str, id: &str) -> Result<bool> {
+        let c = self.yhteys();
+        let n = c.execute(
+            "DELETE FROM yksikot WHERE polku = ?1 AND id = ?2",
+            params![polku, id],
+        )?;
+        Ok(n > 0)
+    }
+
     /// Kaikki erilliset polut (hautakivien polut mukana) lataamatta yksiköitä.
     pub fn polut(&self) -> Result<BTreeSet<String>> {
         let c = self.yhteys();

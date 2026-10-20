@@ -79,6 +79,7 @@ impl Palvelin {
             vertaiset: vec![],
             lr_vertainen: None,
             lahetin,
+            peili: Default::default(),
         });
         let hakemisto = web_kaytossa.then(|| tmp.web());
         let osoite = palvele(api::router(tila.clone()).merge(web::reitit(hakemisto))).await;

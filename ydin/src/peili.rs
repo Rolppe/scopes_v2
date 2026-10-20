@@ -17,10 +17,11 @@ use axum::{
 };
 use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::sync::{Arc, Mutex};
+use std::time::{Duration, Instant};
 
-const POLKU: &str = "peili";
+pub const POLKU: &str = "peili";
 const OFFSET_POLKU: &str = "peili-offset";
 
 /// Sarjoittaa offsetin tarkistuksen ja kirjoituksen, jotta kaksi samanaikaista POST:ia ei kirjoita päällekkäin.
@@ -29,6 +30,7 @@ static KIRJOITUS: Mutex<()> = Mutex::new(());
 pub fn reitit(tila: Arc<Tila>) -> Router {
     Router::new()
         .route("/api/peili", post(laheta))
+        .route("/api/peili/koko", get(koko))
         .route("/api/peili/*tiedosto", get(hae_offset))
         .with_state(tila)
 }
@@ -210,6 +212,221 @@ async fn hae_offset(State(t): State<Arc<Tila>>, Path(polku): Path<String>) -> Re
     };
     match offset(&t.varasto, tiedosto) {
         Ok(n) => Json(json!({"offset": n})).into_response(),
+        Err(e) => virhe(StatusCode::INTERNAL_SERVER_ERROR, &e.to_string()),
+    }
+}
+
+// ---- Aikaikkuna (S-9, ARK-17) ------------------------------------------------------------------------
+
+const PAIVA_MS: u64 = 86_400_000;
+/// Megatavu katon yksikkönä (Mt = 2^20 tavua).
+const MT: u64 = 1_048_576;
+/// S-9e: taustahaulla haetut yksiköt pysyvät karsinnan ulkopuolella näin kauan.
+pub const HAKUSUOJA: Duration = Duration::from_secs(600);
+/// Karsintojen vähimmäisväli (S-9c).
+pub const KARSINTAVALI: Duration = Duration::from_secs(60);
+
+/// Laitekohtainen peiliasetus ja karsinnan suojamuisti (`Tila.peili`). Oletus = täysi solmu.
+pub struct PeiliIkkuna {
+    /// `None` = täysi solmu (ei ikkunaa, ei karsintaa).
+    pub ikkuna_vrk: Option<u32>,
+    /// Katto megatavuina; käytössä vain ikkunan kanssa.
+    pub katto_mt: u32,
+    /// S-9e: viimeksi pyynnöstä haetut yksiköt (id -> hetki); karsinta ohittaa alle `HAKUSUOJA` vanhat.
+    pub haetut: Mutex<HashMap<String, Instant>>,
+}
+
+impl Default for PeiliIkkuna {
+    fn default() -> Self {
+        PeiliIkkuna::uusi(None, 38)
+    }
+}
+
+impl PeiliIkkuna {
+    pub fn uusi(ikkuna_vrk: Option<u32>, katto_mt: u32) -> PeiliIkkuna {
+        PeiliIkkuna {
+            ikkuna_vrk,
+            katto_mt,
+            haetut: Mutex::new(HashMap::new()),
+        }
+    }
+
+    /// Merkitsee yksikön (id `<tiedosto>:<offset>`) juuri haetuksi: karsinta ohittaa sen 10 min (S-9e).
+    pub fn merkitse_haetuksi(&self, id: &str) {
+        let mut h = self.haetut.lock().unwrap_or_else(|e| e.into_inner());
+        h.retain(|_, t| t.elapsed() < HAKUSUOJA);
+        h.insert(id.to_string(), Instant::now());
+    }
+
+    fn suojattu(&self, id: &str) -> bool {
+        let h = self.haetut.lock().unwrap_or_else(|e| e.into_inner());
+        h.get(id).is_some_and(|t| t.elapsed() < HAKUSUOJA)
+    }
+}
+
+/// Karsinnan tulos.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Karsinta {
+    pub poistetut: usize,
+    pub tavut_ennen: u64,
+    pub tavut_jalkeen: u64,
+}
+
+fn teksti_lohko(l: &Value) -> bool {
+    l.get("type").and_then(Value::as_str) == Some("text")
+}
+
+fn tynkarivi(tyyppi: Option<&Value>) -> String {
+    let tyyppi = tyyppi
+        .filter(|t| t.is_string())
+        .cloned()
+        .unwrap_or(Value::Null);
+    json!({"type": tyyppi, "karsittu": true}).to_string()
+}
+
+fn riisu_rivi(rivi: &str) -> String {
+    let Ok(Value::Object(o)) = serde_json::from_str::<Value>(rivi) else {
+        return tynkarivi(None);
+    };
+    let tyyppi = o.get("type");
+    if !matches!(tyyppi.and_then(Value::as_str), Some("user" | "assistant")) {
+        return tynkarivi(tyyppi);
+    }
+    let viesti = o.get("message");
+    let sisalto = match viesti.and_then(|m| m.get("content")) {
+        Some(Value::String(s)) if !s.is_empty() => Some(Value::String(s.clone())),
+        Some(Value::Array(a)) => {
+            let tekstit: Vec<Value> = a.iter().filter(|l| teksti_lohko(l)).cloned().collect();
+            (!tekstit.is_empty()).then_some(Value::Array(tekstit))
+        }
+        _ => None,
+    };
+    let Some(sisalto) = sisalto else {
+        return tynkarivi(tyyppi);
+    };
+    let mut ulos = serde_json::Map::new();
+    for avain in ["type", "timestamp", "uuid"] {
+        if let Some(v) = o.get(avain) {
+            ulos.insert(avain.to_string(), v.clone());
+        }
+    }
+    let mut viesti_ulos = serde_json::Map::new();
+    for avain in ["role", "model"] {
+        if let Some(v) = viesti.and_then(|m| m.get(avain)) {
+            viesti_ulos.insert(avain.to_string(), v.clone());
+        }
+    }
+    viesti_ulos.insert("content".to_string(), sisalto);
+    ulos.insert("message".to_string(), Value::Object(viesti_ulos));
+    Value::Object(ulos).to_string()
+}
+
+/// S-9a: riisuu transkriptirivit viestiteksteiksi. Rivi, jonka type on "user" tai "assistant", säilyttää
+/// avaimet type, timestamp, uuid, message.role, message.model ja message.content (merkkijono sellaisenaan,
+/// taulukosta vain text-lohkot); muu rivi tai rivi, josta ei jää tekstiä, on tyngän
+/// `{"type":<alkuperäinen|null>,"karsittu":true}`. Pituus on sama kuin syötteen.
+pub fn riisu(rivit: &[String]) -> Vec<String> {
+    rivit.iter().map(|r| riisu_rivi(r)).collect()
+}
+
+/// S-9a: ikkunoidun solmun vastaanotto. `None` = hylätään (yksikkö on ikkunaa vanhempi), muuten
+/// yksikkö riisuttuna sisällöltään (id, versio ja aika säilyvät).
+pub fn ikkunoi(tila: &Tila, y: &Yksikko, nyt_ms: u64) -> Option<Yksikko> {
+    let n = tila.peili.ikkuna_vrk?;
+    let raja = nyt_ms.saturating_sub(u64::from(n) * PAIVA_MS);
+    if y.aika.ms < raja {
+        return None;
+    }
+    let mut uusi = y.clone();
+    if let Some(sisalto) = &y.sisalto {
+        // Tunnistamaton sisältö (ei merkkijonotaulukkoa) tallennetaan sellaisenaan.
+        if let Ok(rivit) = serde_json::from_slice::<Vec<String>>(sisalto) {
+            uusi.sisalto = Some(serde_json::to_vec(&riisu(&rivit)).unwrap_or_default());
+        }
+    }
+    Some(uusi)
+}
+
+/// S-9c: poistaa paikallisesti ikkunan ulkopuoliset peili-yksiköt ja pitää sisältötavut katon alla
+/// (vanhin UTC-vuorokausi kerrallaan). Täysi solmu ei koskaan poista mitään. Ei muutoslokia, ei tapahtumaa.
+pub fn karsi(tila: &Tila) -> Result<Karsinta> {
+    let Some(n) = tila.peili.ikkuna_vrk else {
+        return Ok(Karsinta {
+            poistetut: 0,
+            tavut_ennen: 0,
+            tavut_jalkeen: 0,
+        });
+    };
+    let katto = u64::from(tila.peili.katto_mt) * MT;
+    let raja = kello_ms().saturating_sub(u64::from(n) * PAIVA_MS);
+    // (vuorokausi, id, tavut) vanhimmasta; jäsentymättömät ajat ohitetaan.
+    let mut yksikot: Vec<(u64, String, u64)> = tila
+        .varasto
+        .sisalto_koot(POLKU)?
+        .into_iter()
+        .filter_map(|(id, aika, tavut)| Some((Hlc::parse(&aika)?.ms, id, tavut)))
+        .collect();
+    yksikot.sort();
+    let ennen: u64 = yksikot.iter().map(|(_, _, t)| t).sum();
+    let mut jalkeen = ennen;
+    let mut poistetut = 0;
+    let mut poista = |id: &str, tavut: u64, jalkeen: &mut u64| -> Result<()> {
+        if tila.varasto.poista_paikallisesti(POLKU, id)? {
+            poistetut += 1;
+            *jalkeen -= tavut;
+        }
+        Ok(())
+    };
+    // Ikkunan ulkopuoliset.
+    let mut jaljella = Vec::new();
+    for (ms, id, tavut) in yksikot {
+        if ms < raja && !tila.peili.suojattu(&id) {
+            poista(&id, tavut, &mut jalkeen)?;
+        } else {
+            jaljella.push((ms, id, tavut));
+        }
+    }
+    // Katto: vanhin UTC-vuorokausi kerrallaan.
+    let vuorokaudet: BTreeSet<u64> = jaljella.iter().map(|(ms, _, _)| ms / PAIVA_MS).collect();
+    for vrk in vuorokaudet {
+        if jalkeen <= katto {
+            break;
+        }
+        for (_, id, tavut) in jaljella.iter().filter(|(ms, _, _)| ms / PAIVA_MS == vrk) {
+            if !tila.peili.suojattu(id) {
+                poista(id, *tavut, &mut jalkeen)?;
+            }
+        }
+    }
+    Ok(Karsinta {
+        poistetut,
+        tavut_ennen: ennen,
+        tavut_jalkeen: jalkeen,
+    })
+}
+
+/// S-9: `GET /api/peili/koko` -> sisältötavut, yksiköt, vanhin HLC ja asetukset.
+async fn koko(State(t): State<Arc<Tila>>) -> Response {
+    let tulos = tokio::task::spawn_blocking(move || {
+        let koot = t.varasto.sisalto_koot(POLKU)?;
+        let tavut: u64 = koot.iter().map(|(_, _, k)| k).sum();
+        let vanhin = koot
+            .iter()
+            .map(|(_, a, _)| a.as_str())
+            .min()
+            .map(String::from);
+        Ok::<_, rusqlite::Error>(json!({
+            "tavut": tavut,
+            "yksikot": koot.len(),
+            "vanhin": vanhin,
+            "ikkuna_vrk": t.peili.ikkuna_vrk,
+            "katto_mt": t.peili.katto_mt,
+        }))
+    })
+    .await;
+    match tulos {
+        Ok(Ok(v)) => Json(v).into_response(),
+        Ok(Err(e)) => virhe(StatusCode::INTERNAL_SERVER_ERROR, &e.to_string()),
         Err(e) => virhe(StatusCode::INTERNAL_SERVER_ERROR, &e.to_string()),
     }
 }
