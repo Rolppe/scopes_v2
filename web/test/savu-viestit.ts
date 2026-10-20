@@ -174,6 +174,8 @@ try {
   await tid(sivu, 'lahetys-kentta').fill('painikkeella');
   await tid(sivu, 'laheta').click();
   await odota(async () => (await kirjatut()).viestit.some((v) => v.teksti === 'painikkeella'), 3000, 'painike ei lähettänyt');
+  // Mock kirjaa ennen vastausta: kenttä tyhjenee vasta vastauksen jälkeen, ja sitä ennen lähetys on kesken eikä Enter lähetä.
+  await odota(async () => (await tid(sivu, 'lahetys-kentta').inputValue()) === '', 3000, 'kenttä ei tyhjentynyt painikelähetyksen jälkeen');
 
   // Tuntematon skooppi → lahetys-virhe, teksti säilyy. Selaimen 404-konsolirivi on odotettu.
   await sivu.route(`**/api/skoopit/${encodeURIComponent(SKOOPPI)}/viesti`, (r) => {
