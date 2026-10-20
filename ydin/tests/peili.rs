@@ -288,6 +288,34 @@ fn rivit_vain_tiedoston_yksikot_valihaulla() {
     assert_eq!(peili::rivit_alkaen(&v, "ei", 0).unwrap(), (vec![], 0));
 }
 
+/// R-3: offsetia edeltävien yksiköiden sisältöä ei lueta. Rikkinäinen (ei JSON-taulukko) sisältö
+/// offsetin alla ei vaikuta; sama sisältö offsetin kohdalla on virhe, joten sisältö luetaan vain sieltä.
+#[test]
+fn rivit_alkaen_ei_lue_offsetia_edeltavia_sisaltoja() {
+    let tmp = Tmp::uusi();
+    let v = Varasto::avaa(&tmp.0).unwrap();
+    for o in [0, 10] {
+        let y = Yksikko {
+            polku: "peili".to_string(),
+            id: format!("r:{o}"),
+            versio: BTreeMap::from([("koe".to_string(), 1)]),
+            aika: Hlc {
+                ms: 1_800_000_000_000,
+                laskuri: 0,
+                laite: "koe".to_string(),
+            },
+            sisalto: Some(b"ei json".to_vec()),
+            poistettu: false,
+        };
+        v.kirjoita(&y, Yhdistaja::Lisays).unwrap();
+    }
+    peiliyksikko(&v, "r", 20);
+    let (rivit, seuraava) = peili::rivit_alkaen(&v, "r", 20).unwrap();
+    assert_eq!(rivit, vec!["r/20".to_string()]);
+    assert_eq!(seuraava, 20 + "r/20".len() as u64 + 1);
+    assert!(peili::rivit_alkaen(&v, "r", 10).is_err());
+}
+
 #[tokio::test]
 async fn ilman_avainta_401() {
     let p = Palvelin::kaynnista().await;

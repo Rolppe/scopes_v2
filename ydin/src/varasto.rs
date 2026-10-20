@@ -209,6 +209,21 @@ impl Varasto {
         rivit.collect()
     }
 
+    /// Kuten `listaa_vali`, mutta vain otsakkeet (`sisalto` = None): välin sisältöjä ei lueta muistiin.
+    pub fn listaa_vali_otsakkeet(
+        &self,
+        polku: &str,
+        alku: &str,
+        loppu: &str,
+    ) -> Result<Vec<Yksikko>> {
+        let c = self.yhteys();
+        let mut kysely = c.prepare(
+            "SELECT polku, id, versio, aika, NULL, poistettu FROM yksikot WHERE polku = ?1 AND id >= ?2 AND id < ?3 ORDER BY id",
+        )?;
+        let rivit = kysely.query_map(params![polku, alku, loppu], yksikko_rivilta)?;
+        rivit.collect()
+    }
+
     /// Kaikki erilliset polut (hautakivien polut mukana) lataamatta yksiköitä.
     pub fn polut(&self) -> Result<BTreeSet<String>> {
         let c = self.yhteys();
