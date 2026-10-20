@@ -6,18 +6,22 @@
 use crate::api::{kello_ms, kirjoita_yhdistajalla, Tila};
 use crate::muutosloki::Result;
 use crate::varasto::Varasto;
+use crate::vertaiset::Vertainen;
 use crate::yksikko::{Hlc, Yhdistaja, Yksikko};
 use axum::{
     body::Bytes,
-    extract::{Path, State},
+    extract::{Path, Query, State},
     http::StatusCode,
     response::{IntoResponse, Response},
     routing::{get, post},
     Json, Router,
 };
+use rusqlite::{params, Connection, OpenFlags};
+use serde::de::DeserializeOwned;
+use serde::Deserialize;
 use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
-use std::collections::{BTreeMap, BTreeSet, HashMap};
+use std::collections::{BTreeMap, BTreeSet, HashMap, VecDeque};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
@@ -31,7 +35,7 @@ pub fn reitit(tila: Arc<Tila>) -> Router {
     Router::new()
         .route("/api/peili", post(laheta))
         .route("/api/peili/koko", get(koko))
-        .route("/api/peili/*tiedosto", get(hae_offset))
+        .route("/api/peili/*tiedosto", get(hae_tiedostosta))
         .with_state(tila)
 }
 
@@ -206,7 +210,25 @@ async fn laheta(State(t): State<Arc<Tila>>, runko: Bytes) -> Response {
     }
 }
 
-async fn hae_offset(State(t): State<Arc<Tila>>, Path(polku): Path<String>) -> Response {
+/// `GET /api/peili/<tiedosto>/offset` (S-5a) ja `GET /api/peili/<tiedosto>/rivi?offset=<tavu>` (S-9d).
+async fn hae_tiedostosta(
+    State(t): State<Arc<Tila>>,
+    Path(polku): Path<String>,
+    Query(q): Query<HashMap<String, String>>,
+) -> Response {
+    if let Some(tiedosto) = polku.strip_suffix("/rivi").filter(|s| !s.is_empty()) {
+        let Some(alku) = q.get("offset").and_then(|s| s.parse::<u64>().ok()) else {
+            return virhe(StatusCode::BAD_REQUEST, "offset puuttuu");
+        };
+        let tiedosto = tiedosto.to_string();
+        let tulos = tokio::task::spawn_blocking(move || rivi(&t.varasto, &tiedosto, alku)).await;
+        return match tulos {
+            Ok(Ok(Some(n))) => Json(json!({"offset": alku, "rivi": n})).into_response(),
+            Ok(Ok(None)) => virhe(StatusCode::NOT_FOUND, "offset ei ole yksikön alku"),
+            Ok(Err(e)) => virhe(StatusCode::INTERNAL_SERVER_ERROR, &e.to_string()),
+            Err(e) => virhe(StatusCode::INTERNAL_SERVER_ERROR, &e.to_string()),
+        };
+    }
     let Some(tiedosto) = polku.strip_suffix("/offset").filter(|s| !s.is_empty()) else {
         return virhe(StatusCode::NOT_FOUND, "tuntematon polku");
     };
@@ -337,6 +359,11 @@ pub fn ikkunoi(tila: &Tila, y: &Yksikko, nyt_ms: u64) -> Option<Yksikko> {
     if y.aika.ms < raja {
         return None;
     }
+    Some(riisuttu(y))
+}
+
+/// S-9a:n riisunta yksikölle ikkunarajasta riippumatta (id, versio ja aika säilyvät).
+fn riisuttu(y: &Yksikko) -> Yksikko {
     let mut uusi = y.clone();
     if let Some(sisalto) = &y.sisalto {
         // Tunnistamaton sisältö (ei merkkijonotaulukkoa) tallennetaan sellaisenaan.
@@ -344,7 +371,7 @@ pub fn ikkunoi(tila: &Tila, y: &Yksikko, nyt_ms: u64) -> Option<Yksikko> {
             uusi.sisalto = Some(serde_json::to_vec(&riisu(&rivit)).unwrap_or_default());
         }
     }
-    Some(uusi)
+    uusi
 }
 
 /// S-9b/S-9c: karsintarajan sisäinen polku (id "raja", `{"ms":n}`); ei replikoida eikä virtaan.
@@ -482,4 +509,326 @@ async fn koko(State(t): State<Arc<Tila>>) -> Response {
         Ok(Err(e)) => virhe(StatusCode::INTERNAL_SERVER_ERROR, &e.to_string()),
         Err(e) => virhe(StatusCode::INTERNAL_SERVER_ERROR, &e.to_string()),
     }
+}
+
+// ---- Rivipohja ja pyynnöstä haku (S-9d, S-9e) ----------------------------------------------------------
+
+/// S-9d: tiedoston vanhimman paikallisen yksikön pohja (id `<tiedosto>`, `{"offset","rivi"}`). Sisäinen
+/// polku kuten "peili-offset": ei replikoida eikä broadcast-ilmoitusta.
+pub const POHJA_POLKU: &str = "peili-pohja";
+/// S-9d/S-9e: yhden vertaispyynnön aikaraja.
+pub const PYYNNON_AIKARAJA: Duration = Duration::from_secs(10);
+/// S-9e: yhden taustahaun sisältötavut enintään (8 Mt).
+pub const HAKU_TAVUT: u64 = 8 * MT;
+/// S-9e: taustahakujen vähimmäisväli tiedostoa kohden.
+pub const HAKUVALI: Duration = Duration::from_secs(60);
+/// `/api/hae`-pyynnön tunnukset enintään (`replikointi::ERA`).
+const HAE_ERA: usize = 300;
+
+/// Tiedoston rivinumeroinnin pohja: `rivi` riviä edeltää tavua `offset` (S-9d).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Pohja {
+    pub offset: u64,
+    pub rivi: u64,
+}
+
+/// Yksikön alku, jos tunnus `<nimi>:<offset>` kuuluu tiedostolle `tiedosto`.
+fn tiedoston_alku(id: &str, tiedosto: &str) -> Option<u64> {
+    let (nimi, alku) = id.rsplit_once(':')?;
+    if nimi != tiedosto {
+        return None;
+    }
+    alku.parse().ok()
+}
+
+/// S-9d: rivien määrä tiedoston yksiköissä, joiden offset < `alku`; `None`, jos `alku` ei ole yksikön alku.
+/// SQL (`json_array_length`) omalla lukuyhteydellä samaan kantaan (`<data>/ydin.db` kuten `liite.rs`):
+/// rivejä ei ladata muistiin, vain tunnus ja rivimäärä yksikköä kohden.
+pub fn rivi(varasto: &Varasto, tiedosto: &str, alku: u64) -> Result<Option<u64>> {
+    let data = varasto
+        .data()
+        .ok_or_else(|| muunnosvirhe("varaston hakemisto puuttuu".to_string()))?;
+    let c = Connection::open_with_flags(
+        data.join("ydin.db"),
+        OpenFlags::SQLITE_OPEN_READ_ONLY | OpenFlags::SQLITE_OPEN_NO_MUTEX,
+    )?;
+    c.busy_timeout(Duration::from_secs(5))?;
+    let mut kysely = c.prepare(
+        "SELECT id, COALESCE(json_array_length(CAST(sisalto AS TEXT)), 0) FROM yksikot \
+         WHERE polku = ?1 AND id >= ?2 AND id < ?3 AND poistettu = 0",
+    )?;
+    let mut rivit = kysely.query(params![
+        POLKU,
+        format!("{tiedosto}:"),
+        format!("{tiedosto};")
+    ])?;
+    let mut loytyi = false;
+    let mut summa = 0u64;
+    while let Some(r) = rivit.next()? {
+        let id: String = r.get(0)?;
+        let n: i64 = r.get(1)?;
+        match tiedoston_alku(&id, tiedosto) {
+            Some(a) if a == alku => loytyi = true,
+            Some(a) if a < alku => summa += n.max(0) as u64,
+            _ => {}
+        }
+    }
+    Ok(loytyi.then_some(summa))
+}
+
+/// Tiedoston vanhimman paikallisen (ei poistetun) peili-yksikön offset; otsakkeet avainväliltä.
+pub fn vanhin_offset(varasto: &Varasto, tiedosto: &str) -> Result<Option<u64>> {
+    Ok(varasto
+        .listaa_vali_otsakkeet(POLKU, &format!("{tiedosto}:"), &format!("{tiedosto};"))?
+        .into_iter()
+        .filter(|y| !y.poistettu)
+        .filter_map(|y| tiedoston_alku(&y.id, tiedosto))
+        .min())
+}
+
+/// Tallennettu pohja (voi olla vanhentunut, ks. `voimassa_pohja`).
+pub fn pohja(varasto: &Varasto, tiedosto: &str) -> Result<Option<Pohja>> {
+    let Some(y) = varasto.lue(POHJA_POLKU, tiedosto)?.filter(|y| !y.poistettu) else {
+        return Ok(None);
+    };
+    let arvo: Value = y
+        .sisalto
+        .as_deref()
+        .map(serde_json::from_slice)
+        .transpose()
+        .map_err(|e| muunnosvirhe(e.to_string()))?
+        .unwrap_or(Value::Null);
+    Ok(
+        match (
+            arvo.get("offset").and_then(Value::as_u64),
+            arvo.get("rivi").and_then(Value::as_u64),
+        ) {
+            (Some(offset), Some(rivi)) => Some(Pohja { offset, rivi }),
+            _ => None,
+        },
+    )
+}
+
+/// Pohja, joka vastaa tiedoston vanhinta paikallista yksikköä: offset 0 → `{0,0}` ilman hakua; muuten
+/// tallennettu pohja, jos sen offset on vanhimman yksikön alku. `None` = numerointi ei ole tiedossa.
+pub fn voimassa_pohja(varasto: &Varasto, tiedosto: &str) -> Result<Option<Pohja>> {
+    match vanhin_offset(varasto, tiedosto)? {
+        None => Ok(None),
+        Some(0) => Ok(Some(Pohja { offset: 0, rivi: 0 })),
+        Some(o) => Ok(pohja(varasto, tiedosto)?.filter(|p| p.offset == o)),
+    }
+}
+
+/// Tarvitaanko vertaiselta uusi pohja (vanhin paikallinen yksikkö > 0 eikä tallennettu pohja vastaa sitä)?
+pub fn tarvitsee_pohjan(varasto: &Varasto, tiedosto: &str) -> Result<bool> {
+    Ok(
+        matches!(vanhin_offset(varasto, tiedosto)?, Some(o) if o > 0)
+            && voimassa_pohja(varasto, tiedosto)?.is_none(),
+    )
+}
+
+/// Tallentaa pohjan sisäiseen polkuun (suoraan varastoon, ei broadcast-ilmoitusta); sama arvo → ei kirjoitusta.
+fn tallenna_pohja(tila: &Tila, tiedosto: &str, p: Pohja) -> Result<()> {
+    let edellinen = tila.varasto.lue(POHJA_POLKU, tiedosto)?;
+    if pohja(&tila.varasto, tiedosto)? == Some(p) {
+        return Ok(());
+    }
+    let mut versio = edellinen
+        .as_ref()
+        .map(|y| y.versio.clone())
+        .unwrap_or_default();
+    *versio.entry(tila.laite.clone()).or_insert(0) += 1;
+    let y = Yksikko {
+        polku: POHJA_POLKU.to_string(),
+        id: tiedosto.to_string(),
+        versio,
+        aika: Hlc::nyt(&tila.laite, edellinen.as_ref().map(|y| &y.aika), kello_ms()),
+        sisalto: Some(
+            serde_json::to_vec(&json!({"offset": p.offset, "rivi": p.rivi})).unwrap_or_default(),
+        ),
+        poistettu: false,
+    };
+    tila.varasto.kirjoita(&y, Yhdistaja::Lww)?;
+    Ok(())
+}
+
+type Haku<T> = std::result::Result<T, String>;
+
+fn asiakas() -> Haku<reqwest::Client> {
+    reqwest::Client::builder()
+        .connect_timeout(Duration::from_secs(5))
+        .timeout(PYYNNON_AIKARAJA)
+        .build()
+        .map_err(|e| e.to_string())
+}
+
+/// Polun prosenttikoodaus; '/' ja RFC 3986 unreserved säilyvät (tiedostonimessä on hakemisto).
+fn koodaa_polku(s: &str) -> String {
+    let mut ulos = String::with_capacity(s.len());
+    for b in s.bytes() {
+        if b.is_ascii_alphanumeric() || matches!(b, b'-' | b'.' | b'_' | b'~' | b'/') {
+            ulos.push(b as char);
+        } else {
+            ulos.push_str(&format!("%{b:02X}"));
+        }
+    }
+    ulos
+}
+
+fn osoite(v: &Vertainen, polku: &str) -> String {
+    format!("{}{polku}", v.osoite.trim_end_matches('/'))
+}
+
+async fn json_vastaus<T: DeserializeOwned>(v: &Vertainen, rb: reqwest::RequestBuilder) -> Haku<T> {
+    let vastaus = rb
+        .bearer_auth(&v.avain)
+        .send()
+        .await
+        .and_then(reqwest::Response::error_for_status)
+        .map_err(|e| format!("{}: {e}", v.id))?;
+    vastaus.json().await.map_err(|e| format!("{}: {e}", v.id))
+}
+
+/// S-9d/S-9e: ensimmäinen tavoitettava vertainen, jonka tiivistevastauksessa ei ole "ikkunoidut"-kenttää
+/// (S-9b korjaus 1: ikkunoitu solmu ei ole peilin lähde).
+async fn taysi_vertainen(tila: &Tila, http: &reqwest::Client) -> Haku<Vertainen> {
+    for v in crate::vertaiset::vertaiset(tila) {
+        match json_vastaus::<Value>(&v, http.get(osoite(&v, "/api/tiiviste"))).await {
+            Ok(t) if t.get("ikkunoidut").is_none() => return Ok(v),
+            Ok(_) => {}
+            Err(e) => eprintln!("peili: vertainen {e}"),
+        }
+    }
+    Err("ei tavoitettavaa täyttä vertaista".to_string())
+}
+
+async fn vertaisen_rivi(
+    http: &reqwest::Client,
+    v: &Vertainen,
+    tiedosto: &str,
+    alku: u64,
+) -> Haku<u64> {
+    let polku = format!("/api/peili/{}/rivi", koodaa_polku(tiedosto));
+    let r: Value = json_vastaus(
+        v,
+        http.get(osoite(v, &polku))
+            .query(&[("offset", alku.to_string())]),
+    )
+    .await?;
+    r.get("rivi")
+        .and_then(Value::as_u64)
+        .ok_or_else(|| format!("{}: virheellinen rivivastaus", v.id))
+}
+
+/// S-9d: varmistaa tiedoston vanhimman paikallisen yksikön pohjan; puuttuva tai vanhentunut haetaan täydeltä
+/// vertaiselta ja tallennetaan. `None` = tiedostolla ei ole paikallisia yksiköitä.
+pub async fn hae_pohja(tila: &Tila, tiedosto: &str) -> Haku<Option<Pohja>> {
+    let v = &tila.varasto;
+    let Some(vanhin) = vanhin_offset(v, tiedosto).map_err(|e| e.to_string())? else {
+        return Ok(None);
+    };
+    if let Some(p) = voimassa_pohja(v, tiedosto).map_err(|e| e.to_string())? {
+        return Ok(Some(p));
+    }
+    let http = asiakas()?;
+    let vertainen = taysi_vertainen(tila, &http).await?;
+    let rivi = vertaisen_rivi(&http, &vertainen, tiedosto, vanhin).await?;
+    let p = Pohja {
+        offset: vanhin,
+        rivi,
+    };
+    tallenna_pohja(tila, tiedosto, p).map_err(|e| e.to_string())?;
+    Ok(Some(p))
+}
+
+#[derive(Deserialize)]
+struct ListaRivi {
+    id: String,
+}
+
+#[derive(Deserialize)]
+struct Lista {
+    yksikot: Vec<ListaRivi>,
+}
+
+#[derive(Deserialize)]
+struct HaeVastaus {
+    yksikot: Vec<Yksikko>,
+    #[serde(default)]
+    jatko: Vec<String>,
+}
+
+/// S-9e: hakee täydeltä vertaiselta tiedoston edeltävät yksiköt (offset < vanhin paikallinen) uusimmasta
+/// alkaen, enintään `HAKU_TAVUT`; kirjoitus S-9a:n riisunnalla ikkunarajasta riippumatta, yksiköt 10 min
+/// karsinnan suojaan ja pohja päivitetään. Pohja kirjoitetaan ennen yksiköitä, jotta viimeinen kirjoitus
+/// herättää näkymän virran kautta. Palauttaa haettujen yksiköiden määrän.
+pub async fn hae_edeltavat(tila: &Tila, tiedosto: &str) -> Haku<usize> {
+    let Some(vanhin) = vanhin_offset(&tila.varasto, tiedosto).map_err(|e| e.to_string())? else {
+        return Ok(0);
+    };
+    if vanhin == 0 {
+        return Ok(0);
+    }
+    let http = asiakas()?;
+    let v = taysi_vertainen(tila, &http).await?;
+    let lista: Lista = json_vastaus(
+        &v,
+        http.get(osoite(&v, "/api/listat"))
+            .query(&[("polku", POLKU)]),
+    )
+    .await?;
+    let mut edeltavat: Vec<(u64, String)> = lista
+        .yksikot
+        .into_iter()
+        .filter_map(|r| {
+            let a = tiedoston_alku(&r.id, tiedosto)?;
+            (a < vanhin).then_some((a, r.id))
+        })
+        .collect();
+    edeltavat.sort_by_key(|a| std::cmp::Reverse(a.0));
+    let mut jono: VecDeque<String> = edeltavat.into_iter().map(|(_, id)| id).collect();
+    let mut saadut: Vec<Yksikko> = Vec::new();
+    let mut tavut = 0u64;
+    'haku: while !jono.is_empty() {
+        let pyydetyt: Vec<String> = jono.iter().take(HAE_ERA).cloned().collect();
+        let vastaus: HaeVastaus = json_vastaus(
+            &v,
+            http.post(osoite(&v, "/api/hae"))
+                .json(&json!({"polku": POLKU, "idt": &pyydetyt})),
+        )
+        .await?;
+        // Vertainen palvelee pyynnön alusta; `jatko` on palvelematon loppu.
+        let palvellut = pyydetyt.len().saturating_sub(vastaus.jatko.len());
+        for y in vastaus.yksikot {
+            if y.polku != POLKU || y.poistettu || tiedoston_alku(&y.id, tiedosto).is_none() {
+                continue;
+            }
+            let koko = y.sisalto.as_ref().map_or(0, |s| s.len() as u64);
+            if !saadut.is_empty() && tavut + koko > HAKU_TAVUT {
+                break 'haku;
+            }
+            tavut += koko;
+            saadut.push(y);
+        }
+        if palvellut == 0 {
+            break;
+        }
+        jono.drain(..palvellut.min(jono.len()));
+    }
+    let Some(alin) = saadut
+        .iter()
+        .filter_map(|y| tiedoston_alku(&y.id, tiedosto))
+        .min()
+    else {
+        return Ok(0);
+    };
+    let rivi = vertaisen_rivi(&http, &v, tiedosto, alin).await?;
+    tallenna_pohja(tila, tiedosto, Pohja { offset: alin, rivi }).map_err(|e| e.to_string())?;
+    for y in &saadut {
+        tila.peili.merkitse_haetuksi(&y.id);
+    }
+    for y in &saadut {
+        kirjoita_yhdistajalla(tila, &riisuttu(y), Yhdistaja::Lisays).map_err(|e| e.to_string())?;
+    }
+    Ok(saadut.len())
 }

@@ -33,9 +33,9 @@ pub const ERA: usize = 300;
 pub const HAE_TAVUT: usize = 8 * 1024 * 1024;
 /// `/api/laheta`-pyynnön sisältöjen enimmäistavut: vastaanottajan runkoraja on axumin oletus 2 Mt JSONina.
 pub const LAHETA_TAVUT: usize = 400 * 1024;
-/// Sisäiset polut (S-5 "peili-offset", S-9b "peili-karsinta"): ei tiivisteeseen, listaan, lähetykseen
-/// eikä virran soveltamiseen.
-const SISAINEN: [&str; 2] = ["peili-offset", peili::KARSINTA_POLKU];
+/// Sisäiset polut (S-5 "peili-offset", S-9b "peili-karsinta", S-9d "peili-pohja"): ei tiivisteeseen,
+/// listaan, lähetykseen eikä virran soveltamiseen.
+const SISAINEN: [&str; 3] = ["peili-offset", peili::KARSINTA_POLKU, peili::POHJA_POLKU];
 /// Vuorokausi millisekunteina (S-9b:n ikkunaraja).
 const PAIVA_MS: u64 = 86_400_000;
 /// Virran hiljaisuus, jonka jälkeen kerätty erä sovelletaan.
