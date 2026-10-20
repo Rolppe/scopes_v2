@@ -241,7 +241,7 @@ async function main(): Promise<number> {
       hwm = rssHuippu;
     }
     const mittari = PROC ? 'VmHWM' : 'RSS-huippu (ps 0,5 s)';
-    ehto(`ytimen ${mittari} < 512 MiB (pid ${PID})`, hwm >= 0 && hwm < HWM_RAJA_KIB, `${mittari} ${hwm} kB`);
+    ehto(`ytimen ${mittari} ${hwm} kB < 512 MiB (pid ${PID})`,hwm >= 0 && hwm < HWM_RAJA_KIB, `${mittari} ${hwm} kB`);
   }
   if (GIT_SCOPES) {
     const jalkeen = gitScopes();

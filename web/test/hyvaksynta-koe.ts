@@ -18,6 +18,8 @@ const BINAARI = join(process.env['CARGO_TARGET_DIR'] ?? join(WEB, '../ydin/targe
 
 const MUISTIRAJA_KIB = 1572864;
 const MAC = process.platform === 'darwin';
+// Vahdin todennus: SCOPES2_KOE_RSS_RAJA_KIB (esim. 1) laskee vain macOS-vahdin rajaa; Linuxin ulimit pysyy ennallaan.
+const VAHTIRAJA_KIB = Number(process.env['SCOPES2_KOE_RSS_RAJA_KIB'] ?? '') || MUISTIRAJA_KIB;
 
 let ydin: ChildProcess | null = null;
 let mock: Mock | null = null;
@@ -31,9 +33,9 @@ function rssVahti(): void {
   const kib = Number(spawnSync('ps', ['-o', 'rss=', '-p', String(pid)], { encoding: 'utf8' }).stdout?.trim());
   if (!(kib > 0)) return;
   rssHuippu = Math.max(rssHuippu, kib);
-  if (kib > MUISTIRAJA_KIB && !ylitys) {
+  if (kib > VAHTIRAJA_KIB && !ylitys) {
     ylitys = true;
-    console.error(`VIRHE: ytimen RSS ${kib} kB > ${MUISTIRAJA_KIB} kB, ydin tapetaan`);
+    console.error(`VIRHE: ytimen RSS ${kib} kB > ${VAHTIRAJA_KIB} kB, ydin tapetaan`);
     try { process.kill(-pid, 'SIGKILL'); } catch { /* jo poissa */ }
   }
 }
@@ -104,7 +106,7 @@ async function main(): Promise<number> {
     env: { ...process.env, SCOPES2_AVAIN: avain },
   });
   const koodi = await new Promise<number>((ok) => lapsi.once('exit', (k) => ok(k ?? 1)));
-  if (MAC) console.log(`ytimen RSS-huippu (vahti 0,5 s): ${rssHuippu} kB, raja ${MUISTIRAJA_KIB} kB`);
+  if (MAC) console.log(`ytimen RSS-huippu (vahti 0,5 s): ${rssHuippu} kB, raja ${VAHTIRAJA_KIB} kB`);
   return ylitys ? 1 : koodi;
 }
 
