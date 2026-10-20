@@ -113,9 +113,11 @@ async fn virta(
             match s.tila.varasto.loki(s.viimeinen, 200) {
                 Ok(erä) if !erä.is_empty() => {
                     s.viimeinen = erä.last().map_or(s.viimeinen, |t| t.seq);
-                    // S-5: "peili-offset" on sisäinen yksikkö, ei virtaan
-                    s.jono
-                        .extend(erä.into_iter().filter(|t| t.polku != "peili-offset"));
+                    // S-5 ja S-9b: sisäiset polut ("peili-offset", karsintaraja, pohja) eivät mene virtaan
+                    s.jono.extend(
+                        erä.into_iter()
+                            .filter(|t| !crate::replikointi::on_sisainen(&t.polku)),
+                    );
                     continue;
                 }
                 Ok(_) => {}

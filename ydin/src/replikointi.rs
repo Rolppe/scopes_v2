@@ -131,8 +131,8 @@ struct LahetaPyynto {
 
 // ---- Palvelinpuoli -----------------------------------------------------------------------------------
 
-/// Onko polku sisäinen (ei replikoida)?
-fn on_sisainen(polku: &str) -> bool {
+/// Onko polku sisäinen (ei replikoida eikä virtaan)?
+pub(crate) fn on_sisainen(polku: &str) -> bool {
     SISAINEN.contains(&polku)
 }
 
