@@ -10,6 +10,8 @@ public struct SkoopinViestit: View {
 
     @State private var alhaalla = true
     @State private var virhe: String?
+    /// Ylin näkyvä viesti (scrollPosition); synkataan tilaan vierityskohta/<skooppi> (2 s viive).
+    @State private var ylin: String?
 
     public init(varasto: Varasto, asiakas: Asiakas, skooppi: String) {
         self.varasto = varasto
@@ -25,7 +27,7 @@ public struct SkoopinViestit: View {
                 if t.auki {
                     lista(t)
                     Divider()
-                    Lahetys(asiakas: asiakas, skooppi: skooppi, voiLahettaa: t.voiLahettaa) {
+                    Lahetys(asiakas: asiakas, skooppi: skooppi, voiLahettaa: t.voiLahettaa, tila: varasto.tila) {
                         await varasto.paivitaViestit(skooppi)
                     }
                 } else {
@@ -38,7 +40,29 @@ public struct SkoopinViestit: View {
         .task(id: skooppi) {
             varasto.valittu = skooppi
             await varasto.paivitaViestit(skooppi)
+            kuittaaJosAlhaalla()
         }
+        .overlay(alignment: .topLeading) {
+            // Testikoukku: avattu skooppi ja vierityskohta luettavissa käyttöliittymätestille.
+            Color.clear.frame(width: 1, height: 1)
+                .accessibilityElement()
+                .accessibilityIdentifier("avattu-\(skooppi)")
+            Color.clear.frame(width: 1, height: 1)
+                .accessibilityElement()
+                .accessibilityIdentifier("vierityskohta")
+                .accessibilityLabel(ylin ?? "-")
+        }
+        .onChange(of: alhaalla) { _, _ in kuittaaJosAlhaalla() }
+        .onChange(of: tiedot?.viestit.last?.id) { _, _ in kuittaaJosAlhaalla() }
+        .onChange(of: ylin) { _, uusi in
+            if let uusi, uusi != "loppu" { varasto.tila.kirjoita(TilaAvain.vierityskohta(skooppi), .teksti(uusi)) }
+        }
+    }
+
+    /// Skoopin avaus ja vieritys loppuun kuittaavat luetuksi (kuittaus/<skooppi>).
+    private func kuittaaJosAlhaalla() {
+        guard alhaalla, let t = tiedot else { return }
+        varasto.tila.kuittaa(skooppi: skooppi, viestit: t.viestit)
     }
 
     private func tyhja(_ teksti: String) -> some View {
@@ -60,9 +84,17 @@ public struct SkoopinViestit: View {
                     }
                     Color.clear.frame(height: 1).id("loppu")
                 }
+                .scrollTargetLayout()
                 .padding(16)
             }
+            .scrollPosition(id: $ylin, anchor: .top)
             .seuraaAlareunaa($alhaalla)
+            .onChange(of: varasto.tila.teksti(TilaAvain.vierityskohta(skooppi))) { _, uusi in
+                if let uusi, uusi != ylin, t.viestit.contains(where: { $0.id == uusi }) {
+                    ylin = uusi
+                    vierita.scrollTo(uusi, anchor: .top)
+                }
+            }
             .onChange(of: t.viestit.count) { vanha, uusi in
                 if Vieritys.vieritaLoppuun(alhaalla: alhaalla, vanhaMaara: vanha, uusiMaara: uusi, viimeinenOma: t.viestit.last?.omaViesti == true) {
                     vierita.scrollTo("loppu", anchor: .bottom)
@@ -72,7 +104,12 @@ public struct SkoopinViestit: View {
                 if alhaalla { vierita.scrollTo("loppu", anchor: .bottom) }
             }
             .onAppear {
-                if !t.viestit.isEmpty { vierita.scrollTo("loppu", anchor: .bottom) }
+                if let kohta = varasto.tila.teksti(TilaAvain.vierityskohta(skooppi)), t.viestit.contains(where: { $0.id == kohta }) {
+                    ylin = kohta
+                    vierita.scrollTo(kohta, anchor: .top)
+                } else if !t.viestit.isEmpty {
+                    vierita.scrollTo("loppu", anchor: .bottom)
+                }
             }
         }
     }

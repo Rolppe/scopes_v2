@@ -7,7 +7,9 @@ public struct AsetuksetNakyma: View {
     let varasto: Varasto
     let asiakas: Asiakas?
     let avainMuuttui: () -> Void
+    let headlessMuuttui: () -> Void
 
+    @AppStorage("scopes2.headless") private var headless: Bool = false
     @AppStorage("scopes2.vertainen") private var vertainen: String = Oletukset.vertainen.absoluteString
     @State private var uusiAvain = ""
     @State private var avainOlemassa: Bool?
@@ -16,10 +18,11 @@ public struct AsetuksetNakyma: View {
     @State private var seq: String = "–"
     @State private var portti: String = "–"
 
-    public init(varasto: Varasto, asiakas: Asiakas? = nil, avainMuuttui: @escaping () -> Void = {}) {
+    public init(varasto: Varasto, asiakas: Asiakas? = nil, avainMuuttui: @escaping () -> Void = {}, headlessMuuttui: @escaping () -> Void = {}) {
         self.varasto = varasto
         self.asiakas = asiakas
         self.avainMuuttui = avainMuuttui
+        self.headlessMuuttui = headlessMuuttui
     }
 
     private struct Terveys: Decodable { let seq: Int? }
@@ -51,6 +54,13 @@ public struct AsetuksetNakyma: View {
                 Text("Käytetään, kun oma ydin ei ole käynnissä. Muutos tulee voimaan uudelleenyhdistettäessä.")
                     .font(.caption).foregroundStyle(.secondary)
                 Button("Yhdistä uudelleen") { avainMuuttui() }
+            }
+            Section("Synkka") {
+                Toggle("Headless (ei UI-tilan synkkaa)", isOn: $headless)
+                    .accessibilityIdentifier("headless")
+                    .onChange(of: headless) { _, _ in headlessMuuttui() }
+                Text("Valinta, luonnos, vierityskohta ja suodatin pysyvät tällä laitteella; lukemattomien kuittaus synkataan silti. Solmu käynnistyy uudelleen.")
+                    .font(.caption).foregroundStyle(.secondary)
             }
             Section("Yhteys") {
                 LabeledContent("Tila", value: Self.yhteysTeksti(varasto.yhteys))

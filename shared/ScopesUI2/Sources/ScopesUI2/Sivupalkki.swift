@@ -39,10 +39,29 @@ public struct Sivupalkki: View {
                         rivi(s)
                             .tag(s.nimi)
                             .accessibilityIdentifier("skooppi-\(s.nimi)")
+                            .task(id: s.nimi) { if s.istuntoja > 0 { await varasto.seuraaLukemattomia(s.nimi) } }   // viestejä on vain skoopeilla, joilla on istunto
+                            .onDisappear { varasto.lopetaSeuranta(s.nimi) }
                     }
                 }
             }
         }
+        .onAppear { lataaSuodatin() }
+        .onChange(of: varasto.tila.teksti(TilaAvain.suodatin)) { _, _ in lataaSuodatin() }
+        .onChange(of: haku) { _, _ in tallennaSuodatin() }
+        .onChange(of: suodatus) { _, _ in tallennaSuodatin() }
+    }
+
+    /// Suodatin tilassa: "<suodatus>\t<haku>".
+    private func tallennaSuodatin() {
+        varasto.tila.kirjoita(TilaAvain.suodatin, .teksti("\(suodatus.rawValue)\t\(haku)"))
+    }
+
+    private func lataaSuodatin() {
+        guard let t = varasto.tila.teksti(TilaAvain.suodatin) else { return }
+        let osat = t.split(separator: "\t", maxSplits: 1, omittingEmptySubsequences: false).map(String.init)
+        if let s = osat.first.flatMap(SkooppiSuodatus.init(rawValue:)), s != suodatus { suodatus = s }
+        let uusiHaku = osat.count > 1 ? osat[1] : ""
+        if uusiHaku != haku { haku = uusiHaku }
     }
 
     private func rivi(_ s: SkooppiYhteenveto) -> some View {
@@ -58,6 +77,14 @@ public struct Sivupalkki: View {
                 }
             }
             Spacer()
+            if let n = varasto.lukemattomia(s.nimi), n > 0 {
+                Text("\(n)")
+                    .font(.caption2).bold()
+                    .padding(.horizontal, 6).padding(.vertical, 2)
+                    .background(Capsule().fill(Color.accentColor.opacity(0.35)))
+                    .accessibilityLabel("\(n) lukematonta")
+                    .accessibilityIdentifier("lukematon-\(s.nimi)")
+            }
             if s.avoimia > 0 {
                 Text("\(s.avoimia)")
                     .font(.caption2).bold()
