@@ -12,6 +12,9 @@ const KOEPORTTI_OLETUS = 'http://127.0.0.1:18797';
 const CHAT_VIESTI = 'Vastaa vain sanalla ok.';
 const CHAT_AIKARAJA_MS = 120000;
 const HWM_RAJA_KIB = 512 * 1024;
+// Jokaisella fetchillä aikaraja: jumittunut palvelu (esim. tukossa oleva 8787) ei saa pysäyttää ajoa tulostamatta syytä.
+const API_AIKARAJA_MS = 15000;
+const TERVEYS_AIKARAJA_MS = 5000;
 
 function arvo(nimi: string): string | undefined {
   const i = process.argv.indexOf(nimi);
@@ -57,7 +60,7 @@ async function odota(ehto: () => Promise<boolean>, ms: number, viesti: string): 
   throw new Error(`aikakatkaisu (${ms} ms): ${viesti}`);
 }
 async function api<T>(polku: string, init?: RequestInit): Promise<{ status: number; runko: T }> {
-  const r = await fetch(`${OSOITE}${polku}`, { ...init, headers: { ...A, ...(init?.headers ?? {}) } });
+  const r = await fetch(`${OSOITE}${polku}`, { ...init, headers: { ...A, ...(init?.headers ?? {}) }, signal: AbortSignal.timeout(API_AIKARAJA_MS) });
   const teksti = await r.text();
   let runko: unknown = null;
   try { runko = JSON.parse(teksti); } catch { runko = teksti; }
@@ -68,7 +71,7 @@ const nimet = (lista: unknown): string[] => (lista as { nimi: string }[]).map((s
 const viestitLista = (runko: unknown): unknown[] => (Array.isArray(runko) ? runko : (runko as { viestit: unknown[] }).viestit);
 
 async function terveys(osoite: string): Promise<number> {
-  try { return (await fetch(`${osoite}/api/terveys`)).status; } catch { return 0; }
+  try { return (await fetch(`${osoite}/api/terveys`, { signal: AbortSignal.timeout(TERVEYS_AIKARAJA_MS) })).status; } catch { return 0; }
 }
 function gitScopes(): string {
   const r = spawnSync('git', ['-C', WEB, 'status', '--porcelain', '--', '../../scopes/'], { encoding: 'utf8' });
@@ -83,11 +86,14 @@ async function main(): Promise<number> {
   };
 
   const terveysEnnen = VANHA !== undefined ? await terveys(VANHA) : 0;
+  if (VANHA !== undefined && terveysEnnen !== 200) { console.error(`VIRHE: ${VANHA}/api/terveys → ${terveysEnnen} (0 = ei vastausta ${TERVEYS_AIKARAJA_MS} ms:ssa)`); return 1; }
   const gitEnnen = GIT_SCOPES ? gitScopes() : '';
 
   const yht = await api<{ ok: boolean }>('/api/terveys');
   if (yht.status !== 200) { console.error(`VIRHE: ${OSOITE}/api/terveys → ${yht.status}`); return 1; }
-  const skoopitAlku = nimet((await api<unknown>('/api/skoopit')).runko);
+  const skoopitVastaus = await api<unknown>('/api/skoopit');
+  if (skoopitVastaus.status !== 200) { console.error(`VIRHE: ${OSOITE}/api/skoopit → ${skoopitVastaus.status}`); return 1; }
+  const skoopitAlku = nimet(skoopitVastaus.runko);
   if (skoopitAlku.length === 0) { console.error('VIRHE: /api/skoopit tyhjä'); return 1; }
 
   const selain = await avaaSelain();
