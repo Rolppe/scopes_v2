@@ -26,9 +26,9 @@ use axum::{
     Json, Router,
 };
 use serde_json::{json, Map, Value};
-use std::collections::{BTreeMap, HashMap, VecDeque};
+use std::collections::{BTreeMap, HashMap, HashSet, VecDeque};
 use std::sync::{Arc, Mutex, RwLock, Weak};
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 /// Viestejä enintään (viestit.keskustelu: 120 viimeisintä).
 const MAARA: usize = 120;
@@ -736,10 +736,14 @@ pub struct Keskustelu {
     poistetut: VecDeque<(String, u64)>,
     poisto_raja: u64,
     alku: u64,
+    /// Ikkunoitu solmu (S-9d): numerointi alkaa pohjasta, ei tiedoston alusta.
+    ikkunoitu: bool,
+    /// S-9d: pohja, josta näkymä on rakennettu; ikkunoitu ilman pohjaa = tiedoston viestejä ei näytetä.
+    pohja: Option<peili::Pohja>,
 }
 
 impl Keskustelu {
-    fn uusi(istunto: &str, seq: u64) -> Keskustelu {
+    fn uusi(istunto: &str, seq: u64, ikkunoitu: bool) -> Keskustelu {
         Keskustelu {
             istunto: istunto.to_string(),
             rivit: 0,
@@ -751,19 +755,80 @@ impl Keskustelu {
             poistetut: VecDeque::new(),
             poisto_raja: 0,
             alku: seq,
+            ikkunoitu,
+            pohja: None,
         }
     }
 
-    /// Lukee peilistä offsetin `self.peili_offset` jälkeiset rivit ja soveltaa ne.
+    /// Lukee peilistä offsetin `self.peili_offset` jälkeiset rivit ja soveltaa ne. Ikkunoitu solmu (S-9d):
+    /// voimassa oleva pohja, joka eroaa näkymän pohjasta (karsinta, S-9e-haku), rakentaa näkymän
+    /// pohjasta uudelleen; ilman pohjaa tiedoston viestejä ei näytetä.
     fn lue_peilista(
         &mut self,
         v: &Varasto,
         tiedosto: &str,
         seq: u64,
     ) -> crate::muutosloki::Result<()> {
+        if self.ikkunoitu {
+            if let Some(p) = peili::voimassa_pohja(v, tiedosto)? {
+                if self.pohja != Some(p) {
+                    return self.rakenna_pohjasta(v, tiedosto, p, seq);
+                }
+            }
+            if self.pohja.is_none() {
+                return Ok(());
+            }
+        }
         let (uudet, seuraava) = peili::rivit_alkaen(v, tiedosto, self.peili_offset)?;
         self.peili_offset = seuraava;
         self.sovella(&uudet, seq);
+        Ok(())
+    }
+
+    /// S-9d: rakentaa näkymän pohjasta `p` uudelleen. Ennallaan olevat viestit säilyttävät muutoshetkensä;
+    /// näkymästä poistuneet viestit kirjataan `poistetut`-listaan hetkellä `seq` (`since`-asiakkaat).
+    fn rakenna_pohjasta(
+        &mut self,
+        v: &Varasto,
+        tiedosto: &str,
+        p: peili::Pohja,
+        seq: u64,
+    ) -> crate::muutosloki::Result<()> {
+        let mut uusi = Keskustelu::uusi(&self.istunto, self.alku, true);
+        uusi.pohja = Some(p);
+        uusi.rivit = usize::try_from(p.rivi).unwrap_or(usize::MAX);
+        let (rivit, seuraava) = peili::rivit_alkaen(v, tiedosto, p.offset)?;
+        uusi.peili_offset = seuraava;
+        uusi.sovella(&rivit, seq);
+        let vanhat: HashMap<&str, &Viesti> =
+            self.viestit.iter().map(|x| (x.id.as_str(), x)).collect();
+        for x in uusi.viestit.iter_mut() {
+            if let Some(o) = vanhat.get(x.id.as_str()) {
+                if o.arvo == x.arvo {
+                    x.muutettu = o.muutettu;
+                }
+            }
+        }
+        let nyt: HashSet<&str> = uusi.viestit.iter().map(|x| x.id.as_str()).collect();
+        let mut poistetut = std::mem::take(&mut self.poistetut);
+        poistetut.retain(|(id, _)| !nyt.contains(id.as_str()));
+        for o in &self.viestit {
+            if !nyt.contains(o.id.as_str()) {
+                poistetut.push_back((o.id.clone(), seq));
+            }
+        }
+        uusi.poistetut = poistetut;
+        uusi.poisto_raja = self.poisto_raja;
+        while uusi.poistetut.len() > POISTOMUISTI {
+            if let Some((_, s)) = uusi.poistetut.pop_front() {
+                uusi.poisto_raja = uusi.poisto_raja.max(s);
+            }
+        }
+        if uusi.malli.is_null() {
+            uusi.malli = self.malli.clone();
+            uusi.effort = self.effort.clone();
+        }
+        *self = uusi;
         Ok(())
     }
 
@@ -1102,6 +1167,18 @@ pub struct Nakymat {
     /// `rekisterit/<p>` tai `rekisterit-meta/<p>` muuttuu.
     rekisterit: Mutex<HashMap<String, Option<Arc<Jasennetty>>>>,
     silta: Mutex<Siltavalimuisti>,
+    /// S-9d/S-9e: ikkunoidun solmun taustahakujen tila tiedostoittain.
+    haut: Mutex<HashMap<String, Haku>>,
+}
+
+/// Yhden tiedoston taustahaun tila (S-9d pohja, S-9e edeltävät yksiköt).
+#[derive(Default)]
+struct Haku {
+    kaynnissa: bool,
+    /// Viimeisimmän S-9e-haun alku (`peili::HAKUVALI`).
+    edeltavat: Option<Instant>,
+    /// Viimeisin haku epäonnistui (vertainen ei vastaa) → `haettavissa: true`.
+    epaonnistui: bool,
 }
 
 type Rekisteri = Mutex<Vec<(Weak<Varasto>, Arc<Nakymat>)>>;
@@ -1119,6 +1196,7 @@ pub fn nakyma(tila: &Tila) -> Arc<Nakymat> {
         sisa: RwLock::new(Sisa::default()),
         rekisterit: Mutex::new(HashMap::new()),
         silta: Mutex::new(Siltavalimuisti::default()),
+        haut: Mutex::new(HashMap::new()),
     });
     r.push((oma, n.clone()));
     n
@@ -1228,12 +1306,13 @@ impl Nakymat {
     /// Ajaa näkymän muutoslokin tasalle.
     pub fn paivita(&self, tila: &Tila) -> crate::muutosloki::Result<()> {
         let v = &tila.varasto;
+        let ikkunoitu = tila.peili.ikkuna_vrk.is_some();
         let mut s = self.sisa.write().unwrap_or_else(|e| e.into_inner());
         if !s.rakennettu {
             let seq = v.seq()?;
             s.alku = seq;
             s.seq_viimeisin = seq;
-            s.paivita_lahteet(v, seq)?;
+            s.paivita_lahteet(v, seq, ikkunoitu)?;
             s.rakennettu = true;
         }
         loop {
@@ -1253,6 +1332,11 @@ impl Nakymat {
                             tiedostot.push(tiedosto.to_string());
                         }
                     }
+                } else if t.polku == peili::POHJA_POLKU {
+                    // S-9d: uusi pohja → istunnon näkymä pohjasta uudelleen (`lue_peilista`).
+                    if !tiedostot.contains(&t.id) {
+                        tiedostot.push(t.id.clone());
+                    }
                 } else if t.polku == "rekisterit" || t.polku.starts_with("rekisterit/") {
                     s.rekisterit_seq = viimeinen;
                 }
@@ -1271,7 +1355,7 @@ impl Nakymat {
                 }
             }
             if lahteet {
-                s.paivita_lahteet(v, viimeinen)?;
+                s.paivita_lahteet(v, viimeinen, ikkunoitu)?;
             }
             for tiedosto in tiedostot {
                 if let Some(k) = s.viestit.get_mut(&tiedosto) {
@@ -1352,7 +1436,12 @@ async fn paivita_silta(tila: &Tila, n: &Nakymat) {
 }
 
 impl Sisa {
-    fn paivita_lahteet(&mut self, v: &Varasto, seq: u64) -> crate::muutosloki::Result<()> {
+    fn paivita_lahteet(
+        &mut self,
+        v: &Varasto,
+        seq: u64,
+        ikkunoitu: bool,
+    ) -> crate::muutosloki::Result<()> {
         self.istunnot = lue_lahde(v, "istunnot", "istunto")?;
         self.agy = lue_lahde(v, "agy", "id")?;
         let mut uudet: BTreeMap<String, Skooppi> = BTreeMap::new();
@@ -1407,7 +1496,7 @@ impl Sisa {
         self.viestit.retain(|t, _| seurattavat.contains_key(t));
         for (t, id) in seurattavat {
             if let std::collections::hash_map::Entry::Vacant(e) = self.viestit.entry(t) {
-                let mut k = Keskustelu::uusi(&id, seq);
+                let mut k = Keskustelu::uusi(&id, seq, ikkunoitu);
                 k.lue_peilista(v, e.key(), seq)?;
                 e.insert(k);
             }
@@ -1673,8 +1762,9 @@ pub async fn skooppi(tila: &Tila, nimi: &str, since: Option<u64>) -> Vastaus {
     }
 }
 
-/// `GET /api/skoopit/<nimi>/viestit[?since=]`.
-pub async fn viestit(tila: &Tila, nimi: &str, since: Option<u64>) -> Vastaus {
+/// `GET /api/skoopit/<nimi>/viestit[?since=]`. Ikkunoitu solmu lisää kentän `haettavissa` ja käynnistää
+/// tarvittaessa taustahaun (S-9d pohja, S-9e edeltävät yksiköt) vastauksen koostamisen jälkeen.
+pub async fn viestit(tila: &Arc<Tila>, nimi: &str, since: Option<u64>) -> Vastaus {
     let n = match tasalle(tila) {
         Ok(n) => n,
         Err(v) => return v,
@@ -1727,9 +1817,19 @@ pub async fn viestit(tila: &Tila, nimi: &str, since: Option<u64>) -> Vastaus {
     };
     let tiedosto = i.get("transkripti").and_then(Value::as_str).unwrap_or("");
     let k = s.viestit.get(tiedosto);
+    // S-9d/S-9e: vain ikkunoitu solmu; täyden solmun vastaus ennallaan (ei `haettavissa`-kenttää).
+    let haku = match (tila.peili.ikkuna_vrk.is_some(), k) {
+        (true, Some(k)) => Some((
+            tiedosto.to_string(),
+            peili::tarvitsee_pohjan(&tila.varasto, tiedosto).unwrap_or(false),
+            k.pohja.is_some_and(|p| p.rivi > 0) && k.viestit.len() < MAARA,
+        )),
+        _ => None,
+    };
+    let haettavissa = haku.as_ref().map(|(t, _, _)| n.haettavissa(t));
     let ruudullisia = avoinna.iter().filter(|(_, x)| tosi(x.get("ruutu"))).count();
     let kentta = |x: &str| i.get(x).cloned().unwrap_or(Value::Null);
-    let runko = json!({
+    let mut runko = json!({
         "nimi": nimi,
         "auki": true,
         "istunto": {
@@ -1744,34 +1844,123 @@ pub async fn viestit(tila: &Tila, nimi: &str, since: Option<u64>) -> Vastaus {
         "voiLahettaa": tosi(i.get("ruutu")) && ruudullisia == 1,
         "viestit": k.map_or_else(Vec::new, Keskustelu::lista),
     });
-    let Some(x) = since else {
-        return Vastaus::ydin(runko);
-    };
-    let mut nollaus = match s.nollaus(&tila.varasto, x) {
-        Ok(b) => b,
-        Err(e) => return Vastaus::virhe(StatusCode::INTERNAL_SERVER_ERROR, &e.to_string()),
-    };
-    nollaus =
-        nollaus || sk.valittu_muutettu > x || k.is_none_or(|k| x < k.alku || x < k.poisto_raja);
-    let Some(k) = k else {
-        return Vastaus::ydin(since_runko(s.seq_viimeisin, Vec::new(), Vec::new(), true));
-    };
-    let muuttuneet: Vec<Value> = k
-        .viestit
-        .iter()
-        .filter(|v| nollaus || v.muutettu > x)
-        .map(Keskustelu::tunnisteella)
-        .collect();
-    let poistetut: Vec<String> = if nollaus {
-        Vec::new()
-    } else {
-        k.poistetut
+    if let Some(h) = haettavissa {
+        runko["haettavissa"] = Value::Bool(h);
+    }
+    let vastaus = 'v: {
+        let Some(x) = since else {
+            break 'v Vastaus::ydin(runko);
+        };
+        let mut nollaus = match s.nollaus(&tila.varasto, x) {
+            Ok(b) => b,
+            Err(e) => return Vastaus::virhe(StatusCode::INTERNAL_SERVER_ERROR, &e.to_string()),
+        };
+        nollaus =
+            nollaus || sk.valittu_muutettu > x || k.is_none_or(|k| x < k.alku || x < k.poisto_raja);
+        let Some(k) = k else {
+            break 'v Vastaus::ydin(since_runko(s.seq_viimeisin, Vec::new(), Vec::new(), true));
+        };
+        let muuttuneet: Vec<Value> = k
+            .viestit
             .iter()
-            .filter(|(_, s)| *s > x)
-            .map(|(id, _)| id.clone())
-            .collect()
+            .filter(|v| nollaus || v.muutettu > x)
+            .map(Keskustelu::tunnisteella)
+            .collect();
+        let poistetut: Vec<String> = if nollaus {
+            Vec::new()
+        } else {
+            k.poistetut
+                .iter()
+                .filter(|(_, s)| *s > x)
+                .map(|(id, _)| id.clone())
+                .collect()
+        };
+        let mut r = since_runko(s.seq_viimeisin, muuttuneet, poistetut, nollaus);
+        if let Some(h) = haettavissa {
+            r["haettavissa"] = Value::Bool(h);
+        }
+        Vastaus::ydin(r)
     };
-    Vastaus::ydin(since_runko(s.seq_viimeisin, muuttuneet, poistetut, nollaus))
+    drop(s);
+    if let Some((tiedosto, pohja, edeltavat)) = haku {
+        kaynnista_haku(&n, tila, tiedosto, pohja, edeltavat);
+    }
+    vastaus
+}
+
+impl Nakymat {
+    /// S-9e: epäonnistuiko tiedoston viimeisin taustahaku?
+    fn haettavissa(&self, tiedosto: &str) -> bool {
+        self.haut
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .get(tiedosto)
+            .is_some_and(|h| h.epaonnistui)
+    }
+
+    /// S-9e: täyttääkö istunnon näkymä haun ehdon (pohja.rivi > 0 ja alle `MAARA` viestiä)?
+    fn vajaa(&self, tiedosto: &str) -> bool {
+        self.sisa
+            .read()
+            .unwrap_or_else(|e| e.into_inner())
+            .viestit
+            .get(tiedosto)
+            .is_some_and(|k| k.pohja.is_some_and(|p| p.rivi > 0) && k.viestit.len() < MAARA)
+    }
+}
+
+/// Käynnistää tiedoston taustahaun, ellei edellinen ole kesken: pohja (S-9d), jos tarvitaan, ja sen jälkeen
+/// edeltävät yksiköt (S-9e, enintään kerran `HAKUVALI`ssa), jos näkymä on yhä vajaa.
+fn kaynnista_haku(
+    n: &Arc<Nakymat>,
+    tila: &Arc<Tila>,
+    tiedosto: String,
+    pohja: bool,
+    edeltavat: bool,
+) {
+    if !pohja && !edeltavat {
+        return;
+    }
+    {
+        let mut h = n.haut.lock().unwrap_or_else(|e| e.into_inner());
+        let e = h.entry(tiedosto.clone()).or_default();
+        if e.kaynnissa || (!pohja && e.edeltavat.is_some_and(|t| t.elapsed() < peili::HAKUVALI)) {
+            return;
+        }
+        e.kaynnissa = true;
+    }
+    let (n, tila) = (n.clone(), tila.clone());
+    tokio::spawn(async move {
+        let tulos = aja_haku(&n, &tila, &tiedosto, pohja).await;
+        if let Err(e) = &tulos {
+            eprintln!("nakymat: haku {tiedosto}: {e}");
+        }
+        let mut h = n.haut.lock().unwrap_or_else(|e| e.into_inner());
+        let e = h.entry(tiedosto).or_default();
+        e.kaynnissa = false;
+        e.epaonnistui = tulos.is_err();
+    });
+}
+
+async fn aja_haku(n: &Nakymat, tila: &Tila, tiedosto: &str, pohja: bool) -> Result<(), String> {
+    if pohja {
+        peili::hae_pohja(tila, tiedosto).await?;
+        n.paivita(tila).map_err(|e| e.to_string())?;
+    }
+    if !n.vajaa(tiedosto) {
+        return Ok(());
+    }
+    {
+        let mut h = n.haut.lock().unwrap_or_else(|e| e.into_inner());
+        let e = h.entry(tiedosto.to_string()).or_default();
+        if e.edeltavat.is_some_and(|t| t.elapsed() < peili::HAKUVALI) {
+            return Ok(());
+        }
+        e.edeltavat = Some(Instant::now());
+    }
+    peili::hae_edeltavat(tila, tiedosto).await?;
+    n.paivita(tila).map_err(|e| e.to_string())?;
+    Ok(())
 }
 
 /// `GET /api/rekisterit/<p>`: ytimessä `{polku, osat}` (lahteet.mjs `rekisterinOsat`), muuten silta.
