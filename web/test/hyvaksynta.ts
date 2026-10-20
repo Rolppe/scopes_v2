@@ -34,6 +34,15 @@ if (AVAIN === '') {
 }
 const VANHA = arvo('--vanha')?.replace(/\/+$/, '');
 const PID = arvo('--pid');
+// macOS:ssa ei ole /proc/<pid>/status-tiedostoa: muistihuippu on ajon ajan ps-näytteiden suurin RSS (VmHWM:n alaraja).
+const PROC = process.platform === 'linux';
+let rssHuippu = -1;
+function rssNayte(): void {
+  const r = spawnSync('ps', ['-o', 'rss=', '-p', PID ?? ''], { encoding: 'utf8' });
+  const kib = Number(r.stdout?.trim());
+  if (r.status === 0 && kib > 0) rssHuippu = Math.max(rssHuippu, kib);
+}
+const rssAjastin = PID !== undefined && !PROC ? setInterval(rssNayte, 500) : undefined;
 const GIT_SCOPES = liput.has('--git-scopes');
 const A = { authorization: `Bearer ${AVAIN}` };
 
@@ -224,8 +233,15 @@ async function main(): Promise<number> {
   }
   if (PID !== undefined) {
     let hwm = -1;
-    try { hwm = Number(/^VmHWM:\s+(\d+) kB/m.exec(readFileSync(`/proc/${PID}/status`, 'utf8'))?.[1] ?? -1); } catch { /* prosessi poissa */ }
-    ehto(`ytimen VmHWM < 512 MiB (pid ${PID})`, hwm >= 0 && hwm < HWM_RAJA_KIB, `VmHWM ${hwm} kB`);
+    if (PROC) {
+      try { hwm = Number(/^VmHWM:\s+(\d+) kB/m.exec(readFileSync(`/proc/${PID}/status`, 'utf8'))?.[1] ?? -1); } catch { /* prosessi poissa */ }
+    } else {
+      clearInterval(rssAjastin);
+      rssNayte();
+      hwm = rssHuippu;
+    }
+    const mittari = PROC ? 'VmHWM' : 'RSS-huippu (ps 0,5 s)';
+    ehto(`ytimen ${mittari} < 512 MiB (pid ${PID})`, hwm >= 0 && hwm < HWM_RAJA_KIB, `${mittari} ${hwm} kB`);
   }
   if (GIT_SCOPES) {
     const jalkeen = gitScopes();

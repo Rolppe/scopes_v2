@@ -1,5 +1,6 @@
-// Testiapu: mock-ytimen käynnistys ja Chromium (järjestelmän /usr/bin/chromium, ei Playwrightin omaa latausta).
+// Testiapu: mock-ytimen käynnistys ja Chromium (palvelimella järjestelmän /usr/bin/chromium, ei Playwrightin omaa latausta).
 import { spawn } from 'node:child_process';
+import { existsSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { chromium } from 'playwright-core';
@@ -47,8 +48,15 @@ export interface Selain {
   sulje(): Promise<void>;
 }
 
+// SCOPES2_CHROMIUM, muuten palvelimen /usr/bin/chromium, muuten (Mac) Playwrightin välimuistin Chromium.
+function selainPolku(): string | undefined {
+  const oma = process.env['SCOPES2_CHROMIUM'];
+  if (oma !== undefined && oma !== '') return oma;
+  return existsSync('/usr/bin/chromium') ? '/usr/bin/chromium' : undefined;
+}
+
 export async function avaaSelain(): Promise<Selain> {
-  const selain = await chromium.launch({ executablePath: '/usr/bin/chromium', headless: true, args: ['--no-sandbox'] });
+  const selain = await chromium.launch({ executablePath: selainPolku(), headless: true, args: ['--no-sandbox'] });
   const konteksti = await selain.newContext({ viewport: { width: 1280, height: 800 } });
   const sivu = await konteksti.newPage();
   const konsolivirheet: string[] = [];
