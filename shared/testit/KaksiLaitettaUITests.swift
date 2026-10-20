@@ -166,15 +166,17 @@ final class KaksiLaitettaUITests: XCTestCase {
         e.typeText(teksti)
     }
 
-    /// Suodatin rajaa sivupalkin yhteen riviin, jolloin rivi on aina osoitettavissa.
-    private func rivi(_ app: XCUIApplication, _ nimi: String) -> XCUIElement {
+    /// Suodatin rajaa sivupalkin yhteen riviin, jolloin rivi on aina osoitettavissa. `avattuKelpaa`: skooppi on jo auki (toisen laitteen
+    /// valinta synkkautui), jolloin haku päättyy ilman virhettä (avaaSkooppi).
+    private func rivi(_ app: XCUIApplication, _ nimi: String, avattuKelpaa: Bool = false) -> XCUIElement {
         let suodatin = elementti(app, "skooppi-suodatin")
-        if !suodatin.waitForExistence(timeout: 30) {
+        let auki = { avattuKelpaa && self.elementti(app, "avattu-\(nimi)").exists }
+        if !odota(30, { suodatin.exists || auki() }) {
             print("KL-DIAG suodatin puuttuu; ikkuna:\n" + String(app.debugDescription.prefix(5000)))
         }
         // Suodatin synkkautuu laitteiden välillä: toisen laitteen kirjoitus voi ehtiä kentälle ennen omaa, jolloin teksti tuplaantuisi.
         // Kirjoitetaan, odotetaan hetki ja korjataan (tyhjennys + uusi kirjoitus), kunnes kentän arvo on täsmälleen nimi.
-        for _ in 0..<4 where suodatin.exists && (suodatin.value as? String) != nimi {
+        for _ in 0..<4 where !auki() && suodatin.exists && (suodatin.value as? String) != nimi {
             let nykyinen = (suodatin.value as? String).flatMap { $0 == "Suodata skoopit" ? "" : $0 } ?? ""
             napauta(suodatin)
             if !nykyinen.isEmpty { suodatin.typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: nykyinen.count + 2)) }
@@ -182,11 +184,12 @@ final class KaksiLaitettaUITests: XCTestCase {
             nuku(1.5)
         }
         let r = elementti(app, "skooppi-\(nimi)")
-        if !r.waitForExistence(timeout: 120) {
+        if !odota(120, { r.exists || auki() }) {
             let rivit = app.descendants(matching: .any).matching(NSPredicate(format: "identifier BEGINSWITH 'skooppi-'")).allElementsBoundByIndex.prefix(60).map(\.identifier)
             print("KL-DIAG rivi \(nimi) puuttuu; suodatin='\(suodatin.exists ? "\(suodatin.value ?? "")" : "ei ole")' rivit=\(rivit)")
             print("KL-DIAG ikkuna:\n" + String(app.debugDescription.prefix(5000)))
         }
+        if auki() { return r }
         XCTAssertTrue(r.exists, "skooppi \(nimi) ei listalla")
         return r
     }
@@ -200,8 +203,13 @@ final class KaksiLaitettaUITests: XCTestCase {
 
     private func avaaSkooppi(_ app: XCUIApplication, _ nimi: String) {
         // Rivin asettelu muuttuu, kun lukemattomien merkki ilmestyy: napautus voi osua vanhaan paikkaan, joten yritetään uudelleen.
+        // Toisen laitteen valinta synkkautuu (valittu-skooppi): iPhonen NavigationSplitView siirtyy itse näkymään ja sivupalkin rivi
+        // katoaa kesken napautuksen (T-52 ajo 10: "Failed to get matching snapshot"). Avattu skooppi kelpaa; rivi napautetaan vain osoitettavana.
         for _ in 0..<4 {
-            napauta(rivi(app, nimi))
+            if elementti(app, "avattu-\(nimi)").exists { return }
+            let r = rivi(app, nimi, avattuKelpaa: true)
+            if elementti(app, "avattu-\(nimi)").exists { return }
+            if r.exists && r.isHittable { napauta(r) }
             if elementti(app, "avattu-\(nimi)").waitForExistence(timeout: 8) { return }
         }
         if !elementti(app, "avattu-\(nimi)").waitForExistence(timeout: 60) {
