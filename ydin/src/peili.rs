@@ -69,10 +69,13 @@ pub fn rivit(varasto: &Varasto, tiedosto: &str) -> Result<Vec<String>> {
 /// Tiedoston rivit yksiköistä, joiden offset >= `offset`, offset-järjestyksessä, ja seuraava offset
 /// (viimeisen yksikön loppu; ei yksiköitä = `offset`). Hakee vain tiedoston avainvälin
 /// `<tiedosto>:` … `<tiedosto>;` (';' = ':' + 1); väli voi sisältää tiedoston "a:b" yksiköitä
-/// tiedostolle "a", joten nimi tarkistetaan vielä haun jälkeen.
+/// tiedostolle "a", joten nimi tarkistetaan vielä haun jälkeen. Väli luetaan otsakkeina, ja sisältö
+/// haetaan vain offsetin jälkeisistä yksiköistä (R-3: pitkän transkriptin päivitys ei lataa koko tiedostoa).
 pub fn rivit_alkaen(varasto: &Varasto, tiedosto: &str, offset: u64) -> Result<(Vec<String>, u64)> {
     let mut osat: Vec<(u64, Vec<String>)> = Vec::new();
-    for y in varasto.listaa_vali(POLKU, &format!("{tiedosto}:"), &format!("{tiedosto};"))? {
+    for y in
+        varasto.listaa_vali_otsakkeet(POLKU, &format!("{tiedosto}:"), &format!("{tiedosto};"))?
+    {
         if y.poistettu {
             continue;
         }
@@ -88,6 +91,9 @@ pub fn rivit_alkaen(varasto: &Varasto, tiedosto: &str, offset: u64) -> Result<(V
         if alku < offset {
             continue;
         }
+        let Some(y) = varasto.lue(POLKU, &y.id)?.filter(|y| !y.poistettu) else {
+            continue;
+        };
         let taulukko: Vec<String> = y
             .sisalto
             .as_deref()
