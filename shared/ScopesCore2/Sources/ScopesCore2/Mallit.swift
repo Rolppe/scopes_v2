@@ -121,18 +121,21 @@ public struct SkooppiViestit: Codable, Hashable, Sendable {
     public let voiLahettaa: Bool
     public let viestit: [Viesti]
     public let istunto: Istunto?
+    /// S-9: true = ikkunoitu solmu ei saanut haettua vanhempia viestejä vertaiselta (ytimen "haettavissa"; puuttuu täydeltä solmulta).
+    public let haettavissa: Bool
 
-    public init(nimi: String, auki: Bool, pakattu: Bool? = nil, voiLahettaa: Bool = true, viestit: [Viesti] = [], istunto: Istunto? = nil) {
+    public init(nimi: String, auki: Bool, pakattu: Bool? = nil, voiLahettaa: Bool = true, viestit: [Viesti] = [], istunto: Istunto? = nil, haettavissa: Bool = false) {
         self.nimi = nimi
         self.auki = auki
         self.pakattu = pakattu
         self.voiLahettaa = voiLahettaa
         self.viestit = viestit
         self.istunto = istunto
+        self.haettavissa = haettavissa
     }
 
     private enum CodingKeys: String, CodingKey {
-        case nimi, auki, pakattu, voiLahettaa, viestit, istunto
+        case nimi, auki, pakattu, voiLahettaa, viestit, istunto, haettavissa
     }
 
     public init(from decoder: Decoder) throws {
@@ -146,7 +149,34 @@ public struct SkooppiViestit: Codable, Hashable, Sendable {
         for i in rivit.indices where rivit[i].id.isEmpty { rivit[i].id = String(i) }
         self.viestit = rivit
         self.istunto = try c.decodeIfPresent(Istunto.self, forKey: .istunto)
+        self.haettavissa = try c.decodeIfPresent(Bool.self, forKey: .haettavissa) ?? false
     }
+}
+
+/// S-9: GET /api/peili/koko. Ytimen avaimet ovat snake_case (ikkuna_vrk, katto_mt); vanhin on vanhimman sisällön aika (ms) tai null.
+public struct PeiliKoko: Codable, Hashable, Sendable {
+    public let tavut: Int
+    public let yksikot: Int
+    public let vanhin: Int?
+    public let ikkunaVrk: Int?
+    public let kattoMt: Int
+
+    public init(tavut: Int, yksikot: Int, vanhin: Int? = nil, ikkunaVrk: Int? = nil, kattoMt: Int) {
+        self.tavut = tavut
+        self.yksikot = yksikot
+        self.vanhin = vanhin
+        self.ikkunaVrk = ikkunaVrk
+        self.kattoMt = kattoMt
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case tavut, yksikot, vanhin
+        case ikkunaVrk = "ikkuna_vrk"
+        case kattoMt = "katto_mt"
+    }
+
+    /// Käytetty koko megatavuina (1 048 576 tavua, kuten ytimen MT).
+    public var kokoMt: Double { Double(tavut) / 1_048_576 }
 }
 
 // Palvelun vastaus liitteen tallennukseen: polku, koko tavuina, sha256 ja solmu, joka tallensi (S-8b).

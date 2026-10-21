@@ -12,6 +12,13 @@ public struct AsetuksetNakyma: View {
 
     @AppStorage("scopes2.headless") private var headless: Bool = false
     @AppStorage("scopes2.vertainen") private var vertainen: String = Oletukset.vertainen.absoluteString
+    #if os(iOS)
+    // T-58 (S-9): laitekohtainen transkriptipeilin ikkuna; oletus laitteella 7 vrk / 38 Mt, simulaattorissa 0 = koko peili (P-17).
+    @AppStorage(Oletukset.peiliIkkunaAvain) private var peiliIkkuna: Int = Oletukset.peiliIkkunaOletusVrk
+    @AppStorage(Oletukset.peiliKattoAvain) private var peiliKatto: Int = Oletukset.peiliKattoMt
+    @State private var peiliKoko: PeiliKoko?
+    @State private var peiliKokoVirhe: String?
+    #endif
     @State private var uusiAvain = ""
     @State private var avainOlemassa: Bool?
     @State private var ilmoitus: String?
@@ -64,6 +71,9 @@ public struct AsetuksetNakyma: View {
                 Text("Valinta, luonnos, vierityskohta ja suodatin pysyvät tällä laitteella; lukemattomien kuittaus synkataan silti. Solmu käynnistyy uudelleen.")
                     .font(.caption).foregroundStyle(.secondary)
             }
+            #if os(iOS)
+            peiliOsio
+            #endif
             Section("Yhteys") {
                 LabeledContent("Tila", value: Self.yhteysTeksti(varasto.yhteys))
                     .accessibilityIdentifier("asetukset-yhteys")
@@ -79,8 +89,67 @@ public struct AsetuksetNakyma: View {
             avainOlemassa = Avain.hae() != nil
             if let o = await Solmu.jaettu.osoite, let p = o.port { portti = String(p) }
             await tarkista()
+            #if os(iOS)
+            await paivitaPeiliKoko()
+            #endif
         }
     }
+
+    #if os(iOS)
+    private var peiliOsio: some View {
+        Section("Transkriptipeili") {
+            HStack {
+                Text("Ikkuna")
+                Spacer()
+                Text(Self.ikkunaTeksti(peiliIkkuna))
+                    .foregroundStyle(.secondary)
+                    .accessibilityIdentifier("peili-ikkuna")
+                Stepper("Ikkuna (vrk)", value: $peiliIkkuna, in: 0...365)
+                    .labelsHidden()
+                    .accessibilityIdentifier("peili-ikkuna-askel")
+            }
+            HStack {
+                Text("Katto")
+                Spacer()
+                Text("\(peiliKatto) Mt")
+                    .foregroundStyle(.secondary)
+                    .accessibilityIdentifier("peili-katto")
+                Stepper("Katto (Mt)", value: $peiliKatto, in: 1...1000, step: 1)
+                    .labelsHidden()
+                    .accessibilityIdentifier("peili-katto-askel")
+            }
+            HStack {
+                Text("Käytetty koko")
+                Spacer()
+                Text(Self.kokoTeksti(peiliKoko))
+                    .foregroundStyle(.secondary)
+                    .accessibilityIdentifier("peili-koko")
+            }
+            if let peiliKokoVirhe { Text(peiliKokoVirhe).font(.caption).foregroundStyle(.red) }
+            Text("Ikkuna 0 = koko peili. Muutos tulee voimaan, kun äppi käynnistyy uudelleen")
+                .font(.caption).foregroundStyle(.secondary)
+        }
+    }
+
+    static func ikkunaTeksti(_ vrk: Int) -> String { vrk > 0 ? "\(vrk) vrk" : "koko peili" }
+
+    /// "x,y Mt / katto" ikkunoidulla solmulla; täydellä solmulla ei kattoa.
+    static func kokoTeksti(_ k: PeiliKoko?) -> String {
+        guard let k else { return "–" }
+        let mt = k.kokoMt.formatted(.number.precision(.fractionLength(1)).locale(Locale(identifier: "fi_FI")))
+        return k.ikkunaVrk == nil ? "\(mt) Mt (ei kattoa)" : "\(mt) Mt / \(k.kattoMt) Mt"
+    }
+
+    private func paivitaPeiliKoko() async {
+        guard let asiakas else { return }
+        do {
+            peiliKoko = try await asiakas.peiliKoko()
+            peiliKokoVirhe = nil
+        } catch {
+            peiliKokoVirhe = "Peilin kokoa ei saatu: \(Virheteksti.muodosta(error))"
+        }
+    }
+    #endif
 
     static func yhteysTeksti(_ y: Yhteys) -> String {
         switch y {

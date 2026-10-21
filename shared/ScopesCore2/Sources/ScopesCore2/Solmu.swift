@@ -14,8 +14,13 @@ public struct SolmuAsetukset: Codable, Sendable {
     public var laite: String
     /// 0 = järjestelmän valitsema; kiinteä portti vain testeille (kaksi-laitetta.sh: solmut ovat toistensa vertaisia).
     public var portti: Int
+    /// S-9: transkriptipeilin ikkuna vuorokausina; nil = täysi solmu (asetukset_json "peili_ikkuna_vrk": null).
+    public var peiliIkkunaVrk: Int?
+    /// S-9: peilin katto megatavuina (asetukset_json "peili_katto_mt"); käytössä vain ikkunan kanssa.
+    public var peiliKattoMt: Int
 
-    public init(data: URL, avain: String, vertaiset: [URL] = [], vanha: URL? = nil, headless: Bool = false, laite: String, portti: Int = 0) {
+    public init(data: URL, avain: String, vertaiset: [URL] = [], vanha: URL? = nil, headless: Bool = false, laite: String, portti: Int = 0,
+                peiliIkkunaVrk: Int? = nil, peiliKattoMt: Int = Oletukset.peiliKattoMt) {
         self.data = data
         self.avain = avain
         self.vertaiset = vertaiset
@@ -23,6 +28,26 @@ public struct SolmuAsetukset: Codable, Sendable {
         self.headless = headless
         self.laite = laite
         self.portti = portti
+        self.peiliIkkunaVrk = peiliIkkunaVrk
+        self.peiliKattoMt = peiliKattoMt
+    }
+
+    /// scopes_solmu_kaynnista-kutsun asetukset_json (scopes_solmu.h).
+    func ytimenAsetukset() -> [String: Any] {
+        var vanhaArvo: Any = NSNull()
+        if let v = vanha { vanhaArvo = v.absoluteString }
+        return [
+            "data": data.path,
+            "avain": avain,
+            "portti": portti,
+            "vertaiset": vertaiset.map { $0.absoluteString },
+            "vanha": vanhaArvo,
+            "vanha_avain": avain,
+            "headless": headless,
+            "laite": laite,
+            "peili_ikkuna_vrk": peiliIkkunaVrk.map { $0 as Any } ?? NSNull(),
+            "peili_katto_mt": peiliKattoMt
+        ]
     }
 }
 
@@ -48,18 +73,7 @@ public actor Solmu {
     public func kaynnista(_ a: SolmuAsetukset) throws -> URL {
         if _osoite != nil { throw SolmuVirhe.jo_kaynnissa }
         guard !a.avain.isEmpty else { throw SolmuVirhe.avain_puuttuu }
-        var vanha: Any = NSNull()
-        if let v = a.vanha { vanha = v.absoluteString }
-        let asetukset: [String: Any] = [
-            "data": a.data.path,
-            "avain": a.avain,
-            "portti": a.portti,
-            "vertaiset": a.vertaiset.map { $0.absoluteString },
-            "vanha": vanha,
-            "vanha_avain": a.avain,
-            "headless": a.headless,
-            "laite": a.laite
-        ]
+        let asetukset = a.ytimenAsetukset()
         let json = try JSONSerialization.data(withJSONObject: asetukset)
         guard let jsonTeksti = String(data: json, encoding: .utf8) else {
             throw SolmuVirhe.kaynnistys(koodi: -1, viesti: "asetukset eivät ole UTF-8")
@@ -92,6 +106,34 @@ public actor Solmu {
 }
 
 public enum Oletukset {
+    /// S-9: peilin oletuskatto (Mt).
+    public static let peiliKattoMt = 38
+    /// UserDefaults-avaimet (laitekohtaiset; ei tila-avain eikä synkkaa). Käynnistysargumentti `-scopes2.peili-ikkuna-vrk <n>`
+    /// tulee UserDefaultsin argumenttialueelle ja ohittaa tallennetun arvon.
+    public static let peiliIkkunaAvain = "scopes2.peili-ikkuna-vrk"
+    public static let peiliKattoAvain = "scopes2.peili-katto-mt"
+
+    /// Fyysinen iOS-laite 7 vrk; simulaattori ja macOS 0 = täysi solmu (P-17).
+    public static var peiliIkkunaOletusVrk: Int {
+        #if os(iOS) && !targetEnvironment(simulator)
+        return 7
+        #else
+        return 0
+        #endif
+    }
+
+    /// Peilin ikkuna vuorokausina; nil (täysi solmu), kun arvo on 0 tai negatiivinen.
+    public static func peiliIkkunaVrk(_ d: UserDefaults = .standard, oletus: Int? = nil) -> Int? {
+        let n = d.object(forKey: peiliIkkunaAvain) != nil ? d.integer(forKey: peiliIkkunaAvain) : (oletus ?? peiliIkkunaOletusVrk)
+        return n > 0 ? n : nil
+    }
+
+    /// Peilin katto Mt; oletus 38, ei-positiivinen arvo → oletus.
+    public static func peiliKattoMt(_ d: UserDefaults = .standard) -> Int {
+        let n = d.object(forKey: peiliKattoAvain) != nil ? d.integer(forKey: peiliKattoAvain) : peiliKattoMt
+        return n > 0 ? n : peiliKattoMt
+    }
+
     /// Testikoukku (T-52): SCOPES2_PORTTI = solmun kiinteä portti; SCOPES2_VERTAISET = pilkuilla erotetut lisävertaiset.
     /// Tuotannossa ei asetettu. Tarvitaan, koska replikointi vetää vain vertaisen virrasta: kaksi laitetta näkevät toistensa
     /// tilamuutokset vain, jos ne ovat toistensa vertaisia (palvelimen koeydin ei tunne äppien osoitteita).

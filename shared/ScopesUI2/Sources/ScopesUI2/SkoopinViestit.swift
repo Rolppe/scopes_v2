@@ -76,6 +76,12 @@ public struct SkoopinViestit: View {
         ScrollViewReader { vierita in
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: 12) {
+                    // S-9: ikkunoitu solmu ei saanut haettua vanhempia viestejä (vertainen poissa); viestit ovat ikkunan sisältö.
+                    if t.haettavissa {
+                        Text("Vanhempia viestejä ei saatu haettua. Ne haetaan, kun yhteys palvelimeen palaa.")
+                            .font(.caption).foregroundStyle(.secondary)
+                            .accessibilityIdentifier("haettavissa")
+                    }
                     ForEach(t.viestit) { v in
                         rivi(v, viimeinen: v.id == t.viestit.last?.id)
                     }
