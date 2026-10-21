@@ -59,6 +59,7 @@ fn tila_tiedostoon(tiedosto: &Path, laite: &str, ikkuna: Option<u32>, katto: u32
         vanha_avain: None,
         vertaiset: vec![],
         lr_vertainen: None,
+        adapteri: Default::default(),
         lahetin,
         peili: PeiliIkkuna::uusi(ikkuna, katto),
     })

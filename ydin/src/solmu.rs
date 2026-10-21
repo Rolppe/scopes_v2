@@ -39,6 +39,8 @@ pub struct Asetukset {
     pub headless: bool,
     pub laite: String,
     pub lr_vertainen: Option<String>,
+    /// S-10: adapterin osoite; `None` (oletus) = ei adapteria.
+    pub adapteri: Option<String>,
     pub web: Option<PathBuf>,
     /// S-9: transkriptipeilin ikkuna vuorokausina; `None` = täysi solmu (oletus).
     pub peili_ikkuna_vrk: Option<u32>,
@@ -161,6 +163,10 @@ pub async fn kaynnista(a: Asetukset) -> Result<Kaynnissa, Virhe> {
         vanha_avain,
         vertaiset: a.vertaiset,
         lr_vertainen: a.lr_vertainen,
+        adapteri: crate::silta::Adapteri {
+            url: a.adapteri,
+            ..Default::default()
+        },
         lahetin,
         peili: PeiliIkkuna::uusi(a.peili_ikkuna_vrk, a.peili_katto_mt),
     });

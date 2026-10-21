@@ -78,6 +78,7 @@ impl Palvelin {
             vanha_avain: None,
             vertaiset: vec![],
             lr_vertainen: None,
+            adapteri: Default::default(),
             lahetin,
             peili: Default::default(),
         });
