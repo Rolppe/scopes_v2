@@ -1,6 +1,7 @@
 use clap::{Parser, Subcommand};
 use scopes_ydin::api;
 use scopes_ydin::lr;
+use scopes_ydin::nakymat::{muistiloki, muistiloki_paalla};
 use scopes_ydin::solmu::{self, Asetukset, Avainlahde};
 use scopes_ydin::varasto::Varasto;
 use std::io::Write;
@@ -123,10 +124,23 @@ async fn main() {
         peili_ikkuna_vrk: args.peili_ikkuna_vrk,
         peili_katto_mt: args.peili_katto_mt,
     };
+    muistiloki("alku");
     let kaynnissa = solmu::kaynnista(asetukset)
         .await
         .unwrap_or_else(|v| panic!("{}", v.teksti));
     eprintln!("scopes-solmu kuuntelee 127.0.0.1:{}", kaynnissa.portti);
+    muistiloki("kuuntelee");
+    // T-76: huippumuisti 10 s välein ajon aikana (vain SCOPES2_MUISTILOKI=1).
+    if muistiloki_paalla() {
+        tokio::spawn(async {
+            let mut ajastin = tokio::time::interval(Duration::from_secs(10));
+            ajastin.tick().await;
+            loop {
+                ajastin.tick().await;
+                muistiloki("ajo");
+            }
+        });
+    }
     let mut sigterm = tokio::signal::unix::signal(tokio::signal::unix::SignalKind::terminate())
         .expect("SIGTERM-käsittelijä epäonnistui");
     tokio::select! {
@@ -134,4 +148,5 @@ async fn main() {
         _ = sigterm.recv() => {}
     }
     kaynnissa.sammuta(Duration::from_secs(5)).await;
+    muistiloki("loppu");
 }

@@ -116,6 +116,57 @@ pub fn rivit_alkaen(varasto: &Varasto, tiedosto: &str, offset: u64) -> Result<(V
     Ok((osat.into_iter().flat_map(|(_, r)| r).collect(), seuraava))
 }
 
+/// T-76: `yksikoiden_rivimaarat` vain, jos lukuyhteyden kanta `<data>/ydin.db` on varaston oma: kanta on
+/// olemassa ja sen yksiköt ovat samat kuin varaston otsakkeissa (avainväli, ei poistettuja). Muuten `None`
+/// (esim. testivarasto toisella tiedostonimellä); kutsuja lukee silloin rivit varastosta.
+pub fn varmistetut_rivimaarat(
+    varasto: &Varasto,
+    tiedosto: &str,
+) -> Result<Option<Vec<(u64, u64)>>> {
+    if !varasto.data().is_some_and(|d| d.join("ydin.db").is_file()) {
+        return Ok(None);
+    }
+    let Ok(maarat) = yksikoiden_rivimaarat(varasto, tiedosto) else {
+        return Ok(None);
+    };
+    let mut alut: Vec<u64> = paikalliset_alut(varasto, tiedosto)?;
+    alut.sort_unstable();
+    Ok(alut
+        .iter()
+        .copied()
+        .eq(maarat.iter().map(|(a, _)| *a))
+        .then_some(maarat))
+}
+
+/// Tiedoston paikallisten (ei poistettujen) peili-yksiköiden alut otsakkeista (avainväli).
+fn paikalliset_alut(varasto: &Varasto, tiedosto: &str) -> Result<Vec<u64>> {
+    Ok(varasto
+        .listaa_vali_otsakkeet(POLKU, &format!("{tiedosto}:"), &format!("{tiedosto};"))?
+        .into_iter()
+        .filter(|y| !y.poistettu)
+        .filter_map(|y| tiedoston_alku(&y.id, tiedosto))
+        .collect())
+}
+
+/// Yhden peiliyksikön `<tiedosto>:<alku>` rivit (T-76: näkymä hännästä yksikkö kerrallaan); puuttuva tai
+/// poistettu yksikkö = `None`. Sisältö jäsennetään kuten `rivit_alkaen`issa.
+pub fn yksikon_rivit(varasto: &Varasto, tiedosto: &str, alku: u64) -> Result<Option<Vec<String>>> {
+    let Some(y) = varasto
+        .lue(POLKU, &format!("{tiedosto}:{alku}"))?
+        .filter(|y| !y.poistettu)
+    else {
+        return Ok(None);
+    };
+    let taulukko: Vec<String> = y
+        .sisalto
+        .as_deref()
+        .map(serde_json::from_slice)
+        .transpose()
+        .map_err(|e| muunnosvirhe(e.to_string()))?
+        .unwrap_or_default();
+    Ok(Some(taulukko))
+}
+
 /// Rivien tiiviste kuten adapterissa: rivit rivinvaihtoineen.
 fn tiiviste(rivit: &[String]) -> String {
     let mut sha = Sha256::new();
@@ -1248,8 +1299,8 @@ pub struct Raaka {
 }
 
 /// Tiedoston yksiköt (alku, rivien määrä) offset-järjestyksessä; SQL (`json_array_length`) kuten `rivi`:
-/// rivejä ei ladata. Ei yksiköitä = tuntematon tiedosto.
-fn yksikoiden_rivimaarat(varasto: &Varasto, tiedosto: &str) -> Result<Vec<(u64, u64)>> {
+/// rivejä ei ladata. Ei yksiköitä = tuntematon tiedosto. Myös täyden solmun näkymä hännästä (T-76).
+pub fn yksikoiden_rivimaarat(varasto: &Varasto, tiedosto: &str) -> Result<Vec<(u64, u64)>> {
     let data = varasto
         .data()
         .ok_or_else(|| muunnosvirhe("varaston hakemisto puuttuu".to_string()))?;

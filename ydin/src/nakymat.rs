@@ -39,6 +39,64 @@ const SILTA_RAJA: usize = 64 << 20;
 /// Siltavälimuistin (`/api/skoopit`, `/api/rekisterit`) taustapäivityksen väli.
 pub const SILTAVALI: Duration = Duration::from_secs(15);
 
+// ---- muistiloki (T-76) -------------------------------------------------------------------------------------------
+
+/// `SCOPES2_MUISTILOKI=1`: luetaan kerran; ilman muuttujaa `muistiloki` ei tulosta eikä kutsu `getrusage`a.
+pub fn muistiloki_paalla() -> bool {
+    static PAALLA: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
+    *PAALLA.get_or_init(|| std::env::var_os("SCOPES2_MUISTILOKI").is_some_and(|v| v == "1"))
+}
+
+/// Prosessin huippumuisti (`getrusage(RUSAGE_SELF)` `ru_maxrss`) tavuina; Linuxissa ydin antaa kilotavuja.
+/// `struct rusage` on 64-bittisillä macOS:llä ja Linuxilla kaksi 16 tavun `timeval`ia ja 14 `long`ia.
+pub fn huippumuisti() -> u64 {
+    #[repr(C)]
+    struct Rusage {
+        ajat: [i64; 4],
+        ru_maxrss: i64,
+        muut: [i64; 13],
+    }
+    extern "C" {
+        fn getrusage(kuka: i32, kaytto: *mut Rusage) -> i32;
+    }
+    let mut r = Rusage {
+        ajat: [0; 4],
+        ru_maxrss: 0,
+        muut: [0; 13],
+    };
+    // SAFETY: RUSAGE_SELF = 0; `r` on kirjoitettava ja `struct rusage`n kokoinen (144 tavua).
+    if unsafe { getrusage(0, &mut r) } != 0 {
+        return 0;
+    }
+    let arvo = u64::try_from(r.ru_maxrss).unwrap_or(0);
+    if cfg!(target_os = "macos") {
+        arvo
+    } else {
+        arvo * 1024
+    }
+}
+
+/// Kuten `muistiloki`, mutta vain vaiheen ensimmäisellä kutsulla (ensimmäinen palveltu pyyntö).
+pub fn muistiloki_kerran(vaihe: &'static str) {
+    static NAHDYT: std::sync::Mutex<std::collections::BTreeSet<&'static str>> =
+        std::sync::Mutex::new(std::collections::BTreeSet::new());
+    if muistiloki_paalla()
+        && NAHDYT
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .insert(vaihe)
+    {
+        muistiloki(vaihe);
+    }
+}
+
+/// Kirjoittaa stderriin `MUISTI <vaihe> <ru_maxrss tavuina>`, kun `SCOPES2_MUISTILOKI=1`.
+pub fn muistiloki(vaihe: &str) {
+    if muistiloki_paalla() {
+        eprintln!("MUISTI {vaihe} {}", huippumuisti());
+    }
+}
+
 // ---- vastaus -----------------------------------------------------------------------------------------------------
 
 /// Kumpi vastasi: ydin (johdettu) vai silta (vanha 8787).
@@ -740,6 +798,16 @@ pub struct Keskustelu {
     ikkunoitu: bool,
     /// S-9d: pohja, josta näkymä on rakennettu; ikkunoitu ilman pohjaa = tiedoston viestejä ei näytetä.
     pohja: Option<peili::Pohja>,
+    /// T-76: hännästä rakennuksen aikainen työkalutunnusten seuranta (muuten `None`).
+    seuranta: Option<Box<Seuranta>>,
+}
+
+/// T-76: hännän työkalutunnukset. `kaytot` = käsiteltyjen assistant-rivien tool_use-tunnukset;
+/// `tulokset` = käsiteltyjen user-rivien tool_result-viittaukset (rivinumero, tool_use_id).
+#[derive(Debug, Default)]
+struct Seuranta {
+    kaytot: HashSet<String>,
+    tulokset: Vec<(usize, String)>,
 }
 
 impl Keskustelu {
@@ -757,6 +825,7 @@ impl Keskustelu {
             alku: seq,
             ikkunoitu,
             pohja: None,
+            seuranta: None,
         }
     }
 
@@ -777,6 +846,13 @@ impl Keskustelu {
             }
             if self.pohja.is_none() {
                 return Ok(());
+            }
+        } else if self.peili_offset == 0 && self.rivit == 0 && seq == self.alku {
+            // Täysi solmu, ensimmäinen rakennus samalla seq:llä kuin näkymän alku (T-76): hännästä, ei koko
+            // transkriptia muistiin. Hännän ulkopuolelle jäävät viestit eivät näy `poistetut`-listassa, koska
+            // alun seq:n poistot eivät näy since-vastauksissa (`since < alku` = nollaus).
+            if let Some(yksikot) = peili::varmistetut_rivimaarat(v, tiedosto)? {
+                return self.rakenna_hannasta(v, tiedosto, &yksikot, seq);
             }
         }
         let (uudet, seuraava) = peili::rivit_alkaen(v, tiedosto, self.peili_offset)?;
@@ -830,6 +906,129 @@ impl Keskustelu {
         }
         *self = uusi;
         Ok(())
+    }
+
+    /// T-76: täyden solmun ensimmäinen rakennus tiedoston hännästä. Yksiköiden rivimäärät lasketaan SQL:llä
+    /// (S-9d:n tavoin `json_array_length`), joten numerointi ja tunnisteet ovat samat kuin koko tiedostosta.
+    /// Häntä kasvaa (1, 2, 4 … yksikköä), kunnes siitä syntyy `MAARA` viestiä ja näkyvien viestien rivien
+    /// tool_result-viittaukset löytyvät hännästä (kysymyksen vastaus, S-6); malli ja effort haetaan
+    /// tarvittaessa edeltävistä yksiköistä. Yksiköt luetaan yksi kerrallaan, joten muistissa on enintään
+    /// yksi yksikkö ja viestit. Lopputulos (viestit, malli, effort, rivit, offset) = koko tiedoston rakennus.
+    fn rakenna_hannasta(
+        &mut self,
+        v: &Varasto,
+        tiedosto: &str,
+        yksikot: &[(u64, u64)],
+        seq: u64,
+    ) -> crate::muutosloki::Result<()> {
+        if yksikot.is_empty() {
+            return Ok(());
+        }
+        let mut askel = 1usize;
+        let mut s = yksikot.len() - 1;
+        loop {
+            let mut k = self.rakenna_alkaen(v, tiedosto, yksikot, s, seq)?;
+            if s > 0 && k.viestit.len() < MAARA {
+                s = s.saturating_sub(askel);
+                askel = askel.saturating_mul(2);
+                continue;
+            }
+            // Näkyvien viestien alin rivi: sitä myöhempien rivien tool_result-viittausten on löydyttävä
+            // hännästä; muuten viittaus voi olla edeltävään kysymykseen (vastausviesti, `kysymykset`).
+            let alin = k
+                .viestit
+                .front()
+                .and_then(|x| k.rivinro(&x.id))
+                .unwrap_or(0);
+            let mut avoimet: HashSet<String> = k
+                .seuranta
+                .as_ref()
+                .map(|t| {
+                    t.tulokset
+                        .iter()
+                        .filter(|(nro, id)| *nro >= alin && !t.kaytot.contains(id))
+                        .map(|(_, id)| id.clone())
+                        .collect()
+                })
+                .unwrap_or_default();
+            let mut kysymys_yksikko: Option<usize> = None;
+            let mut i = s;
+            while !avoimet.is_empty() && i > 0 {
+                i -= 1;
+                let apu = Keskustelu::yksikosta(v, tiedosto, yksikot[i].0, seq)?;
+                let t = apu.seuranta.as_deref();
+                avoimet.retain(|id| {
+                    if apu.kysymykset.contains_key(id) {
+                        kysymys_yksikko = Some(i);
+                    }
+                    !t.is_some_and(|t| t.kaytot.contains(id))
+                });
+            }
+            if let Some(q) = kysymys_yksikko {
+                // Kysymys ennen häntää: häntä laajenee sen yksikköön ja rakennetaan uudelleen.
+                s = q;
+                continue;
+            }
+            let mut i = s;
+            while k.malli.is_null() && i > 0 {
+                i -= 1;
+                let apu = Keskustelu::yksikosta(v, tiedosto, yksikot[i].0, seq)?;
+                if !apu.malli.is_null() {
+                    k.malli = apu.malli;
+                    k.effort = apu.effort;
+                }
+            }
+            k.seuranta = None;
+            *self = k;
+            return Ok(());
+        }
+    }
+
+    /// T-76: näkymä yksiköistä `yksikot[s..]` luettuna yksi kerrallaan; numerointi alkaa edeltävien
+    /// yksiköiden rivimäärästä. Peräkkäiset `sovella`-kutsut tuottavat saman näkymän kuin yksi kutsu kaikille
+    /// riveille (vanhimmat yli `MAARA`n viestit eivät palaa näkyviin; kysymyksen tila päätellään samoin).
+    fn rakenna_alkaen(
+        &self,
+        v: &Varasto,
+        tiedosto: &str,
+        yksikot: &[(u64, u64)],
+        s: usize,
+        seq: u64,
+    ) -> crate::muutosloki::Result<Keskustelu> {
+        let mut k = Keskustelu::uusi(&self.istunto, self.alku, false);
+        k.seuranta = Some(Box::default());
+        let pohja: u64 = yksikot[..s].iter().map(|(_, n)| n).sum();
+        k.rivit = usize::try_from(pohja).unwrap_or(usize::MAX);
+        for &(alku, _) in &yksikot[s..] {
+            let Some(rivit) = peili::yksikon_rivit(v, tiedosto, alku)? else {
+                continue;
+            };
+            k.peili_offset = alku + rivit.iter().map(|r| r.len() as u64 + 1).sum::<u64>();
+            k.sovella(&rivit, seq);
+        }
+        Ok(k)
+    }
+
+    /// T-76: yhden yksikön rivit erillisenä näkymänä (malli, kysymykset ja työkalutunnukset); numerointi ei
+    /// ole tiedoston numerointi, joten näkymää käytetään vain hakuun.
+    fn yksikosta(
+        v: &Varasto,
+        tiedosto: &str,
+        alku: u64,
+        seq: u64,
+    ) -> crate::muutosloki::Result<Keskustelu> {
+        let mut k = Keskustelu::uusi("", seq, false);
+        k.seuranta = Some(Box::default());
+        if let Some(rivit) = peili::yksikon_rivit(v, tiedosto, alku)? {
+            k.sovella(&rivit, seq);
+        }
+        Ok(k)
+    }
+
+    /// Viestitunnisteen `<istunto>:<rivinro>[.<osa>]` rivinumero.
+    fn rivinro(&self, id: &str) -> Option<usize> {
+        let loppu = id.strip_prefix(self.istunto.as_str())?.strip_prefix(':')?;
+        loppu.split('.').next()?.parse().ok()
     }
 
     /// Soveltaa uudet rivit rivinumerosta `self.rivit + 1` eteenpäin.
@@ -924,6 +1123,11 @@ impl Keskustelu {
                             Some(t) => js_teksti(t),
                         });
                     } else if ot == Some("tool_use") {
+                        if let (Some(t), Some(id)) =
+                            (self.seuranta.as_mut(), o.get("id").and_then(Value::as_str))
+                        {
+                            t.kaytot.insert(id.to_string());
+                        }
                         let t = teksti.join("\n").trim().to_string();
                         if !t.is_empty() {
                             self.lisaa(nro, &mut osa, viesti("agentti", t, &aika), seq);
@@ -957,6 +1161,12 @@ impl Keskustelu {
                 for o in osat {
                     if o.get("type").and_then(Value::as_str) != Some("tool_result") {
                         continue;
+                    }
+                    if let (Some(t), Some(id)) = (
+                        self.seuranta.as_mut(),
+                        o.get("tool_use_id").and_then(Value::as_str),
+                    ) {
+                        t.tulokset.push((nro, id.to_string()));
                     }
                     let Some(kid) = o
                         .get("tool_use_id")
@@ -1498,6 +1708,9 @@ impl Sisa {
             if let std::collections::hash_map::Entry::Vacant(e) = self.viestit.entry(t) {
                 let mut k = Keskustelu::uusi(&id, seq, ikkunoitu);
                 k.lue_peilista(v, e.key(), seq)?;
+                if muistiloki_paalla() {
+                    muistiloki(&format!("nakyma:{}", e.key()));
+                }
                 e.insert(k);
             }
         }
@@ -2110,9 +2323,12 @@ pub fn kaynnista_valilla(tila: Arc<Tila>, vali: Duration) -> tokio::task::JoinHa
     let mut rx = tila.lahetin.subscribe();
     tokio::spawn(async move {
         let n = nakyma(&tila);
+        // T-76: varasto on avattu (`solmu::kaynnista`) ennen tätä tehtävää.
+        muistiloki("varasto_avattu");
         if let Err(e) = n.paivita(&tila) {
             eprintln!("nakymat: {e}");
         }
+        muistiloki("nakymat_kaynnistetty");
         let seuraa = async {
             // Lagged: loki luetaan seq:stä, joten väliin jääneet tapahtumat eivät katoa.
             while let Ok(_) | Err(tokio::sync::broadcast::error::RecvError::Lagged(_)) =
