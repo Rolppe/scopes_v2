@@ -1,0 +1,12 @@
+{
+  "tapaus": "android-liite-push-epaonnistuu",
+  "pyynto": {
+    "metodi": "POST",
+    "polku": "/api/android/liite?nimi=muistio.txt",
+    "runko": "liitteen sisältö"
+  },
+  "status": 502,
+  "runko": {
+    "virhe": "push epäonnistui: adb: error: failed to copy"
+  }
+}

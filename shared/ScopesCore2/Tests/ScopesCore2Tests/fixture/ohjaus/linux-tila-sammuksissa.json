@@ -1,0 +1,12 @@
+{
+  "tapaus": "linux-tila-sammuksissa",
+  "pyynto": {
+    "metodi": "GET",
+    "polku": "/api/palvelin",
+    "runko": null
+  },
+  "status": 200,
+  "runko": {
+    "tila": "sammuksissa"
+  }
+}

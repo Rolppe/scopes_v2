@@ -1,0 +1,12 @@
+{
+  "tapaus": "linux-kaynnista-toinen-toiminto-kaynnissa",
+  "pyynto": {
+    "metodi": "POST",
+    "polku": "/api/palvelin/kaynnista",
+    "runko": {}
+  },
+  "status": 429,
+  "runko": {
+    "virhe": "kaynnista on jo käynnissä"
+  }
+}

@@ -1,0 +1,18 @@
+{
+  "tapaus": "android-pyyhkaise",
+  "pyynto": {
+    "metodi": "POST",
+    "polku": "/api/android/pyyhkaise",
+    "runko": {
+      "x1": 0.5,
+      "y1": 0.8,
+      "x2": 0.5,
+      "y2": 0.2,
+      "kesto": 500
+    }
+  },
+  "status": 200,
+  "runko": {
+    "ok": true
+  }
+}

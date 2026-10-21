@@ -1,0 +1,12 @@
+{
+  "tapaus": "linux-kaynnista-sammuksissa-herata-epaonnistuu",
+  "pyynto": {
+    "metodi": "POST",
+    "polku": "/api/palvelin/kaynnista",
+    "runko": {}
+  },
+  "status": 504,
+  "runko": {
+    "virhe": "PC ei vastannut 90 s kuluessa herätyksestä"
+  }
+}

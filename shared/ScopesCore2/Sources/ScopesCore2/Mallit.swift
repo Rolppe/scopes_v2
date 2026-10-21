@@ -249,3 +249,108 @@ public struct Istunto: Codable, Identifiable, Hashable, Sendable {
         self.tyyppi = tyyppi
     }
 }
+
+// ARK-19 (T-87): Android-etäohjaus ja palvelin. Rungot = vanhan 8787:n (T-79-G:n fixturet scopes2/adapteri/testidata/toiminnot/);
+// kentät valinnaisia, koska toiminnot palauttavat eri osat, ja tuntemattomat kentät sallitaan.
+
+/// GET /api/android (ytimen lähdetilasta tai adapterista): { hereilla, heratimme, koko, kuiva }.
+public struct AndroidTila: Codable, Hashable, Sendable {
+    public let hereilla: Bool?
+    public let heratimme: Bool?
+    /// Ruudun koko pikseleinä [leveys, korkeus].
+    public let koko: [Int]?
+    public let kuiva: Bool?
+
+    public init(hereilla: Bool? = nil, heratimme: Bool? = nil, koko: [Int]? = nil, kuiva: Bool? = nil) {
+        self.hereilla = hereilla
+        self.heratimme = heratimme
+        self.koko = koko
+        self.kuiva = kuiva
+    }
+}
+
+/// Geminin keskustelun viesti (`talteen`-vastaus).
+public struct AndroidViesti: Codable, Hashable, Sendable {
+    public let rooli: String
+    public let teksti: String
+
+    public init(rooli: String, teksti: String) {
+        self.rooli = rooli
+        self.teksti = teksti
+    }
+}
+
+/// POST /api/android/<toiminto> ja /liite: { ok, piste, nimi, liitetty, lahetetty, polku, teksti, viestit, kuiva }.
+/// `kuiva` on koepalvelimen (kuivatila) komento, joka olisi ajettu.
+public struct AndroidVastaus: Codable, Hashable, Sendable {
+    public let ok: Bool?
+    public let piste: [Int]?
+    public let nimi: String?
+    public let liitetty: Bool?
+    public let lahetetty: Bool?
+    public let polku: String?
+    public let teksti: String?
+    public let viestit: [AndroidViesti]?
+    public let kuiva: String?
+
+    public init(ok: Bool? = nil, piste: [Int]? = nil, nimi: String? = nil, liitetty: Bool? = nil, lahetetty: Bool? = nil,
+                polku: String? = nil, teksti: String? = nil, viestit: [AndroidViesti]? = nil, kuiva: String? = nil) {
+        self.ok = ok
+        self.piste = piste
+        self.nimi = nimi
+        self.liitetty = liitetty
+        self.lahetetty = lahetetty
+        self.polku = polku
+        self.teksti = teksti
+        self.viestit = viestit
+        self.kuiva = kuiva
+    }
+}
+
+/// Laitteen tuotostiedosto (GET /api/android/tuotokset); `aika` ISO-merkkijonona.
+public struct AndroidTuotos: Codable, Identifiable, Hashable, Sendable {
+    public let polku: String
+    public let nimi: String
+    public let koko: Int
+    public let aika: String
+
+    public var id: String { polku }
+
+    public init(polku: String, nimi: String, koko: Int, aika: String) {
+        self.polku = polku
+        self.nimi = nimi
+        self.koko = koko
+        self.aika = aika
+    }
+}
+
+struct AndroidTuotokset: Decodable {
+    let tiedostot: [AndroidTuotos]
+}
+
+/// GET /api/palvelin: tila linux | windows | sammuksissa (pingin TTL:stä), osoite kun PC vastaa.
+public struct LinuxServerTila: Codable, Hashable, Sendable {
+    public let tila: String
+    public let osoite: String?
+
+    public init(tila: String, osoite: String? = nil) {
+        self.tila = tila
+        self.osoite = osoite
+    }
+}
+
+/// POST /api/palvelin/<kaynnista|sammuta>: tila toiminnon jälkeen (vaihtaa, heratetty, linux, sammuu), `lahto` = tila ennen.
+public struct LinuxServerVastaus: Codable, Hashable, Sendable {
+    public let tila: String
+    public let lahto: String?
+    public let viesti: String?
+    /// Koepalvelin (kuivatila): komento, joka olisi ajettu.
+    public let kuiva: String?
+
+    public init(tila: String, lahto: String? = nil, viesti: String? = nil, kuiva: String? = nil) {
+        self.tila = tila
+        self.lahto = lahto
+        self.viesti = viesti
+        self.kuiva = kuiva
+    }
+}

@@ -1,0 +1,12 @@
+{
+  "tapaus": "android-tuntematon-toiminto",
+  "pyynto": {
+    "metodi": "POST",
+    "polku": "/api/android/ei-ole",
+    "runko": {}
+  },
+  "status": 404,
+  "runko": {
+    "virhe": "tuntematon toiminto"
+  }
+}

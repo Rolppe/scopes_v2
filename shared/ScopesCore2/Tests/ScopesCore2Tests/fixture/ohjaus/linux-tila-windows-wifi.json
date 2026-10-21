@@ -1,0 +1,13 @@
+{
+  "tapaus": "linux-tila-windows-wifi",
+  "pyynto": {
+    "metodi": "GET",
+    "polku": "/api/palvelin",
+    "runko": null
+  },
+  "status": 200,
+  "runko": {
+    "tila": "windows",
+    "osoite": "192.0.2.99"
+  }
+}

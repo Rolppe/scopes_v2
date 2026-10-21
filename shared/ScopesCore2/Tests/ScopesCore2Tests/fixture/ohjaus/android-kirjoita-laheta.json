@@ -1,0 +1,15 @@
+{
+  "tapaus": "android-kirjoita-laheta",
+  "pyynto": {
+    "metodi": "POST",
+    "polku": "/api/android/kirjoita",
+    "runko": {
+      "teksti": "Hei äiti",
+      "laheta": true
+    }
+  },
+  "status": 200,
+  "runko": {
+    "ok": true
+  }
+}

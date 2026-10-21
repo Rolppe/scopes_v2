@@ -1,0 +1,14 @@
+{
+  "tapaus": "android-nappi-tuntematon",
+  "pyynto": {
+    "metodi": "POST",
+    "polku": "/api/android/nappi",
+    "runko": {
+      "nimi": "ei-ole"
+    }
+  },
+  "status": 400,
+  "runko": {
+    "virhe": "tuntematon nappi (sallitut: takaisin, koti, enter, poista, herata, nukuta, sovellukset)"
+  }
+}

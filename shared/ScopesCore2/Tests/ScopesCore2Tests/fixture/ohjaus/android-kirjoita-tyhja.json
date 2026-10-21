@@ -1,0 +1,14 @@
+{
+  "tapaus": "android-kirjoita-tyhja",
+  "pyynto": {
+    "metodi": "POST",
+    "polku": "/api/android/kirjoita",
+    "runko": {
+      "teksti": "  "
+    }
+  },
+  "status": 400,
+  "runko": {
+    "virhe": "teksti puuttuu"
+  }
+}

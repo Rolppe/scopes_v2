@@ -24,11 +24,21 @@ public struct InfraNakyma: View {
                 if let virhe {
                     Text(virhe).font(.caption).foregroundStyle(.red).padding(8).accessibilityIdentifier("infra-virhe")
                 }
-                List(rivit) { r in
-                    NavigationLink(value: r) { rivi(r) }
-                        .accessibilityIdentifier("rekisteri-\(r.polku)")
+                List {
+                    // ARK-19 (T-87): kehityspaneelit. palvelimen osio ja linkki Android-etäohjaukseen.
+                    LinuxServerOsio(asiakas: asiakas)
+                    Section {
+                        NavigationLink { AndroidNakyma(asiakas: asiakas) } label: { Label("Android-etäohjaus", systemImage: "iphone") }
+                            .accessibilityIdentifier("infra-android")
+                    }
+                    Section("Rekisterit") {
+                        ForEach(rivit) { r in
+                            NavigationLink(value: r) { rivi(r) }
+                                .accessibilityIdentifier("rekisteri-\(r.polku)")
+                        }
+                        if rivit.isEmpty && !lataa { Text("Ei rekistereitä").foregroundStyle(.secondary) }
+                    }
                 }
-                .overlay { if rivit.isEmpty && !lataa { Text("Ei rekistereitä").foregroundStyle(.secondary) } }
             }
             .navigationDestination(for: RekisteriRivi.self) { r in
                 RekisterinOsatNakyma(asiakas: asiakas, rivi: r)

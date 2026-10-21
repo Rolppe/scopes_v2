@@ -1,0 +1,14 @@
+{
+  "tapaus": "linux-kaynnista-linux",
+  "pyynto": {
+    "metodi": "POST",
+    "polku": "/api/palvelin/kaynnista",
+    "runko": {}
+  },
+  "status": 200,
+  "runko": {
+    "tila": "linux",
+    "lahto": "linux",
+    "viesti": "palvelin on jo päällä"
+  }
+}

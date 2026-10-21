@@ -1,0 +1,14 @@
+{
+  "tapaus": "android-heratys",
+  "pyynto": {
+    "metodi": "POST",
+    "polku": "/api/android/nappi",
+    "runko": {
+      "nimi": "koti"
+    }
+  },
+  "status": 200,
+  "runko": {
+    "ok": true
+  }
+}

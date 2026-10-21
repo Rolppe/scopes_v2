@@ -1,0 +1,13 @@
+{
+  "tapaus": "android-ruutu",
+  "pyynto": {
+    "metodi": "GET",
+    "polku": "/api/android/ruutu",
+    "runko": null
+  },
+  "status": 200,
+  "runko": {
+    "tyyppi": "image/jpeg",
+    "base64": "/9j/4AAQSkZJRgABAQAAAQABAAD/2Q=="
+  }
+}

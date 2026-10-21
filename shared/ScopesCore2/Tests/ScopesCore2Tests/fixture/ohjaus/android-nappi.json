@@ -1,0 +1,14 @@
+{
+  "tapaus": "android-nappi",
+  "pyynto": {
+    "metodi": "POST",
+    "polku": "/api/android/nappi",
+    "runko": {
+      "nimi": "takaisin"
+    }
+  },
+  "status": 200,
+  "runko": {
+    "ok": true
+  }
+}

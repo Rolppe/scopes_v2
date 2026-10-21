@@ -1,0 +1,12 @@
+{
+  "tapaus": "android-uusi-ei-nappia",
+  "pyynto": {
+    "metodi": "POST",
+    "polku": "/api/android/uusi",
+    "runko": {}
+  },
+  "status": 409,
+  "runko": {
+    "virhe": "New chat -painiketta ei näy"
+  }
+}

@@ -1,0 +1,14 @@
+{
+  "tapaus": "android-kirjoita-liite-odottaa",
+  "pyynto": {
+    "metodi": "POST",
+    "polku": "/api/android/kirjoita",
+    "runko": {
+      "teksti": "Hei"
+    }
+  },
+  "status": 409,
+  "runko": {
+    "virhe": "kentässä odottaa liite; jakointentti poistaisi sen — lähetä teksti liitteen kanssa tai poista liite"
+  }
+}

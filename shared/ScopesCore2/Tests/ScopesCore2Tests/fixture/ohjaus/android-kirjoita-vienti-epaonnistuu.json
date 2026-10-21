@@ -1,0 +1,14 @@
+{
+  "tapaus": "android-kirjoita-vienti-epaonnistuu",
+  "pyynto": {
+    "metodi": "POST",
+    "polku": "/api/android/kirjoita",
+    "runko": {
+      "teksti": "Hei"
+    }
+  },
+  "status": 502,
+  "runko": {
+    "virhe": "tekstin vienti epäonnistui: Error: Activity not started"
+  }
+}

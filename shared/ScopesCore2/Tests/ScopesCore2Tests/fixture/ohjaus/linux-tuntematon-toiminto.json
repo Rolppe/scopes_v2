@@ -1,0 +1,12 @@
+{
+  "tapaus": "linux-tuntematon-toiminto",
+  "pyynto": {
+    "metodi": "POST",
+    "polku": "/api/palvelin/ei-ole",
+    "runko": {}
+  },
+  "status": 404,
+  "runko": {
+    "virhe": "tuntematon toiminto"
+  }
+}

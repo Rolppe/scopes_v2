@@ -1,0 +1,12 @@
+{
+  "tapaus": "android-laheta-ei-nappia",
+  "pyynto": {
+    "metodi": "POST",
+    "polku": "/api/android/laheta",
+    "runko": {}
+  },
+  "status": 409,
+  "runko": {
+    "virhe": "Send-painiketta ei näy (kenttä tyhjä tai Gemini ei edessä)"
+  }
+}

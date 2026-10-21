@@ -1,0 +1,12 @@
+{
+  "tapaus": "linux-sammuta-tunnistusvirhe",
+  "pyynto": {
+    "metodi": "POST",
+    "polku": "/api/palvelin/sammuta",
+    "runko": {}
+  },
+  "status": 502,
+  "runko": {
+    "virhe": "sammutus epäonnistui: Permission denied (publickey)."
+  }
+}

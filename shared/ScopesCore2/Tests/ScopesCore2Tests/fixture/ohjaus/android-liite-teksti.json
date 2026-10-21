@@ -1,0 +1,15 @@
+{
+  "tapaus": "android-liite-teksti",
+  "pyynto": {
+    "metodi": "POST",
+    "polku": "/api/android/liite?nimi=muistio.txt&teksti=Katso%20t%C3%A4m%C3%A4",
+    "runko": "liitteen sisältö"
+  },
+  "status": 200,
+  "runko": {
+    "ok": true,
+    "nimi": "scopes-080000-muistio.txt",
+    "liitetty": true,
+    "lahetetty": true
+  }
+}
