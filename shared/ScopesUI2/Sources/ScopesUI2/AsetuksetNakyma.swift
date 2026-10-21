@@ -8,6 +8,7 @@ public struct AsetuksetNakyma: View {
     let asiakas: Asiakas?
     let avainMuuttui: () -> Void
     let headlessMuuttui: () -> Void
+    let lisaosio: AnyView?
 
     @AppStorage("scopes2.headless") private var headless: Bool = false
     @AppStorage("scopes2.vertainen") private var vertainen: String = Oletukset.vertainen.absoluteString
@@ -18,11 +19,12 @@ public struct AsetuksetNakyma: View {
     @State private var seq: String = "–"
     @State private var portti: String = "–"
 
-    public init(varasto: Varasto, asiakas: Asiakas? = nil, avainMuuttui: @escaping () -> Void = {}, headlessMuuttui: @escaping () -> Void = {}) {
+    public init(varasto: Varasto, asiakas: Asiakas? = nil, avainMuuttui: @escaping () -> Void = {}, headlessMuuttui: @escaping () -> Void = {}, lisaosio: AnyView? = nil) {
         self.varasto = varasto
         self.asiakas = asiakas
         self.avainMuuttui = avainMuuttui
         self.headlessMuuttui = headlessMuuttui
+        self.lisaosio = lisaosio
     }
 
     private struct Terveys: Decodable { let seq: Int? }
@@ -70,6 +72,7 @@ public struct AsetuksetNakyma: View {
                 Button("Tarkista yhteys") { Task { await tarkista() } }
                     .disabled(asiakas == nil)
             }
+            if let lisaosio { lisaosio }
         }
         .formStyle(.grouped)
         .task {
