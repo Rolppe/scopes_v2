@@ -202,6 +202,7 @@ pub fn router_valilla(tila: Arc<Tila>, ka: Duration) -> Router {
         .merge(tila::reitit(tila.clone()))
         .merge(peili::reitit(tila.clone()))
         .merge(lahde::reitit(tila.clone()))
+        .merge(crate::lahdetila::reitit(tila.clone()))
         .merge(nakymat::reitit(tila.clone()))
         .merge(replikointi::reitit(tila.clone()))
         .merge(lr::reitit(tila.clone()))

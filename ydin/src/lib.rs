@@ -1,6 +1,7 @@
 pub mod api;
 pub mod ffi;
 pub mod lahde;
+pub mod lahdetila;
 pub mod liite;
 pub mod lr;
 pub mod muutosloki;
