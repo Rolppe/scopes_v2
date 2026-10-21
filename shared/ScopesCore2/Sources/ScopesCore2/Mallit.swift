@@ -179,6 +179,19 @@ public struct PeiliKoko: Codable, Hashable, Sendable {
     public var kokoMt: Double { Double(tavut) / 1_048_576 }
 }
 
+/// S-9f: GET /api/peili/<tiedosto>/raaka. rivi on 1-pohjainen (kuten Viesti.id); seuraava on jatkokohta tai nil tiedoston lopussa.
+public struct PeiliRaaka: Codable, Hashable, Sendable {
+    public let rivi: Int
+    public let rivit: [String]
+    public let seuraava: Int?
+
+    public init(rivi: Int, rivit: [String], seuraava: Int? = nil) {
+        self.rivi = rivi
+        self.rivit = rivit
+        self.seuraava = seuraava
+    }
+}
+
 // Palvelun vastaus liitteen tallennukseen: polku, koko tavuina, sha256 ja solmu, joka tallensi (S-8b).
 public struct LiiteVastaus: Codable, Hashable, Sendable {
     public let polku: String
