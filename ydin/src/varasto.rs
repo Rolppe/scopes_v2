@@ -8,7 +8,13 @@ use std::collections::BTreeSet;
 use std::path::{Path, PathBuf};
 use std::sync::{Mutex, MutexGuard};
 
-const SKEEMAVERSIO: &str = "1";
+const SKEEMAVERSIO: &str = "2";
+
+/// Skeema 2 (T-73): peili-yksikön sisältöaika ms (muilla poluilla NULL).
+const SKEEMA_2_MUUTOS: &str = "ALTER TABLE yksikot ADD COLUMN sisaltoaika INTEGER";
+
+/// Siirtymän 1 → 2 eräkoko: yksiköitä enintään näin monta yhtä commitia kohden.
+const SIIRTYMA_ERA: usize = 500;
 
 const SKEEMA_1: &str = "
 CREATE TABLE yksikot  (polku TEXT NOT NULL, id TEXT NOT NULL, versio TEXT NOT NULL, aika TEXT NOT NULL, sisalto BLOB, poistettu INTEGER NOT NULL DEFAULT 0, PRIMARY KEY (polku, id));
@@ -57,20 +63,30 @@ fn hae(c: &Connection, polku: &str, id: &str) -> Result<Option<Yksikko>> {
 }
 
 /// Tallettaa yksikön (lisäys tai korvaus) ja kirjaa muutoslokiin; palauttaa `seq`.
-fn talleta(c: &Connection, y: &Yksikko) -> Result<u64> {
+/// Peili-yksikön `sisaltoaika` (T-73) on annettu arvo tai, jos sitä ei anneta, laskettu tallennettavasta
+/// sisällöstä (HLC-ajan varapolku); muilla poluilla sarake on NULL.
+fn talleta(c: &Connection, y: &Yksikko, sisaltoaika: Option<u64>) -> Result<u64> {
     let aika = y.aika.to_string();
+    let sisaltoaika: Option<i64> = (y.polku == crate::peili::POLKU).then(|| {
+        sisaltoaika.unwrap_or_else(|| {
+            y.sisalto
+                .as_deref()
+                .map_or(y.aika.ms, |s| crate::peili::sisaltoaika(s, y.aika.ms))
+        }) as i64
+    });
     c.execute(
-        "INSERT INTO yksikot (polku, id, versio, aika, sisalto, poistettu) \
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6) \
+        "INSERT INTO yksikot (polku, id, versio, aika, sisalto, poistettu, sisaltoaika) \
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7) \
          ON CONFLICT(polku, id) DO UPDATE SET versio = excluded.versio, aika = excluded.aika, \
-         sisalto = excluded.sisalto, poistettu = excluded.poistettu",
+         sisalto = excluded.sisalto, poistettu = excluded.poistettu, sisaltoaika = excluded.sisaltoaika",
         params![
             y.polku,
             y.id,
             versio_tekstina(&y.versio)?,
             aika,
             y.sisalto,
-            i64::from(y.poistettu)
+            i64::from(y.poistettu),
+            sisaltoaika
         ],
     )?;
     muutosloki::kirjaa(c, &y.polku, &y.id, &y.versio, &aika)
@@ -81,7 +97,7 @@ fn heksa(tavut: &[u8]) -> String {
 }
 
 impl Varasto {
-    /// Avaa (tai luo) tietokannan: WAL, vierasavaimet päälle ja migraatio versioon 1.
+    /// Avaa (tai luo) tietokannan: WAL, vierasavaimet päälle ja migraatio versioon 2.
     pub fn avaa(polku: &Path) -> Result<Varasto> {
         let mut c = Connection::open(polku)?;
         c.pragma_update(None, "journal_mode", "WAL")?;
@@ -108,27 +124,108 @@ impl Varasto {
         )?;
         if !meta_on {
             tx.execute_batch(SKEEMA_1)?;
+            tx.execute_batch(SKEEMA_2_MUUTOS)?;
             tx.execute_batch("CREATE TABLE meta (avain TEXT PRIMARY KEY, arvo TEXT);")?;
             tx.execute(
                 "INSERT INTO meta (avain, arvo) VALUES ('skeemaversio', ?1)",
                 params![SKEEMAVERSIO],
             )?;
-        } else {
-            let versio: Option<String> = tx
-                .query_row(
-                    "SELECT arvo FROM meta WHERE avain = 'skeemaversio'",
-                    [],
-                    |r| r.get(0),
-                )
-                .optional()?;
-            if versio.as_deref() != Some(SKEEMAVERSIO) {
-                return Err(muunnosvirhe(
-                    0,
-                    format!("tuntematon skeemaversio: {versio:?}"),
-                ));
-            }
+            return tx.commit();
         }
-        tx.commit()
+        let versio: Option<String> = tx
+            .query_row(
+                "SELECT arvo FROM meta WHERE avain = 'skeemaversio'",
+                [],
+                |r| r.get(0),
+            )
+            .optional()?;
+        match versio.as_deref() {
+            Some(SKEEMAVERSIO) => tx.commit(),
+            Some("1") => {
+                tx.commit()?;
+                Self::migroi_1_2(c)
+            }
+            _ => Err(muunnosvirhe(
+                0,
+                format!("tuntematon skeemaversio: {versio:?}"),
+            )),
+        }
+    }
+
+    /// Siirtymä 1 → 2 (T-73): sarake `sisaltoaika`, vanhojen peili-yksiköiden täyttö yksi kerrallaan
+    /// (yksi sisältö muistissa kerrallaan, commit enintään `SIIRTYMA_ERA` yksikön välein) ja HLC-pohjaisen
+    /// karsintarajan poisto. Versio nousee vasta lopuksi, joten keskeytynyt siirtymä jatkuu seuraavassa
+    /// avauksessa. Kirjaa stderriin yksiköiden määrän ja keston.
+    fn migroi_1_2(c: &mut Connection) -> Result<()> {
+        let alku = std::time::Instant::now();
+        let tx = c.transaction_with_behavior(TransactionBehavior::Immediate)?;
+        let sarake_on: bool = tx.query_row(
+            "SELECT EXISTS (SELECT 1 FROM pragma_table_info('yksikot') WHERE name = 'sisaltoaika')",
+            [],
+            |r| r.get(0),
+        )?;
+        if !sarake_on {
+            tx.execute_batch(SKEEMA_2_MUUTOS)?;
+        }
+        tx.commit()?;
+
+        let mut yksikoita = 0usize;
+        let mut viimeinen = String::new();
+        loop {
+            let tx = c.transaction_with_behavior(TransactionBehavior::Immediate)?;
+            let era: Vec<(String, String)> = {
+                let mut kysely = tx.prepare(
+                    "SELECT id, aika FROM yksikot WHERE polku = ?1 AND sisaltoaika IS NULL \
+                     AND id > ?2 ORDER BY id LIMIT ?3",
+                )?;
+                let rivit = kysely.query_map(
+                    params![crate::peili::POLKU, viimeinen, SIIRTYMA_ERA as i64],
+                    |r| Ok((r.get::<_, String>(0)?, r.get::<_, String>(1)?)),
+                )?;
+                rivit.collect::<rusqlite::Result<_>>()?
+            };
+            let Some((viimeinen_id, _)) = era.last() else {
+                tx.commit()?;
+                break;
+            };
+            let viimeinen_id = viimeinen_id.clone();
+            for (id, aika) in &era {
+                let hlc_ms = Hlc::parse(aika).map_or(0, |h| h.ms);
+                let sisaltoaika = {
+                    let sisalto: Option<Vec<u8>> = tx.query_row(
+                        "SELECT sisalto FROM yksikot WHERE polku = ?1 AND id = ?2",
+                        params![crate::peili::POLKU, id],
+                        |r| r.get(0),
+                    )?;
+                    sisalto
+                        .as_deref()
+                        .map_or(hlc_ms, |s| crate::peili::sisaltoaika(s, hlc_ms))
+                };
+                tx.execute(
+                    "UPDATE yksikot SET sisaltoaika = ?3 WHERE polku = ?1 AND id = ?2",
+                    params![crate::peili::POLKU, id, sisaltoaika as i64],
+                )?;
+            }
+            yksikoita += era.len();
+            viimeinen = viimeinen_id;
+            tx.commit()?;
+        }
+
+        let tx = c.transaction_with_behavior(TransactionBehavior::Immediate)?;
+        tx.execute(
+            "DELETE FROM yksikot WHERE polku = ?1 AND id = ?2",
+            params![crate::peili::KARSINTA_POLKU, crate::peili::KARSINTA_ID],
+        )?;
+        tx.execute(
+            "UPDATE meta SET arvo = ?1 WHERE avain = 'skeemaversio'",
+            params![SKEEMAVERSIO],
+        )?;
+        tx.commit()?;
+        eprintln!(
+            "varasto: siirtymä skeema 1 → 2: {yksikoita} peili-yksikköä täytetty, {} ms",
+            alku.elapsed().as_millis()
+        );
+        Ok(())
     }
 
     fn yhteys(&self) -> MutexGuard<'_, Connection> {
@@ -139,6 +236,25 @@ impl Varasto {
     /// ei muutosta palauttaa `None`. Rinnakkaiset: nykyinen jää paikalleen ja saapuva talletetaan
     /// tunnuksella `<id>~<laite>` (laite = saapuvan HLC:n laite).
     pub fn kirjoita(&self, y: &Yksikko, yh: Yhdistaja) -> Result<Option<u64>> {
+        self.kirjoita_sisaltoajalla(y, yh, None)
+    }
+
+    /// Kuten `kirjoita`, mutta peili-yksikön sisältöaika (T-73) annetaan: ikkunoitu solmu riisuu sisällön
+    /// ennen tallennusta, joten sisältöaika lasketaan riisumattomista riveistä (`peili::ikkunoi`). `None` =
+    /// lasketaan tallennettavasta sisällöstä. Annettu arvo kelpaa vain, jos tallennettava sisältö on `y`:n.
+    pub fn kirjoita_sisaltoajalla(
+        &self,
+        y: &Yksikko,
+        yh: Yhdistaja,
+        sisaltoaika: Option<u64>,
+    ) -> Result<Option<u64>> {
+        let sa = |r: &Yksikko| {
+            if r.sisalto == y.sisalto {
+                sisaltoaika
+            } else {
+                None
+            }
+        };
         let mut c = self.yhteys();
         let tx = c.transaction_with_behavior(TransactionBehavior::Immediate)?;
         let nykyinen = hae(&tx, &y.polku, &y.id)?;
@@ -147,7 +263,7 @@ impl Varasto {
                 if nykyinen.as_ref() == Some(&r) {
                     None
                 } else {
-                    Some(talleta(&tx, &r)?)
+                    Some(talleta(&tx, &r, sa(&r))?)
                 }
             }
             Tulos::Rinnakkaiset(v) => {
@@ -165,7 +281,7 @@ impl Varasto {
                     {
                         None
                     }
-                    _ => Some(talleta(&tx, &sisar)?),
+                    _ => Some(talleta(&tx, &sisar, sa(&sisar))?),
                 }
             }
         };
@@ -198,6 +314,25 @@ impl Varasto {
         rivit.collect()
     }
 
+    /// Kuten `listaa_otsakkeet`, mutta mukana sarake `sisaltoaika` (T-73; NULL = ei tiedossa).
+    pub fn listaa_otsakkeet_sisaltoajalla(
+        &self,
+        polku: &str,
+    ) -> Result<Vec<(Yksikko, Option<u64>)>> {
+        let c = self.yhteys();
+        let mut kysely = c.prepare(
+            "SELECT polku, id, versio, aika, NULL, poistettu, sisaltoaika FROM yksikot \
+             WHERE polku = ?1 ORDER BY id",
+        )?;
+        let rivit = kysely.query_map(params![polku], |r| {
+            Ok((
+                yksikko_rivilta(r)?,
+                r.get::<_, Option<i64>>(6)?.map(|n| n.max(0) as u64),
+            ))
+        })?;
+        rivit.collect()
+    }
+
     /// Polun yksiköt, joiden tunnus on välillä `alku <= id < loppu`, tunnuksen järjestyksessä
     /// (PRIMARY KEY -indeksin väli, ei polun täyttä läpikäyntiä).
     pub fn listaa_vali(&self, polku: &str, alku: &str, loppu: &str) -> Result<Vec<Yksikko>> {
@@ -224,18 +359,25 @@ impl Varasto {
         rivit.collect()
     }
 
-    /// Polun elävien (ei hautakivien) yksiköiden `(id, aika, sisalto-tavut)`; sisältöjä ei lueta muistiin
-    /// (SQL `length(sisalto)`). Karsinnan (S-9c) ja `GET /api/peili/koko`:n summat.
-    pub fn sisalto_koot(&self, polku: &str) -> Result<Vec<(String, String, u64)>> {
+    /// Polun elävien (ei hautakivien) yksiköiden `(id, sisältöaika ms, sisalto-tavut)`; sisältöjä ei lueta
+    /// muistiin (SQL `length(sisalto)`). Sisältöaika on sarake `sisaltoaika` tai, jos se puuttuu, HLC-aika
+    /// (`None` = ei kumpaakaan). Karsinnan (S-9c) ja `GET /api/peili/koko`:n summat.
+    pub fn sisalto_koot(&self, polku: &str) -> Result<Vec<(String, Option<u64>, u64)>> {
         let c = self.yhteys();
         let mut kysely = c.prepare(
-            "SELECT id, aika, COALESCE(length(sisalto), 0) FROM yksikot WHERE polku = ?1 AND poistettu = 0",
+            "SELECT id, aika, sisaltoaika, COALESCE(length(sisalto), 0) FROM yksikot \
+             WHERE polku = ?1 AND poistettu = 0",
         )?;
         let rivit = kysely.query_map(params![polku], |r| {
+            let aika: String = r.get(1)?;
+            let sisaltoaika = r
+                .get::<_, Option<i64>>(2)?
+                .map(|n| n.max(0) as u64)
+                .or_else(|| Hlc::parse(&aika).map(|h| h.ms));
             Ok((
                 r.get::<_, String>(0)?,
-                r.get::<_, String>(1)?,
-                r.get::<_, i64>(2)?.max(0) as u64,
+                sisaltoaika,
+                r.get::<_, i64>(3)?.max(0) as u64,
             ))
         })?;
         rivit.collect()

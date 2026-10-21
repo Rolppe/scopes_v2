@@ -74,12 +74,15 @@ impl From<serde_json::Error> for Virhe {
 
 pub type Result<T> = std::result::Result<T, Virhe>;
 
-/// `listat`-vastauksen rivi: tunnus, versio ja HLC tekstinä.
+/// `listat`-vastauksen rivi: tunnus, versio ja HLC tekstinä. Polulla "peili" mukana myös sisältöaika
+/// (ms UTC; T-73); puuttuva kenttä (muu polku tai vanha vertainen) → vastaanottaja käyttää HLC-aikaa.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct ListaRivi {
     pub id: String,
     pub versio: Versio,
     pub aika: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub sisaltoaika: Option<u64>,
 }
 
 #[derive(Deserialize)]
@@ -216,12 +219,14 @@ async fn listat(State(t): State<Arc<Tila>>, Query(k): Query<PolkuKysely>) -> Res
         return Json(json!({"polku": p, "yksikot": []})).into_response();
     }
     // Vain otsakkeet: koko polun sisältö (peili: gigatavuja) ei mahdu muistiin.
-    match t.varasto.listaa_otsakkeet(&p) {
+    match t.varasto.listaa_otsakkeet_sisaltoajalla(&p) {
         Ok(ys) => {
+            let peili = p == peili::POLKU;
             let rivit: Vec<ListaRivi> = ys
                 .into_iter()
-                .filter(|y| crate::tila::nakyy(&t, y))
-                .map(|y| ListaRivi {
+                .filter(|(y, _)| crate::tila::nakyy(&t, y))
+                .map(|(y, sisaltoaika)| ListaRivi {
+                    sisaltoaika: peili.then(|| sisaltoaika.unwrap_or(y.aika.ms)),
                     id: y.id,
                     versio: y.versio,
                     aika: y.aika.to_string(),
@@ -398,7 +403,12 @@ async fn veda_ikkunaan(
     let haettavat: Vec<String> = l
         .yksikot
         .into_iter()
-        .filter(|r| Hlc::parse(&r.aika).is_some_and(|h| h.ms >= alaraja))
+        // T-73: vetoraja sisältöajasta; puuttuessa (vanha vertainen) HLC-aika.
+        .filter(|r| {
+            r.sisaltoaika
+                .or_else(|| Hlc::parse(&r.aika).map(|h| h.ms))
+                .is_some_and(|ms| ms >= alaraja)
+        })
         .filter(|r| !omat.contains(&r.id))
         .map(|r| r.id)
         .collect();

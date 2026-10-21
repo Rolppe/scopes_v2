@@ -7,7 +7,7 @@ use crate::api::{kello_ms, kirjoita_yhdistajalla, Tila};
 use crate::muutosloki::Result;
 use crate::varasto::Varasto;
 use crate::vertaiset::Vertainen;
-use crate::yksikko::{Hlc, Yhdistaja, Yksikko};
+use crate::yksikko::{yhdistaja_yksikolle, Hlc, Yhdistaja, Yksikko};
 use axum::{
     body::Bytes,
     extract::{Path, Query, State},
@@ -355,15 +355,138 @@ pub fn riisu(rivit: &[String]) -> Vec<String> {
     rivit.iter().map(|r| riisu_rivi(r)).collect()
 }
 
-/// S-9a: ikkunoidun solmun vastaanotto. `None` = hylätään (yksikkö on ikkunaa vanhempi), muuten
-/// yksikkö riisuttuna sisällöltään (id, versio ja aika säilyvät).
-pub fn ikkunoi(tila: &Tila, y: &Yksikko, nyt_ms: u64) -> Option<Yksikko> {
+/// Sisältöaika (T-73, arkkitehtuuri 5368d699): suurin rivin `timestamp` (RFC 3339 → ms UTC) taulukon
+/// riisumattomista riveistä; ei yhtään jäsentyvää → `hlc_ms`. `sisalto` on peili-yksikön sisältö
+/// (JSON-merkkijonotaulukko); rivistä jäsennetään vain `timestamp`, virheellinen rivi ohitetaan.
+pub fn sisaltoaika(sisalto: &[u8], hlc_ms: u64) -> u64 {
+    #[derive(Deserialize)]
+    struct Aikaleima {
+        timestamp: Option<String>,
+    }
+    let Ok(rivit) = serde_json::from_slice::<Vec<String>>(sisalto) else {
+        return hlc_ms;
+    };
+    rivit
+        .iter()
+        .filter_map(|r| serde_json::from_str::<Aikaleima>(r).ok())
+        .filter_map(|a| rfc3339_ms(&a.timestamp?))
+        .max()
+        .unwrap_or(hlc_ms)
+}
+
+/// Yksikön sisältöaika riisumattomasta sisällöstä; ei sisältöä → HLC-aika.
+pub fn yksikon_sisaltoaika(y: &Yksikko) -> u64 {
+    y.sisalto
+        .as_deref()
+        .map_or(y.aika.ms, |s| sisaltoaika(s, y.aika.ms))
+}
+
+/// RFC 3339 -aikaleima (`YYYY-MM-DDTHH:MM:SS(.fff…)` + `Z` tai `±HH:MM`) millisekunteina Unix-ajasta;
+/// ennen epookkia tai virheellinen = `None`. Murto-osan kolme ensimmäistä numeroa ovat millisekunnit.
+fn rfc3339_ms(t: &str) -> Option<u64> {
+    let b = t.as_bytes();
+    let luku = |a: usize, n: usize| -> Option<i64> {
+        let osa = b.get(a..a + n)?;
+        if !osa.iter().all(u8::is_ascii_digit) {
+            return None;
+        }
+        std::str::from_utf8(osa).ok()?.parse().ok()
+    };
+    let erotin = |i: usize, merkit: &[u8]| b.get(i).is_some_and(|c| merkit.contains(c));
+    if !(erotin(4, b"-")
+        && erotin(7, b"-")
+        && erotin(10, b"Tt")
+        && erotin(13, b":")
+        && erotin(16, b":"))
+    {
+        return None;
+    }
+    let (vuosi, kk, pv) = (luku(0, 4)?, luku(5, 2)?, luku(8, 2)?);
+    let (tunti, min, sek) = (luku(11, 2)?, luku(14, 2)?, luku(17, 2)?);
+    let karkaus = vuosi % 4 == 0 && (vuosi % 100 != 0 || vuosi % 400 == 0);
+    let kuukauden_paivat = match kk {
+        1 | 3 | 5 | 7 | 8 | 10 | 12 => 31,
+        4 | 6 | 9 | 11 => 30,
+        2 if karkaus => 29,
+        2 => 28,
+        _ => return None,
+    };
+    if pv < 1 || pv > kuukauden_paivat || tunti > 23 || min > 59 || sek > 60 {
+        return None;
+    }
+    let mut i = 19;
+    let mut ms = 0i64;
+    if erotin(i, b".") {
+        let alku = i + 1;
+        let mut loppu = alku;
+        while b.get(loppu).is_some_and(u8::is_ascii_digit) {
+            loppu += 1;
+        }
+        if loppu == alku {
+            return None;
+        }
+        for (k, c) in b[alku..loppu].iter().take(3).enumerate() {
+            ms += i64::from(c - b'0') * [100, 10, 1][k];
+        }
+        i = loppu;
+    }
+    let siirtyma_min = if erotin(i, b"Zz") && i + 1 == b.len() {
+        0
+    } else if erotin(i, b"+-") && b.len() == i + 6 && erotin(i + 3, b":") {
+        let (th, tm) = (luku(i + 1, 2)?, luku(i + 4, 2)?);
+        if th > 23 || tm > 59 {
+            return None;
+        }
+        let m = th * 60 + tm;
+        if b[i] == b'-' {
+            -m
+        } else {
+            m
+        }
+    } else {
+        return None;
+    };
+    // Päivät epookista (proleptinen gregoriaaninen kalenteri).
+    let y = if kk <= 2 { vuosi - 1 } else { vuosi };
+    let era = y.div_euclid(400);
+    let yoe = y - era * 400;
+    let doy = (153 * (if kk > 2 { kk - 3 } else { kk + 9 }) + 2) / 5 + pv - 1;
+    let doe = yoe * 365 + yoe / 4 - yoe / 100 + doy;
+    let paivat = era * 146_097 + doe - 719_468;
+    let sekunnit = paivat * 86_400 + tunti * 3600 + min * 60 + sek - siirtyma_min * 60;
+    u64::try_from(sekunnit * 1000 + ms).ok()
+}
+
+/// S-9a: ikkunoidun solmun vastaanotto. `None` = hylätään (yksikön sisältöaika on ikkunaa vanhempi),
+/// muuten yksikkö riisuttuna sisällöltään (id, versio ja aika säilyvät). `sisaltoaika_ms` on laskettu
+/// riisumattomista riveistä ennen tätä kutsua (`yksikon_sisaltoaika`; T-73).
+pub fn ikkunoi(tila: &Tila, y: &Yksikko, sisaltoaika_ms: u64, nyt_ms: u64) -> Option<Yksikko> {
     let n = tila.peili.ikkuna_vrk?;
     let raja = nyt_ms.saturating_sub(u64::from(n) * PAIVA_MS);
-    if y.aika.ms < raja {
+    if sisaltoaika_ms < raja {
         return None;
     }
     Some(riisuttu(y))
+}
+
+/// Kirjoittaa riisutun peili-yksikön annetulla (riisumattomista riveistä lasketulla) sisältöajalla ja
+/// ilmoittaa muutoksen virtaan kuten `api::kirjoita_yhdistajalla` (T-73).
+pub fn kirjoita_riisuttuna(tila: &Tila, y: &Yksikko, sisaltoaika: u64) -> Result<Option<u64>> {
+    let seq = tila
+        .varasto
+        .kirjoita_sisaltoajalla(y, yhdistaja_yksikolle(y), Some(sisaltoaika))?;
+    if let Some(n) = seq {
+        if let Some(t) = tila
+            .varasto
+            .loki(n.saturating_sub(1), 1)?
+            .into_iter()
+            .next()
+        {
+            // Ei vastaanottajia on sallittu tila.
+            let _ = tila.lahetin.send(t);
+        }
+    }
+    Ok(seq)
 }
 
 /// S-9a:n riisunta yksikölle ikkunarajasta riippumatta (id, versio ja aika säilyvät).
@@ -380,7 +503,7 @@ fn riisuttu(y: &Yksikko) -> Yksikko {
 
 /// S-9b/S-9c: karsintarajan sisäinen polku (id "raja", `{"ms":n}`); ei replikoida eikä virtaan.
 pub const KARSINTA_POLKU: &str = "peili-karsinta";
-const KARSINTA_ID: &str = "raja";
+pub(crate) const KARSINTA_ID: &str = "raja";
 
 /// S-9b: viimeksi katon takia karsitun UTC-vuorokauden loppu (ms); ei karsittu = 0.
 pub fn karsintaraja(varasto: &Varasto) -> Result<u64> {
@@ -438,12 +561,12 @@ pub fn karsi(tila: &Tila) -> Result<Karsinta> {
     };
     let katto = u64::from(tila.peili.katto_mt) * MT;
     let raja = kello_ms().saturating_sub(u64::from(n) * PAIVA_MS);
-    // (vuorokausi, id, tavut) vanhimmasta; jäsentymättömät ajat ohitetaan.
+    // (sisältöaika, id, tavut) vanhimmasta (T-73: sisältöaika, ei HLC); jäsentymättömät ajat ohitetaan.
     let mut yksikot: Vec<(u64, String, u64)> = tila
         .varasto
         .sisalto_koot(POLKU)?
         .into_iter()
-        .filter_map(|(id, aika, tavut)| Some((Hlc::parse(&aika)?.ms, id, tavut)))
+        .filter_map(|(id, sisaltoaika, tavut)| Some((sisaltoaika?, id, tavut)))
         .collect();
     yksikot.sort();
     let ennen: u64 = yksikot.iter().map(|(_, _, t)| t).sum();
@@ -489,16 +612,12 @@ pub fn karsi(tila: &Tila) -> Result<Karsinta> {
     })
 }
 
-/// S-9: `GET /api/peili/koko` -> sisältötavut, yksiköt, vanhin HLC ja asetukset.
+/// S-9: `GET /api/peili/koko` -> sisältötavut, yksiköt, vanhin sisältöaika (ms | null) ja asetukset.
 async fn koko(State(t): State<Arc<Tila>>) -> Response {
     let tulos = tokio::task::spawn_blocking(move || {
         let koot = t.varasto.sisalto_koot(POLKU)?;
         let tavut: u64 = koot.iter().map(|(_, _, k)| k).sum();
-        let vanhin = koot
-            .iter()
-            .map(|(_, a, _)| a.as_str())
-            .min()
-            .map(String::from);
+        let vanhin = koot.iter().filter_map(|(_, a, _)| *a).min();
         Ok::<_, rusqlite::Error>(json!({
             "tavut": tavut,
             "yksikot": koot.len(),
@@ -832,7 +951,9 @@ pub async fn hae_edeltavat(tila: &Tila, tiedosto: &str) -> Haku<usize> {
         tila.peili.merkitse_haetuksi(&y.id);
     }
     for y in &saadut {
-        kirjoita_yhdistajalla(tila, &riisuttu(y), Yhdistaja::Lisays).map_err(|e| e.to_string())?;
+        // Sisältöaika lasketaan vertaiselta saaduista riisumattomista riveistä ennen riisuntaa (T-73).
+        kirjoita_riisuttuna(tila, &riisuttu(y), yksikon_sisaltoaika(y))
+            .map_err(|e| e.to_string())?;
     }
     Ok(saadut.len())
 }
