@@ -260,6 +260,11 @@ pub struct PeiliIkkuna {
     pub katto_mt: u32,
     /// S-9e: viimeksi pyynnöstä haetut yksiköt (id -> hetki); karsinta ohittaa alle `HAKUSUOJA` vanhat.
     pub haetut: Mutex<HashMap<String, Instant>>,
+    /// S-9d (T-75): tiedostot, joilta puuttuu voimassa oleva pohja, ja vertainen, jolta niiden yksiköt tulivat
+    /// (`None` = ensimmäinen täysi vertainen). Jono tyhjennetään `hae_pohjakierros`ssa.
+    pohjaa_vailla: Mutex<VecDeque<(String, Option<Vertainen>)>>,
+    /// S-9d (T-75): herättää näkymien pohjatyöntekijän, kun `pohjaa_vailla` sai tiedoston.
+    pub pohja_herate: tokio::sync::Notify,
 }
 
 impl Default for PeiliIkkuna {
@@ -274,6 +279,49 @@ impl PeiliIkkuna {
             ikkuna_vrk,
             katto_mt,
             haetut: Mutex::new(HashMap::new()),
+            pohjaa_vailla: Mutex::new(VecDeque::new()),
+            pohja_herate: tokio::sync::Notify::new(),
+        }
+    }
+
+    /// S-9d (T-75): lisää tiedoston pohjan hakujonoon (ei kaksoiskappaleita; vertaisvihje säilyy, jos uudella ei ole)
+    /// ja herättää työntekijän.
+    fn merkitse_pohjaa_vailla(&self, tiedosto: &str, vertainen: Option<&Vertainen>) {
+        {
+            let mut j = self.pohjaa_vailla.lock().unwrap_or_else(|e| e.into_inner());
+            match j.iter_mut().find(|(t, _)| t == tiedosto) {
+                Some((_, vihje)) => {
+                    if vertainen.is_some() {
+                        *vihje = vertainen.cloned();
+                    }
+                }
+                None => j.push_back((tiedosto.to_string(), vertainen.cloned())),
+            }
+        }
+        self.pohja_herate.notify_one();
+    }
+
+    /// Ottaa jonon alusta enintään `POHJAKIERROS` tiedostoa; loput jäävät seuraavalle kierrokselle.
+    fn ota_pohjaera(&self) -> VecDeque<(String, Option<Vertainen>)> {
+        let mut j = self.pohjaa_vailla.lock().unwrap_or_else(|e| e.into_inner());
+        let n = j.len().min(POHJAKIERROS);
+        j.drain(..n).collect()
+    }
+
+    /// Palauttaa käsittelemättömät jonon alkuun ja epäonnistuneen loppuun (seuraava kierros yrittää uudelleen).
+    fn palauta_pohjaera(
+        &self,
+        kasittelematta: VecDeque<(String, Option<Vertainen>)>,
+        epaonnistunut: (String, Option<Vertainen>),
+    ) {
+        let mut j = self.pohjaa_vailla.lock().unwrap_or_else(|e| e.into_inner());
+        for e in kasittelematta.into_iter().rev() {
+            if !j.iter().any(|(t, _)| *t == e.0) {
+                j.push_front(e);
+            }
+        }
+        if !j.iter().any(|(t, _)| *t == epaonnistunut.0) {
+            j.push_back(epaonnistunut);
         }
     }
 
@@ -671,10 +719,15 @@ pub fn karsi(tila: &Tila) -> Result<Karsinta> {
     let ennen: u64 = yksikot.iter().map(|(_, _, t)| t).sum();
     let mut jalkeen = ennen;
     let mut poistetut = 0;
+    // T-75: tiedostot, joiden paikallisia yksiköitä poistettiin (vanhin yksikkö voi olla muuttunut).
+    let mut muuttuneet: BTreeSet<String> = BTreeSet::new();
     let mut poista = |id: &str, tavut: u64, jalkeen: &mut u64| -> Result<()> {
         if tila.varasto.poista_paikallisesti(POLKU, id)? {
             poistetut += 1;
             *jalkeen -= tavut;
+            if let Some((tiedosto, _)) = id.rsplit_once(':') {
+                muuttuneet.insert(tiedosto.to_string());
+            }
         }
         Ok(())
     };
@@ -703,6 +756,12 @@ pub fn karsi(tila: &Tila) -> Result<Karsinta> {
     }
     if let Some(ms) = uusi_raja {
         nosta_karsintaraja(tila, ms)?;
+    }
+    // S-9d (T-75): vanhin yksikkö muuttui → pohja haetaan heti (ensimmäinen täysi vertainen).
+    for tiedosto in &muuttuneet {
+        if tarvitsee_pohjan(&tila.varasto, tiedosto).unwrap_or(false) {
+            tila.peili.merkitse_pohjaa_vailla(tiedosto, None);
+        }
     }
     Ok(Karsinta {
         poistetut,
@@ -738,6 +797,8 @@ async fn koko(State(t): State<Arc<Tila>>) -> Response {
 /// S-9d: tiedoston vanhimman paikallisen yksikön pohja (id `<tiedosto>`, `{"offset","rivi"}`). Sisäinen
 /// polku kuten "peili-offset": ei replikoida eikä broadcast-ilmoitusta.
 pub const POHJA_POLKU: &str = "peili-pohja";
+/// S-9d (T-75): pohjia haetaan enintään näin monelle tiedostolle kierroksella, loput seuraavalla.
+pub const POHJAKIERROS: usize = 50;
 /// S-9d/S-9e: yhden vertaispyynnön aikaraja.
 pub const PYYNNON_AIKARAJA: Duration = Duration::from_secs(10);
 /// S-9e: yhden taustahaun sisältötavut enintään (8 Mt).
@@ -961,6 +1022,121 @@ pub async fn hae_pohja(tila: &Tila, tiedosto: &str) -> Haku<Option<Pohja>> {
     };
     tallenna_pohja(tila, tiedosto, p).map_err(|e| e.to_string())?;
     Ok(Some(p))
+}
+
+/// S-9d (T-75): merkitsee pohjan hakuun yksiköiden tiedostot (tunnus `<tiedosto>:<offset>`). Vain ikkunoitu
+/// solmu; `vertainen` = täysi vertainen, jolta yksiköt tulivat (`None` = ensimmäinen täysi vertainen).
+pub fn merkitse_pohjaa_vailla<'a>(
+    tila: &Tila,
+    idt: impl IntoIterator<Item = &'a str>,
+    vertainen: Option<&Vertainen>,
+) {
+    if tila.peili.ikkuna_vrk.is_none() {
+        return;
+    }
+    let tiedostot: BTreeSet<&str> = idt
+        .into_iter()
+        .filter_map(|id| id.rsplit_once(':').map(|(t, _)| t))
+        .collect();
+    for t in tiedostot {
+        tila.peili.merkitse_pohjaa_vailla(t, vertainen);
+    }
+}
+
+/// S-9d (T-75), käynnistys: merkitsee pohjan hakuun kaikki tiedostot, joiden vanhin paikallinen offset > 0 eikä
+/// voimassa olevaa pohjaa ole. Täysi solmu ei merkitse mitään. Palauttaa merkittyjen määrän.
+pub fn merkitse_kaikki_pohjaa_vailla(tila: &Tila) -> Result<usize> {
+    if tila.peili.ikkuna_vrk.is_none() {
+        return Ok(0);
+    }
+    let mut vanhimmat: BTreeMap<String, u64> = BTreeMap::new();
+    for y in tila.varasto.listaa_otsakkeet(POLKU)? {
+        if y.poistettu {
+            continue;
+        }
+        let Some((tiedosto, alku)) = y.id.rsplit_once(':') else {
+            continue;
+        };
+        let Ok(alku) = alku.parse::<u64>() else {
+            continue;
+        };
+        let e = vanhimmat.entry(tiedosto.to_string()).or_insert(alku);
+        *e = (*e).min(alku);
+    }
+    let mut n = 0;
+    for (tiedosto, vanhin) in vanhimmat {
+        if vanhin > 0 && pohja(&tila.varasto, &tiedosto)?.is_none_or(|p| p.offset != vanhin) {
+            tila.peili.merkitse_pohjaa_vailla(&tiedosto, None);
+            n += 1;
+        }
+    }
+    Ok(n)
+}
+
+/// Yhden pohjakierroksen tulos.
+#[derive(Debug, Default, PartialEq, Eq)]
+pub struct PohjaKierros {
+    /// Tallennettujen pohjien määrä (> 0 → näkymät rakennetaan uudelleen).
+    pub tallennettu: usize,
+    /// Ensimmäinen virhe; kierros pysähtyi siihen eikä yritä uudelleen (seuraava kierros yrittää).
+    pub virhe: Option<String>,
+}
+
+/// S-9d (T-75): hakee pohjat jonon enintään `POHJAKIERROS` ensimmäiselle tiedostolle, joilta puuttuu voimassa
+/// oleva pohja (vanhin paikallinen offset > 0). Vertainen on se täysi vertainen, jolta tiedoston yksiköt tulivat,
+/// muuten `taysi_vertainen`. Virhe pysäyttää kierroksen: epäonnistunut tiedosto jää jonon loppuun ja
+/// käsittelemättömät alkuun, uusintaa ei yritetä saman kierroksen sisällä.
+pub async fn hae_pohjakierros(tila: &Tila) -> PohjaKierros {
+    let mut jono = tila.peili.ota_pohjaera();
+    let mut tulos = PohjaKierros::default();
+    let mut http: Option<reqwest::Client> = None;
+    let mut taysi: Option<Vertainen> = None;
+    while let Some((tiedosto, vihje)) = jono.pop_front() {
+        let vanhin = match vanhin_offset(&tila.varasto, &tiedosto) {
+            Ok(Some(o)) if o > 0 => o,
+            _ => continue,
+        };
+        if matches!(voimassa_pohja(&tila.varasto, &tiedosto), Ok(Some(_))) {
+            continue;
+        }
+        let yksi = async {
+            let asiakas = match &http {
+                Some(h) => h.clone(),
+                None => {
+                    let h = asiakas()?;
+                    http = Some(h.clone());
+                    h
+                }
+            };
+            let vertainen = match (&vihje, &taysi) {
+                (Some(v), _) | (None, Some(v)) => v.clone(),
+                (None, None) => {
+                    let v = taysi_vertainen(tila, &asiakas).await?;
+                    taysi = Some(v.clone());
+                    v
+                }
+            };
+            let rivi = vertaisen_rivi(&asiakas, &vertainen, &tiedosto, vanhin).await?;
+            tallenna_pohja(
+                tila,
+                &tiedosto,
+                Pohja {
+                    offset: vanhin,
+                    rivi,
+                },
+            )
+            .map_err(|e| e.to_string())
+        };
+        match yksi.await {
+            Ok(()) => tulos.tallennettu += 1,
+            Err(e) => {
+                tulos.virhe = Some(format!("{tiedosto}: {e}"));
+                tila.peili.palauta_pohjaera(jono, (tiedosto, vihje));
+                return tulos;
+            }
+        }
+    }
+    tulos
 }
 
 #[derive(Deserialize)]
