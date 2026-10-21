@@ -115,6 +115,8 @@ final class KaksiLaitettaUITests: XCTestCase {
         app.launchEnvironment["SCOPES2_VERTAISET"] = "http://127.0.0.1:\(toinenPortti)"
         if !kuittaus { app.launchEnvironment["SCOPES2_KUITTAUS"] = "pois" }   // vain kuittaustarkistus kuittaa; muut säästävät lukemattomat
         if headless { app.launchArguments += ["-scopes2.headless", "YES"] }
+        // T-71: portti vie TEST_RUNNER_SCOPES2_NAYTTO_HEREILLA=YES; näyttö pysyy hereillä ilman ssh-caffeinatea (iOS ohittaa argumentin)
+        if env["SCOPES2_NAYTTO_HEREILLA"] == "YES" { app.launchArguments += ["-scopes2.naytto-hereilla", "YES"] }
         app.launch()
         XCTAssertTrue(elementti(app, "skooppi-suodatin").waitForExistence(timeout: 180), "sivupalkki ei latautunut")
         yhdistaVertaiset()

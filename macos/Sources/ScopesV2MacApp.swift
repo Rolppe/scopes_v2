@@ -10,7 +10,13 @@ extension Notification.Name {
 }
 
 final class SovellusValtuutettu: NSObject, NSApplicationDelegate {
+    /// T-71: näyttö hereillä -asetus (tai argumentti -scopes2.naytto-hereilla YES) otetaan käyttöön heti, ilman asetusnäkymää.
+    func applicationDidFinishLaunching(_ notification: Notification) {
+        MainActor.assumeIsolated { NayttoHereilla.jaettu.kaynnista() }
+    }
+
     func applicationWillTerminate(_ notification: Notification) {
+        MainActor.assumeIsolated { NayttoHereilla.jaettu.vapauta() }   // väite pois ennen solmun pysäytystä
         let valmis = DispatchSemaphore(value: 0)
         Task.detached {
             await Solmu.jaettu.pysayta()
@@ -69,13 +75,13 @@ struct AsetuksetKuori: View {
     @State private var asiakas: Asiakas?
 
     var body: some View {
-        AsetuksetNakyma(varasto: varasto, asiakas: asiakas) {
+        AsetuksetNakyma(varasto: varasto, asiakas: asiakas, avainMuuttui: {
             Task {
                 await SolmunElinkaari.kaynnista()
                 asiakas = await SolmunElinkaari.asiakas()
                 NotificationCenter.default.post(name: .paivitaSkoopit, object: nil)
             }
-        }
+        }, lisaosio: AnyView(KehitysOsio(varasto: varasto)))
         .frame(minWidth: 420, minHeight: 320)
         .task { asiakas = await SolmunElinkaari.asiakas() }
     }

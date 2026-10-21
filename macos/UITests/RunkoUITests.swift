@@ -13,12 +13,17 @@ final class RunkoUITests: XCTestCase {
         try XCTUnwrap(ProcessInfo.processInfo.environment["SCOPES2_AVAIN"], "SCOPES2_AVAIN puuttuu")
     }
 
-    private func kaynnista() throws -> XCUIApplication {
+    /// `nayttoArgumentti: false` jättää -scopes2.naytto-hereilla-argumentin pois (testKehitysOsio kokeilee kytkintä itse).
+    private func kaynnista(nayttoArgumentti: Bool = true) throws -> XCUIApplication {
         let app = XCUIApplication()
         app.launchEnvironment["SCOPES2_AVAIN"] = try avain()
         app.launchEnvironment["SCOPES2_VERTAINEN"] = osoite
         app.launchEnvironment["SCOPES2_KUITTAUS"] = "pois"   // T-52: ei kuluta koeytimen lukemattomia kuittaustarkistukselta
         app.launchEnvironment["SCOPES2_DATA"] = NSTemporaryDirectory() + "scopes2-ui-" + UUID().uuidString
+        // T-71: portti vie TEST_RUNNER_SCOPES2_NAYTTO_HEREILLA=YES; näyttö pysyy hereillä ilman ssh-caffeinatea (K-11)
+        if nayttoArgumentti, ProcessInfo.processInfo.environment["SCOPES2_NAYTTO_HEREILLA"] == "YES" {
+            app.launchArguments += ["-scopes2.naytto-hereilla", "YES"]
+        }
         app.launch()
         return app
     }
@@ -131,7 +136,7 @@ final class RunkoUITests: XCTestCase {
         for _ in 0..<10 { lista.scroll(byDeltaX: 0, deltaY: 5000) }
     }
 
-    /// Sivupalkin List näyttää vain näkyvät rivit: vieritä alkuun ja sitten alas, kerää nimet (tunnisteet ovat yksilöllisiä).
+    /// Sivupalkin List näyttää vain näkyvät rivit: vieritä alkuun ja sitten alas, keraa nimet (tunnisteet ovat yksilöllisiä).
     private func nimetListasta(_ app: XCUIApplication) throws -> Set<String> {
         let lista = sivupalkki(app)
         vieritaAlkuun(lista)
@@ -264,6 +269,69 @@ final class RunkoUITests: XCTestCase {
         XCTAssertFalse((v.solmu ?? "").isEmpty, "vastauksesta puuttuu solmu")
         XCTAssertFalse((v.solmu ?? "").hasPrefix("mac-"), "liite päätyi Macin solmuun: \(v.solmu ?? "")")
         print("LIITE: \(sha) \(v.polku)")
+    }
+
+    /// Elementin ja sen jälkeläisten tekstit (label ja value) yhdellä kyselyllä; tyhjät pois.
+    private func tekstit(_ app: XCUIApplication, _ tunnus: String) throws -> [String] {
+        var tulos: [String] = []
+        func keraa(_ e: XCUIElementSnapshot) {
+            if !e.label.isEmpty { tulos.append(e.label) }
+            if let v = e.value as? String, !v.isEmpty { tulos.append(v) }
+            e.children.forEach(keraa)
+        }
+        func etsi(_ e: XCUIElementSnapshot) -> Bool {
+            if e.identifier == tunnus { keraa(e); return true }
+            return e.children.contains(where: etsi)
+        }
+        _ = etsi(try app.snapshot())
+        return tulos
+    }
+
+    private func odotaEhto(_ sekuntia: TimeInterval, _ ehto: () throws -> Bool) rethrows -> Bool {
+        let loppu = Date().addingTimeInterval(sekuntia)
+        repeat {
+            if try ehto() { return true }
+            Thread.sleep(forTimeInterval: 0.5)
+        } while Date() < loppu
+        return false
+    }
+
+    /// T-71 (K-11): Kehitys-osio. Kytkin päälle → "Väite voimassa", pois → "Ei väitettä"; diagnostiikka: vertaisen portti on testin oma
+    /// (SCOPES2_VERTAINEN) ja ytimen versio ei ole "–". Äppi käynnistetään ilman argumenttia. Näyttö ei saa olla lukittu.
+    func testKehitysOsio() async throws {
+        let app = try kaynnista(nayttoArgumentti: false)
+        XCTAssertTrue(skooppiRivit(app).firstMatch.waitForExistence(timeout: 60), "lista ei latautunut 60 s:ssa (solmu ei käynnistynyt)")
+        app.typeKey(",", modifierFlags: .command)
+        let kytkin = app.descendants(matching: .any)["kehitys-naytto"].firstMatch
+        let tila = app.descendants(matching: .any)["kehitys-naytto-tila"].firstMatch
+        XCTAssertTrue(kytkin.waitForExistence(timeout: 30), "Näyttö hereillä -kytkin puuttuu asetuksista")
+        // osio voi jäädä asetusikkunan alareunaan: vieritä, kunnes kytkin on osoitettavissa
+        for _ in 0..<10 where !kytkin.isHittable {
+            app.scrollViews.firstMatch.scroll(byDeltaX: 0, deltaY: -300)
+        }
+        XCTAssertTrue(tila.exists, "tilateksti puuttuu")
+        // macOS paljastaa SwiftUI-Textin tekstin value-kentässä (label on tyhjä); tekstit() lukee samoin.
+        let tilaTeksti = { (tila.value as? String).flatMap { $0.isEmpty ? nil : $0 } ?? tila.label }
+        if tilaTeksti() == "Väite voimassa" { kytkin.click() }   // aiemmasta ajosta tallennettu päälläolo: lähtötila pois
+        XCTAssertTrue(odotaEhto(10) { tilaTeksti() == "Ei väitettä" }, "lähtötila ei ole 'Ei väitettä': \(tilaTeksti())")
+        kytkin.click()
+        XCTAssertTrue(odotaEhto(10) { tilaTeksti() == "Väite voimassa" }, "kytkin päälle ei tuottanut tilaa 'Väite voimassa': \(tilaTeksti())")
+        kytkin.click()
+        XCTAssertTrue(odotaEhto(10) { tilaTeksti() == "Ei väitettä" }, "kytkin pois ei tuottanut tilaa 'Ei väitettä': \(tilaTeksti())")
+
+        let portti = try XCTUnwrap(URL(string: osoite)?.port, "SCOPES2_VERTAINEN ilman porttia: \(osoite)")
+        var vertainen: [String] = []
+        XCTAssertTrue(try odotaEhto(30) {
+            vertainen = try tekstit(app, "kehitys-vertainen")
+            return vertainen.contains { $0.contains(":\(portti)") }
+        }, "Vertainen-rivillä ei ole testin omaa porttia \(portti): \(vertainen)")
+        var versio: [String] = []
+        XCTAssertTrue(try odotaEhto(30) {
+            versio = try tekstit(app, "kehitys-versio")
+            return versio.contains { $0.range(of: #"^\d+\.\d+"#, options: .regularExpression) != nil }
+        }, "Ytimen versio puuttuu tai on '–': \(versio)")
+        XCTAssertFalse(try tekstit(app, "kehitys-portti").isEmpty, "Ytimen portti ja tila -rivi puuttuu")
+        XCTAssertFalse(try tekstit(app, "kehitys-data").isEmpty, "Data-hakemisto-rivi puuttuu")
     }
 
     /// P-11: V2:n bundle-id on oma; vanhaa äppiä ei käynnistetä eikä sen Keychain-palvelua (com.example.scopes.mac) lueta.

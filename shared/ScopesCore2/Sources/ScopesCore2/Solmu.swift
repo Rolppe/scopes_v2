@@ -39,6 +39,9 @@ public actor Solmu {
 
     public init() {}
 
+    /// Ytimen versio: kaynnista-vastauksen "versio" (S-8a); nil, kun solmu ei ole käynnissä.
+    public private(set) var versio: String?
+
     public var osoite: URL? { _osoite }
 
     /// Käynnistää solmun ja palaa, kun portti kuuntelee. Palauttaa http://127.0.0.1:<portti>.
@@ -76,6 +79,7 @@ public actor Solmu {
             throw SolmuVirhe.kaynnistys(koodi: koodi, viesti: "osoite ei kelpaa")
         }
         _osoite = url
+        versio = (try? JSONSerialization.jsonObject(with: Data(vastaus.utf8)) as? [String: Any])?["versio"] as? String
         return url
     }
 
@@ -83,6 +87,7 @@ public actor Solmu {
     public func pysayta() {
         _ = scopes_solmu_pysayta()
         _osoite = nil
+        versio = nil
     }
 }
 
