@@ -204,16 +204,39 @@ fn yksikko(polku: &str, id: &str, laite: &str, ms: u64, sisalto: Vec<u8>) -> Yks
     }
 }
 
+/// RFC 3339 -aikaleima (UTC, millisekunnit) Unix-ajasta; rivien `timestamp` vastaa näin aiottua ikää (T-73).
+fn iso(ms: u64) -> String {
+    let (p, ms_paivassa) = ((ms / 86_400_000) as i64, ms % 86_400_000);
+    let z = p + 719_468;
+    let era = z.div_euclid(146_097);
+    let doe = z - era * 146_097;
+    let yoe = (doe - doe / 1460 + doe / 36_524 - doe / 146_096) / 365;
+    let doy = doe - (365 * yoe + yoe / 4 - yoe / 100);
+    let mp = (5 * doy + 2) / 153;
+    let pv = doy - (153 * mp + 2) / 5 + 1;
+    let kk = if mp < 10 { mp + 3 } else { mp - 9 };
+    let vuosi = yoe + era * 400 + i64::from(kk <= 2);
+    format!(
+        "{vuosi:04}-{kk:02}-{pv:02}T{:02}:{:02}:{:02}.{:03}Z",
+        ms_paivassa / 3_600_000,
+        ms_paivassa / 60_000 % 60,
+        ms_paivassa / 1000 % 60,
+        ms_paivassa % 1000
+    )
+}
+
 fn kirjoita(tila: &Tila, y: &Yksikko) {
     api::kirjoita_yhdistajalla(tila, y, yhdistaja_polulle(&y.polku)).unwrap();
 }
 
 /// Transkriptin rivit: 10 käyttäjäviestiä (4 kt tekstiä + 1 kt riisuttavaa) ja 10 riisuttavaa riviä.
-fn rivit(siemen: &str) -> Vec<String> {
+/// Rivien `timestamp` on `ms` (sisältöaika = yksikön aiottu ikä, T-73).
+fn rivit(siemen: &str, ms: u64) -> Vec<String> {
+    let aika = iso(ms);
     let mut r = Vec::new();
     for i in 0..10 {
         r.push(
-            json!({"type": "user", "uuid": format!("{siemen}-{i}"), "timestamp": "2026-10-20T00:00:00Z",
+            json!({"type": "user", "uuid": format!("{siemen}-{i}"), "timestamp": aika,
                 "message": {"role": "user", "content": format!("{siemen} {}", "x".repeat(4000))},
                 "lisa": "y".repeat(1000)})
             .to_string(),
@@ -230,7 +253,7 @@ fn tayta_a(a: &Tila, nyt: u64) {
             let ms = nyt - k * PAIVA_MS - 3_600_000 - j * 600_000;
             let tiedosto = format!("istunto-{k:02}.jsonl");
             let id = format!("{tiedosto}:{}", j * 100_000);
-            let sisalto = serde_json::to_vec(&rivit(&id)).unwrap();
+            let sisalto = serde_json::to_vec(&rivit(&id, ms)).unwrap();
             kirjoita(a, &yksikko("peili", &id, "a", ms, sisalto));
         }
     }
@@ -474,7 +497,7 @@ async fn taysi_ei_sovella_ikkunoidun_virtaa() {
         "uusi.jsonl:0",
         "b",
         nyt_ms() - 60_000,
-        serde_json::to_vec(&rivit("uusi")).unwrap(),
+        serde_json::to_vec(&rivit("uusi", nyt_ms() - 60_000)).unwrap(),
     );
     assert!(api::kirjoita_ja_ilmoita(&b.tila, &uusi)
         .await

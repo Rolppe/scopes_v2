@@ -71,11 +71,11 @@ pub async fn kirjoita_ja_ilmoita(tila: &Tila, y: &Yksikko) -> Result<Option<u64>
         return tila::kirjoita_tilaan(tila, y);
     }
     if y.polku == peili::POLKU && tila.peili.ikkuna_vrk.is_some() {
-        // S-9a: ikkunoitu solmu hylkää ikkunaa vanhemman yksikön hiljaa ja riisuu muun.
-        return match peili::ikkunoi(tila, y, kello_ms()) {
-            Some(riisuttu) => {
-                kirjoita_yhdistajalla(tila, &riisuttu, yhdistaja_yksikolle(&riisuttu))
-            }
+        // S-9a: ikkunoitu solmu hylkää sisältöajaltaan ikkunaa vanhemman yksikön hiljaa ja riisuu muun.
+        // Sisältöaika lasketaan riisumattomista riveistä ennen riisuntaa (T-73).
+        let sisaltoaika = peili::yksikon_sisaltoaika(y);
+        return match peili::ikkunoi(tila, y, sisaltoaika, kello_ms()) {
+            Some(riisuttu) => peili::kirjoita_riisuttuna(tila, &riisuttu, sisaltoaika),
             None => Ok(None),
         };
     }

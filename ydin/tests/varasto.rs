@@ -78,7 +78,7 @@ fn avaus_ja_migraatio() {
             |r| r.get(0),
         )
         .unwrap();
-    assert_eq!(skeema, "1");
+    assert_eq!(skeema, "2");
     for taulu in [
         "yksikot",
         "muutosloki",

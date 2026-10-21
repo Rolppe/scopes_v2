@@ -146,11 +146,13 @@ fn nyt_ms() -> u64 {
         .as_millis() as u64
 }
 
-fn rivit(siemen: &str) -> Vec<String> {
+/// Rivien `timestamp` on `ms` (sisältöaika = yksikön aiottu ikä, T-73).
+fn rivit(siemen: &str, ms: u64) -> Vec<String> {
+    let aika = iso(ms);
     let mut r = Vec::new();
     for i in 0..10 {
         r.push(
-            json!({"type": "user", "uuid": format!("{siemen}-{i}"),
+            json!({"type": "user", "uuid": format!("{siemen}-{i}"), "timestamp": aika,
                 "message": {"role": "user", "content": format!("{siemen} {}", "x".repeat(4000))},
                 "lisa": "y".repeat(1000)})
             .to_string(),
@@ -158,6 +160,27 @@ fn rivit(siemen: &str) -> Vec<String> {
         r.push(json!({"type": "progress", "data": "z".repeat(1000)}).to_string());
     }
     r
+}
+
+/// RFC 3339 -aikaleima (UTC, millisekunnit) Unix-ajasta; rivien `timestamp` vastaa näin aiottua ikää (T-73).
+fn iso(ms: u64) -> String {
+    let (p, ms_paivassa) = ((ms / 86_400_000) as i64, ms % 86_400_000);
+    let z = p + 719_468;
+    let era = z.div_euclid(146_097);
+    let doe = z - era * 146_097;
+    let yoe = (doe - doe / 1460 + doe / 36_524 - doe / 146_096) / 365;
+    let doy = doe - (365 * yoe + yoe / 4 - yoe / 100);
+    let mp = (5 * doy + 2) / 153;
+    let pv = doy - (153 * mp + 2) / 5 + 1;
+    let kk = if mp < 10 { mp + 3 } else { mp - 9 };
+    let vuosi = yoe + era * 400 + i64::from(kk <= 2);
+    format!(
+        "{vuosi:04}-{kk:02}-{pv:02}T{:02}:{:02}:{:02}.{:03}Z",
+        ms_paivassa / 3_600_000,
+        ms_paivassa / 60_000 % 60,
+        ms_paivassa / 1000 % 60,
+        ms_paivassa % 1000
+    )
 }
 
 fn peiliyksikko(id: &str, ms: u64, rivit: &[String]) -> Yksikko {
@@ -237,7 +260,7 @@ async fn ikkunoitu_b_katon_alla_virta_ja_uudelleenkaynnistys() {
         for j in 0..PAIVASSA {
             let id = format!("istunto-{k:02}.jsonl:{}", j * 100_000);
             let ms = nyt - k * PAIVA_MS - 3_600_000 - j * 600_000;
-            kaikki.push(peiliyksikko(&id, ms, &rivit(&id)));
+            kaikki.push(peiliyksikko(&id, ms, &rivit(&id, ms)));
         }
     }
     for pala in kaikki.chunks(4) {
@@ -279,13 +302,13 @@ async fn ikkunoitu_b_katon_alla_virta_ja_uudelleenkaynnistys() {
     let ennen = kb["yksikot"].as_u64().unwrap();
 
     // Uusi peili-yksikkö A:lle → B:llä virran kautta ≤ 5 s.
+    let uusi_ms = nyt_ms();
     let uusi = peiliyksikko(
         "uusi.jsonl:0",
-        nyt_ms(),
-        &[
-            json!({"type": "assistant", "message": {"role": "assistant", "content": "uusi"}})
-                .to_string(),
-        ],
+        uusi_ms,
+        &[json!({"type": "assistant", "timestamp": iso(uusi_ms),
+            "message": {"role": "assistant", "content": "uusi"}})
+        .to_string()],
     );
     let lahetetty = Instant::now();
     laheta(&http, pa, std::slice::from_ref(&uusi)).await;

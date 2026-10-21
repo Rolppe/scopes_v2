@@ -97,7 +97,7 @@ impl Solmu {
     }
 }
 
-/// Peiliyksikkö `<tiedosto>:<alku>`, jonka HLC-aika on `ms`.
+/// Peiliyksikkö `<tiedosto>:<alku>`, jonka HLC-aika on `ms` (rivien `timestamp` asettaa kutsuja).
 fn yksikko(tiedosto: &str, alku: u64, rivit: &[String], ms: u64) -> Yksikko {
     Yksikko {
         polku: "peili".to_string(),
@@ -118,6 +118,38 @@ fn rivit_jsonl() -> Vec<String> {
         r#"{"type":"summary","summary":"x"}"#.to_string(),
         "ei json".to_string(),
     ]
+}
+
+/// `rivit_jsonl` rivien aikaleimat asetettuna hetkeen `ms` (sisältöaika = aiottu ikä, T-73).
+fn rivit_ajalla(ms: u64) -> Vec<String> {
+    rivit_jsonl()
+        .into_iter()
+        .map(|r| {
+            r.replace("2026-10-20T10:00:00Z", &iso(ms))
+                .replace("2026-10-20T10:00:01Z", &iso(ms))
+        })
+        .collect()
+}
+
+/// RFC 3339 -aikaleima (UTC, millisekunnit) Unix-ajasta; rivien `timestamp` vastaa näin aiottua ikää (T-73).
+fn iso(ms: u64) -> String {
+    let (p, ms_paivassa) = ((ms / 86_400_000) as i64, ms % 86_400_000);
+    let z = p + 719_468;
+    let era = z.div_euclid(146_097);
+    let doe = z - era * 146_097;
+    let yoe = (doe - doe / 1460 + doe / 36_524 - doe / 146_096) / 365;
+    let doy = doe - (365 * yoe + yoe / 4 - yoe / 100);
+    let mp = (5 * doy + 2) / 153;
+    let pv = doy - (153 * mp + 2) / 5 + 1;
+    let kk = if mp < 10 { mp + 3 } else { mp - 9 };
+    let vuosi = yoe + era * 400 + i64::from(kk <= 2);
+    format!(
+        "{vuosi:04}-{kk:02}-{pv:02}T{:02}:{:02}:{:02}.{:03}Z",
+        ms_paivassa / 3_600_000,
+        ms_paivassa / 60_000 % 60,
+        ms_paivassa / 1000 % 60,
+        ms_paivassa % 1000
+    )
 }
 
 #[test]
@@ -155,7 +187,7 @@ async fn ikkunoitu_hylkaa_vanhan_ja_riisuu_tuoreen() {
     let s = Solmu::kaynnista(Some(7), 38).await;
     let mut rx = s.tila.lahetin.subscribe();
     let nyt = kello_ms();
-    let rivit = rivit_jsonl();
+    let rivit = rivit_ajalla(nyt - 8 * PAIVA_MS);
 
     let vanha = yksikko(T, 0, &rivit, nyt - 8 * PAIVA_MS);
     assert_eq!(
@@ -166,6 +198,7 @@ async fn ikkunoitu_hylkaa_vanhan_ja_riisuu_tuoreen() {
     assert_eq!(s.tila.varasto.seq().unwrap(), 0);
     assert!(rx.try_recv().is_err(), "hylätty yksikkö tuotti tapahtuman");
 
+    let rivit = rivit_ajalla(nyt - 6 * PAIVA_MS);
     let tuore = yksikko(T, 100, &rivit, nyt - 6 * PAIVA_MS);
     assert!(api::kirjoita_ja_ilmoita(&s.tila, &tuore)
         .await
@@ -184,7 +217,12 @@ async fn ikkunoitu_hylkaa_vanhan_ja_riisuu_tuoreen() {
 #[tokio::test]
 async fn taysi_solmu_tallettaa_muuttamatta() {
     let s = Solmu::kaynnista(None, 38).await;
-    let y = yksikko(T, 0, &rivit_jsonl(), kello_ms() - 8 * PAIVA_MS);
+    let y = yksikko(
+        T,
+        0,
+        &rivit_ajalla(kello_ms() - 8 * PAIVA_MS),
+        kello_ms() - 8 * PAIVA_MS,
+    );
     assert!(api::kirjoita_ja_ilmoita(&s.tila, &y)
         .await
         .unwrap()
@@ -313,7 +351,8 @@ async fn koko_reitti_molemmilla_solmutyypeilla() {
         let odotettu_tavut = a.sisalto.as_ref().unwrap().len() + b.sisalto.as_ref().unwrap().len();
         assert_eq!(koko["tavut"], odotettu_tavut);
         assert_eq!(koko["yksikot"], 2);
-        assert_eq!(koko["vanhin"], a.aika.to_string());
+        // T-73: vanhin = pienin sisältöaika ms (rivit ilman aikaleimaa → HLC-aika).
+        assert_eq!(koko["vanhin"], a.aika.ms);
         assert_eq!(koko["ikkuna_vrk"], odotettu);
         // Ilman avainta 401 (suojattu reitti).
         let ilman = reqwest::get(format!("{}/api/peili/koko", s.osoite))

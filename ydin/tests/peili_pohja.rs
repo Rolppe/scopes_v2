@@ -171,14 +171,25 @@ impl Drop for Palvelin {
     }
 }
 
+/// Rivin `timestamp` (RFC 3339) HLC-ajasta `ms`: sisältöaika = yksikön aiottu ikä.
+fn aikaleima(ms: u64) -> String {
+    Hlc {
+        ms,
+        laskuri: 0,
+        laite: "a".to_string(),
+    }
+    .to_string()[..24]
+        .to_string()
+}
+
 // ---- data --------------------------------------------------------------------------------------------------------
 
 /// Rivi `k` (1-pohjainen): joka kolmas on ei-viestirivi, muut käyttäjän viestejä "viesti k".
-fn rivi(k: usize) -> String {
+fn rivi(k: usize, ms: u64) -> String {
     if k.is_multiple_of(3) {
         json!({"type": "progress", "data": format!("edistys {k}")}).to_string()
     } else {
-        json!({"type": "user", "timestamp": "2026-10-20T00:00:00.000Z",
+        json!({"type": "user", "timestamp": aikaleima(ms),
             "message": {"role": "user", "content": format!("viesti {k}")}})
         .to_string()
     }
@@ -190,7 +201,7 @@ fn tayta(a: &Tila, yksikot: &[(u64, usize)]) -> Vec<(u64, usize)> {
     let mut offset = 0u64;
     let mut k = 1usize;
     for (ms, n) in yksikot {
-        let rivit: Vec<String> = (k..k + n).map(rivi).collect();
+        let rivit: Vec<String> = (k..k + n).map(|k| rivi(k, *ms)).collect();
         k += n;
         let y = Yksikko {
             polku: "peili".to_string(),

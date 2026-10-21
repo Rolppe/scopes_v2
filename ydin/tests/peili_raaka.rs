@@ -131,15 +131,26 @@ impl Drop for Palvelin {
     }
 }
 
+/// Rivin `timestamp` (RFC 3339) HLC-ajasta `ms`: sisältöaika = yksikön aiottu ikä.
+fn aikaleima(ms: u64) -> String {
+    Hlc {
+        ms,
+        laskuri: 0,
+        laite: "a".to_string(),
+    }
+    .to_string()[..24]
+        .to_string()
+}
+
 // ---- data --------------------------------------------------------------------------------------------------------
 
 /// Rivi `k` (1-pohjainen): joka kolmas on ei-viestirivi (riisunta tekisi siitä tyngän), muut käyttäjän
 /// viestejä; kaikissa on riisunnassa karsiutuva `extra`-kenttä.
-fn rivi(k: usize) -> String {
+fn rivi(k: usize, ms: u64) -> String {
     if k.is_multiple_of(3) {
         json!({"type": "progress", "data": format!("edistys {k}")}).to_string()
     } else {
-        json!({"type": "user", "timestamp": "2026-10-20T00:00:00.000Z", "extra": k,
+        json!({"type": "user", "timestamp": aikaleima(ms), "extra": k,
             "message": {"role": "user", "content": format!("viesti {k}")}})
         .to_string()
     }
@@ -173,7 +184,7 @@ fn tayta(a: &Tila, yksikot: &[(u64, usize)]) -> Vec<String> {
     let mut kaikki = Vec::new();
     let mut ulos = Vec::new();
     for (ms, n) in yksikot {
-        let rivit: Vec<String> = (k..k + n).map(rivi).collect();
+        let rivit: Vec<String> = (k..k + n).map(|k| rivi(k, *ms)).collect();
         k += n;
         kaikki.extend(rivit.clone());
         ulos.push((*ms, rivit));
@@ -280,7 +291,8 @@ async fn kahdeksan_megan_raja_katkaisee_vastauksen() {
     let a = solmu("a", None, &[]);
     let pa = kaynnista(a.tila.clone());
     let iso = format!("{{\"type\":\"user\",\"x\":\"{}\"}}", "x".repeat(8_500_000));
-    let pieni = |k: usize| rivi(k);
+    let ms = nyt();
+    let pieni = |k: usize| rivi(k, ms);
     // Yksikkö 1: pieni, iso; yksikkö 2: pieni, pieni.
     tayta_rivit(
         &a.tila,
