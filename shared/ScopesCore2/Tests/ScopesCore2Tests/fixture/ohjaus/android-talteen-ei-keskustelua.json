@@ -1,0 +1,12 @@
+{
+  "tapaus": "android-talteen-ei-keskustelua",
+  "pyynto": {
+    "metodi": "POST",
+    "polku": "/api/android/talteen",
+    "runko": {}
+  },
+  "status": 409,
+  "runko": {
+    "virhe": "ruudulla ei näy Geminin keskustelua"
+  }
+}

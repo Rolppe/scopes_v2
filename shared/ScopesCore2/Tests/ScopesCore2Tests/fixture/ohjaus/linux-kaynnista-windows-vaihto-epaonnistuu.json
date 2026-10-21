@@ -1,0 +1,12 @@
+{
+  "tapaus": "linux-kaynnista-windows-vaihto-epaonnistuu",
+  "pyynto": {
+    "metodi": "POST",
+    "polku": "/api/palvelin/kaynnista",
+    "runko": {}
+  },
+  "status": 502,
+  "runko": {
+    "virhe": "Windowsin vaihto Linuxiin epäonnistui: Permission denied (publickey)."
+  }
+}

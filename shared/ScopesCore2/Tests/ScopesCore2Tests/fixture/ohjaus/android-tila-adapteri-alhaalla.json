@@ -1,0 +1,13 @@
+{
+  "tapaus": "android-tila-adapteri-alhaalla",
+  "pyynto": {
+    "metodi": "GET",
+    "polku": "/api/android",
+    "runko": null
+  },
+  "status": 503,
+  "runko": {
+    "virhe": "adapteri",
+    "kohde": "http://127.0.0.1:8798"
+  }
+}

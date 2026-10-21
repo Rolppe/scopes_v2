@@ -1,0 +1,14 @@
+{
+  "tapaus": "linux-sammuta-linux-koodi-0",
+  "pyynto": {
+    "metodi": "POST",
+    "polku": "/api/palvelin/sammuta",
+    "runko": {}
+  },
+  "status": 200,
+  "runko": {
+    "tila": "sammuu",
+    "lahto": "linux",
+    "viesti": "palvelin sammuu"
+  }
+}

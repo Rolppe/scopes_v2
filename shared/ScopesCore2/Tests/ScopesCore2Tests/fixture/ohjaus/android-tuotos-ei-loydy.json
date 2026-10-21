@@ -1,0 +1,12 @@
+{
+  "tapaus": "android-tuotos-ei-loydy",
+  "pyynto": {
+    "metodi": "GET",
+    "polku": "/api/android/tuotos?polku=%2Fsdcard%2FDownload%2Fei-ole.txt",
+    "runko": null
+  },
+  "status": 404,
+  "runko": {
+    "virhe": "tiedostoa ei saatu: cat: No such file"
+  }
+}

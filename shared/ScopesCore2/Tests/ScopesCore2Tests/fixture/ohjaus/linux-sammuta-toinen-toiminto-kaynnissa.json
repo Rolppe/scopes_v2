@@ -1,0 +1,12 @@
+{
+  "tapaus": "linux-sammuta-toinen-toiminto-kaynnissa",
+  "pyynto": {
+    "metodi": "POST",
+    "polku": "/api/palvelin/sammuta",
+    "runko": {}
+  },
+  "status": 429,
+  "runko": {
+    "virhe": "kaynnista on jo käynnissä"
+  }
+}

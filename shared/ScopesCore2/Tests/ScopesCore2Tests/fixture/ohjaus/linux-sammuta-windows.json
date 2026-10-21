@@ -1,0 +1,12 @@
+{
+  "tapaus": "linux-sammuta-windows",
+  "pyynto": {
+    "metodi": "POST",
+    "polku": "/api/palvelin/sammuta",
+    "runko": {}
+  },
+  "status": 409,
+  "runko": {
+    "virhe": "PC:ssä on käynnissä Windows, ei palvelin"
+  }
+}

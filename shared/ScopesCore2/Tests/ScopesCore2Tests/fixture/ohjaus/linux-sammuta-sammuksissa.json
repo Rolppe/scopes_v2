@@ -1,0 +1,12 @@
+{
+  "tapaus": "linux-sammuta-sammuksissa",
+  "pyynto": {
+    "metodi": "POST",
+    "polku": "/api/palvelin/sammuta",
+    "runko": {}
+  },
+  "status": 409,
+  "runko": {
+    "virhe": "palvelin on jo sammuksissa"
+  }
+}

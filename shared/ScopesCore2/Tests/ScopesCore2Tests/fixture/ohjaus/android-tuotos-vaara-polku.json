@@ -1,0 +1,12 @@
+{
+  "tapaus": "android-tuotos-vaara-polku",
+  "pyynto": {
+    "metodi": "GET",
+    "polku": "/api/android/tuotos?polku=%2Fdata%2Fdata%2Fsalaisuus.txt",
+    "runko": null
+  },
+  "status": 400,
+  "runko": {
+    "virhe": "polku ei ole tuotoskansiossa"
+  }
+}

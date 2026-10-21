@@ -1,0 +1,15 @@
+{
+  "tapaus": "linux-sammuta-kuiva",
+  "pyynto": {
+    "metodi": "POST",
+    "polku": "/api/palvelin/sammuta",
+    "runko": {}
+  },
+  "status": 200,
+  "runko": {
+    "tila": "sammuu",
+    "lahto": "linux",
+    "viesti": "palvelin sammuu",
+    "kuiva": "ssh -o ConnectTimeout=5 -o BatchMode=yes palvelin sudo -n /usr/sbin/poweroff"
+  }
+}

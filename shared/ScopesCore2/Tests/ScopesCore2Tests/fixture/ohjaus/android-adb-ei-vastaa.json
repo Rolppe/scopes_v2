@@ -1,0 +1,12 @@
+{
+  "tapaus": "android-adb-ei-vastaa",
+  "pyynto": {
+    "metodi": "POST",
+    "polku": "/api/android/avaa",
+    "runko": {}
+  },
+  "status": 502,
+  "runko": {
+    "virhe": "adb ei vastaa: error: device offline"
+  }
+}

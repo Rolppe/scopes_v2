@@ -1,0 +1,12 @@
+{
+  "tapaus": "android-tuotokset-tyhja",
+  "pyynto": {
+    "metodi": "GET",
+    "polku": "/api/android/tuotokset",
+    "runko": null
+  },
+  "status": 200,
+  "runko": {
+    "tiedostot": []
+  }
+}

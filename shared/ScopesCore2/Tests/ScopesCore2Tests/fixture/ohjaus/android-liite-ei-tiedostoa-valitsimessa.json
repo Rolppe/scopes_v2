@@ -1,0 +1,12 @@
+{
+  "tapaus": "android-liite-ei-tiedostoa-valitsimessa",
+  "pyynto": {
+    "metodi": "POST",
+    "polku": "/api/android/liite?nimi=muistio.txt",
+    "runko": "liitteen sisältö"
+  },
+  "status": 409,
+  "runko": {
+    "virhe": "tiedostovalitsin ei näytä tiedostoa scopes-080000-muistio.txt; valitse se ruudulta (Download/Scopes)"
+  }
+}

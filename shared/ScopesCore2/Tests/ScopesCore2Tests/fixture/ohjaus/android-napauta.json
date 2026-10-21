@@ -1,0 +1,19 @@
+{
+  "tapaus": "android-napauta",
+  "pyynto": {
+    "metodi": "POST",
+    "polku": "/api/android/napauta",
+    "runko": {
+      "x": 0.5,
+      "y": 0.25
+    }
+  },
+  "status": 200,
+  "runko": {
+    "ok": true,
+    "piste": [
+      540,
+      600
+    ]
+  }
+}

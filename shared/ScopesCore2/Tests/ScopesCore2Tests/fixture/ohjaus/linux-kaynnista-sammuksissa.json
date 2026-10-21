@@ -1,0 +1,14 @@
+{
+  "tapaus": "linux-kaynnista-sammuksissa",
+  "pyynto": {
+    "metodi": "POST",
+    "polku": "/api/palvelin/kaynnista",
+    "runko": {}
+  },
+  "status": 200,
+  "runko": {
+    "tila": "linux",
+    "lahto": "sammuksissa",
+    "viesti": "Linux vastaa 192.0.2.99 (34 s)"
+  }
+}

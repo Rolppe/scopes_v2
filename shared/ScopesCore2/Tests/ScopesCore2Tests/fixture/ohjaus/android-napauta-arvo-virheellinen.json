@@ -1,0 +1,15 @@
+{
+  "tapaus": "android-napauta-arvo-virheellinen",
+  "pyynto": {
+    "metodi": "POST",
+    "polku": "/api/android/napauta",
+    "runko": {
+      "x": 1.5,
+      "y": 0
+    }
+  },
+  "status": 400,
+  "runko": {
+    "virhe": "x pitää olla luku 0–1"
+  }
+}

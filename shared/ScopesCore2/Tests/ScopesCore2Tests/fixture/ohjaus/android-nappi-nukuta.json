@@ -1,0 +1,14 @@
+{
+  "tapaus": "android-nappi-nukuta",
+  "pyynto": {
+    "metodi": "POST",
+    "polku": "/api/android/nappi",
+    "runko": {
+      "nimi": "nukuta"
+    }
+  },
+  "status": 200,
+  "runko": {
+    "ok": true
+  }
+}

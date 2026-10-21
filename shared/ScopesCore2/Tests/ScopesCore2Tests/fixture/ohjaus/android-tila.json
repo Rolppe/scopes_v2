@@ -1,0 +1,19 @@
+{
+  "tapaus": "android-tila",
+  "pyynto": {
+    "metodi": "GET",
+    "polku": "/api/android",
+    "runko": null
+  },
+  "status": 200,
+  "runko": {
+    "hereilla": true,
+    "heratimme": false,
+    "koko": [
+      1080,
+      2400
+    ],
+    "kuiva": false,
+    "tuleva": "tuntematon kenttä sallitaan"
+  }
+}

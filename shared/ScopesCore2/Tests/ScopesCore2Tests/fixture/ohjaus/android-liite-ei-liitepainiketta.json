@@ -1,0 +1,12 @@
+{
+  "tapaus": "android-liite-ei-liitepainiketta",
+  "pyynto": {
+    "metodi": "POST",
+    "polku": "/api/android/liite?nimi=muistio.txt",
+    "runko": "liitteen sisältö"
+  },
+  "status": 409,
+  "runko": {
+    "virhe": "Geminin liitepainiketta ei näy; tiedosto on laitteella: /sdcard/Download/Scopes/scopes-080000-muistio.txt"
+  }
+}

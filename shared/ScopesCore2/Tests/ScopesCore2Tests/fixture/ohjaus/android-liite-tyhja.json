@@ -1,0 +1,12 @@
+{
+  "tapaus": "android-liite-tyhja",
+  "pyynto": {
+    "metodi": "POST",
+    "polku": "/api/android/liite?nimi=muistio.txt",
+    "runko": ""
+  },
+  "status": 400,
+  "runko": {
+    "virhe": "liite on tyhjä"
+  }
+}

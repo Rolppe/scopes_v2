@@ -1,0 +1,25 @@
+{
+  "tapaus": "android-talteen",
+  "pyynto": {
+    "metodi": "POST",
+    "polku": "/api/android/talteen",
+    "runko": {}
+  },
+  "status": 200,
+  "runko": {
+    "ok": true,
+    "polku": "<ANDROID>/20261021T080000-gemini.md",
+    "teksti": "## Minä\n\nMoi Gemini\n\n## Gemini\n\nHei! Miten voin auttaa?\n",
+    "viestit": [
+      {
+        "rooli": "kayttaja",
+        "teksti": "Moi Gemini"
+      },
+      {
+        "rooli": "gemini",
+        "teksti": "Hei! Miten voin auttaa?"
+      }
+    ],
+    "kaynnissa": false
+  }
+}

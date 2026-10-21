@@ -1,0 +1,12 @@
+{
+  "tapaus": "android-avaa",
+  "pyynto": {
+    "metodi": "POST",
+    "polku": "/api/android/avaa",
+    "runko": {}
+  },
+  "status": 200,
+  "runko": {
+    "ok": true
+  }
+}

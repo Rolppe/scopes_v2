@@ -1,0 +1,13 @@
+{
+  "tapaus": "linux-sammuta-adapteri-alhaalla",
+  "pyynto": {
+    "metodi": "POST",
+    "polku": "/api/palvelin/sammuta",
+    "runko": {}
+  },
+  "status": 503,
+  "runko": {
+    "virhe": "adapteri",
+    "kohde": "http://127.0.0.1:8798"
+  }
+}

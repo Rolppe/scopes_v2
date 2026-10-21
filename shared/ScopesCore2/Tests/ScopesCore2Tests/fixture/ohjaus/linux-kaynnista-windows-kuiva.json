@@ -1,0 +1,15 @@
+{
+  "tapaus": "linux-kaynnista-windows-kuiva",
+  "pyynto": {
+    "metodi": "POST",
+    "polku": "/api/palvelin/kaynnista",
+    "runko": {}
+  },
+  "status": 200,
+  "runko": {
+    "tila": "vaihtaa",
+    "lahto": "windows",
+    "viesti": "Windows käynnistyy Linuxiin, noin 45 s",
+    "kuiva": "ssh -o ConnectTimeout=5 -o BatchMode=yes pc linux"
+  }
+}

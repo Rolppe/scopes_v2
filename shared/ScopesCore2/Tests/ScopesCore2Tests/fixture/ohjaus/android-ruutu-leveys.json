@@ -1,0 +1,13 @@
+{
+  "tapaus": "android-ruutu-leveys",
+  "pyynto": {
+    "metodi": "GET",
+    "polku": "/api/android/ruutu?leveys=360",
+    "runko": null
+  },
+  "status": 200,
+  "runko": {
+    "tyyppi": "image/jpeg",
+    "base64": "/9j/4AAQSkZJRgABAQAAAQABAAD/2Q=="
+  }
+}

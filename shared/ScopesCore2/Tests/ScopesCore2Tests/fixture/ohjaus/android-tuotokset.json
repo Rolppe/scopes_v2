@@ -1,0 +1,25 @@
+{
+  "tapaus": "android-tuotokset",
+  "pyynto": {
+    "metodi": "GET",
+    "polku": "/api/android/tuotokset",
+    "runko": null
+  },
+  "status": 200,
+  "runko": {
+    "tiedostot": [
+      {
+        "polku": "/sdcard/Pictures/kuva.png",
+        "nimi": "kuva.png",
+        "koko": 99,
+        "aika": "2025-10-09T08:55:00.000Z"
+      },
+      {
+        "polku": "/sdcard/Download/raportti.txt",
+        "nimi": "raportti.txt",
+        "koko": 1234,
+        "aika": "2025-10-09T08:53:20.000Z"
+      }
+    ]
+  }
+}

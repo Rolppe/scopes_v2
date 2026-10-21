@@ -1,0 +1,15 @@
+{
+  "tapaus": "linux-kaynnista-sammuksissa-kuiva",
+  "pyynto": {
+    "metodi": "POST",
+    "polku": "/api/palvelin/kaynnista",
+    "runko": {}
+  },
+  "status": 200,
+  "runko": {
+    "tila": "heratetty",
+    "lahto": "sammuksissa",
+    "viesti": "WoL lähetettäisiin",
+    "kuiva": "python3 <REPO>/Infra/linux/palvelin/herata-pc.py --odota 90"
+  }
+}

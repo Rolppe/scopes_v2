@@ -1,0 +1,14 @@
+{
+  "tapaus": "android-tuotos",
+  "pyynto": {
+    "metodi": "GET",
+    "polku": "/api/android/tuotos?polku=%2Fsdcard%2FDownload%2Fraportti.txt",
+    "runko": null
+  },
+  "status": 200,
+  "runko": {
+    "tyyppi": "text/plain; charset=utf-8",
+    "base64": "cmFwb3J0aW4gc2lzw6RsdMO2Cg==",
+    "nimi": "raportti.txt"
+  }
+}

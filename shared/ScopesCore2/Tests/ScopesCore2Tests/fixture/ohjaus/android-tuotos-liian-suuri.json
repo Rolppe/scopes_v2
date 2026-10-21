@@ -1,0 +1,12 @@
+{
+  "tapaus": "android-tuotos-liian-suuri",
+  "pyynto": {
+    "metodi": "GET",
+    "polku": "/api/android/tuotos?polku=%2Fsdcard%2FMovies%2Fiso.mp4",
+    "runko": null
+  },
+  "status": 413,
+  "runko": {
+    "virhe": "tiedosto liian suuri"
+  }
+}

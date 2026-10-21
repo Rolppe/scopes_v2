@@ -1,0 +1,14 @@
+{
+  "tapaus": "android-liite-kuiva",
+  "pyynto": {
+    "metodi": "POST",
+    "polku": "/api/android/liite?nimi=muistio.txt",
+    "runko": "liitteen sisältö"
+  },
+  "status": 200,
+  "runko": {
+    "ok": true,
+    "nimi": "scopes-080000-muistio.txt",
+    "kuiva": "adb push <LIITTEET>/android/20261021T080000-abcdef-muistio.txt /sdcard/Download/Scopes/scopes-080000-muistio.txt; valitsin: Add attachments → Files → scopes-080000-muistio.txt"
+  }
+}

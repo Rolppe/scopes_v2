@@ -1,0 +1,12 @@
+{
+  "tapaus": "android-laheta-jako-kuitataan",
+  "pyynto": {
+    "metodi": "POST",
+    "polku": "/api/android/laheta",
+    "runko": {}
+  },
+  "status": 200,
+  "runko": {
+    "ok": true
+  }
+}
