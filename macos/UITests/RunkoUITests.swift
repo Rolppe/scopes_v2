@@ -20,7 +20,7 @@ final class RunkoUITests: XCTestCase {
         app.launchEnvironment["SCOPES2_VERTAINEN"] = osoite
         app.launchEnvironment["SCOPES2_KUITTAUS"] = "pois"   // T-52: ei kuluta koeytimen lukemattomia kuittaustarkistukselta
         app.launchEnvironment["SCOPES2_DATA"] = NSTemporaryDirectory() + "scopes2-ui-" + UUID().uuidString
-        // T-71: portti vie TEST_RUNNER_SCOPES2_NAYTTO_HEREILLA=YES; näyttö pysyy hereillä ilman ssh-caffeinatea (K-11)
+        // T-71: portti vie TEST_RUNNER_SCOPES2_NAYTTO_HEREILLA=YES; näyttö pysyy hereillä ilman erillistä herätysprosessia (K-11)
         if nayttoArgumentti, ProcessInfo.processInfo.environment["SCOPES2_NAYTTO_HEREILLA"] == "YES" {
             app.launchArguments += ["-scopes2.naytto-hereilla", "YES"]
         }
