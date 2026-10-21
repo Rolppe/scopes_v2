@@ -49,6 +49,9 @@ struct AsetuksetJson {
     vanha_avain: Option<String>,
     #[serde(default)]
     headless: bool,
+    /// S-10: puuttuva avain tai null = ei adapteria.
+    #[serde(default)]
+    adapteri: Option<String>,
     #[serde(default)]
     laite: Option<String>,
     /// S-9: puuttuva avain tai null = täysi solmu.
@@ -121,6 +124,7 @@ unsafe fn kaynnista_sisa(json: *const c_char, ulos: *mut c_char, koko: usize) ->
             .filter(|l| !l.is_empty())
             .unwrap_or_else(|| "solmu".to_string()),
         lr_vertainen: None,
+        adapteri: j.adapteri.filter(|u| !u.is_empty()),
         web: None,
         peili_ikkuna_vrk: j.peili_ikkuna_vrk,
         peili_katto_mt: j.peili_katto_mt.unwrap_or(38),

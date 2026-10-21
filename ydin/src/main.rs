@@ -32,6 +32,9 @@ struct Args {
     vertainen: Vec<String>,
     #[arg(long)]
     lr_vertainen: Option<String>,
+    /// Adapterin osoite (S-10): adapterin ottamat reitit menevät sille, muut vanhalle
+    #[arg(long)]
+    adapteri: Option<String>,
     /// Web-asiakkaan hakemisto (tarjoillaan polusta /web/)
     #[arg(long)]
     web: Option<PathBuf>,
@@ -120,6 +123,7 @@ async fn main() {
         headless: args.headless,
         laite: laite_id(),
         lr_vertainen: args.lr_vertainen,
+        adapteri: args.adapteri,
         web: args.web.map(kotiin),
         peili_ikkuna_vrk: args.peili_ikkuna_vrk,
         peili_katto_mt: args.peili_katto_mt,

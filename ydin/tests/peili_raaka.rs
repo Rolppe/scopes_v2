@@ -66,6 +66,7 @@ fn solmu(laite: &str, ikkuna: Option<u32>, vertaiset: &[&Palvelin]) -> Solmu {
                 .map(|p| format!("127.0.0.1:{}", p.portti))
                 .collect(),
             lr_vertainen: None,
+            adapteri: Default::default(),
             lahetin,
             peili: PeiliIkkuna::uusi(ikkuna, 38),
         }),

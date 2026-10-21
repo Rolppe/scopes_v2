@@ -30,6 +30,8 @@ pub struct Tila {
     pub vanha_avain: Option<PathBuf>,
     pub vertaiset: Vec<String>,
     pub lr_vertainen: Option<String>,
+    /// S-10 (T-64): adapterin osoite ja julkaistut reitit (silta.rs omistaa); oletus = ei adapteria.
+    pub adapteri: silta::Adapteri,
     pub lahetin: broadcast::Sender<Tapahtuma>,
     /// Transkriptipeilin aikaikkuna ja katto (S-9); oletus = täysi solmu.
     pub peili: peili::PeiliIkkuna,

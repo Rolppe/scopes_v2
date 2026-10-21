@@ -60,6 +60,7 @@ impl Solmu {
             vanha_avain: None,
             vertaiset: vec![],
             lr_vertainen: None,
+            adapteri: Default::default(),
             lahetin,
             peili: PeiliIkkuna::uusi(ikkuna_vrk, 38),
         });
