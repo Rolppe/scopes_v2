@@ -2062,6 +2062,7 @@ pub async fn viestit(tila: &Arc<Tila>, nimi: &str, since: Option<u64>) -> Vastau
             "tyyppi": "claude",
             "malli": k.map_or(Value::Null, |k| k.malli.clone()),
             "effort": k.map_or(Value::Null, |k| k.effort.clone()),
+            "transkripti": kentta("transkripti"),
         },
         "voiLahettaa": tosi(i.get("ruutu")) && ruudullisia == 1,
         "viestit": k.map_or_else(Vec::new, Keskustelu::lista),
