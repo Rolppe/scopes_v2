@@ -24,7 +24,7 @@ bash scopes2/shared/gate.sh T-45          # runko: paketit, xcodegen, macOS ja i
 ```
 
 Tapaukset: T-45 runko; T-46 XCFramework (`ydin/apple/rakenna-xcframework.sh`); T-47 + ScopesCore2-testit avaimella;
-T-48 + ScopesUI2 ja äppien build; T-49 + UI-testit. Koeydin, tunneli ja avain (P-14): T-47, T-49 ja T-52 käynnistävät palvelimelle koeytimen (koeportti oletus 18798, ei 8787/8797/18795/18796/18797, varattu → seuraava vapaa; oma tilapäinen `--data`, ajon aikana luotu kertakäyttöavain, RLIMIT_DATA, `--vanha http://127.0.0.1:8787` palvelimen vanhalla avaimella), avaavat Macilla tilapäisen tunnelin `-L <Mac-portti>:127.0.0.1:<koeportti>` (Mac-portti = ajon porttipaikka 18900–18919, testeille `SCOPES2_VERTAINEN`/`TEST_RUNNER_SCOPES2_VERTAINEN`) ja antavat koeytimen kertakäyttöavaimen stdinin kautta ympäristöön `SCOPES2_AVAIN` (ei komentorivillä, ei lokissa). Trap sammuttaa koeytimen ja tunnelin ja poistaa datan. Tuotannon V2-avain ja 8797 eivät ole mukana. Rinnakkaiset ajot (V-605): jokainen ajo pitää Macilla oman lukkonsa `~/scopes2-rakennus-<ajo>/.lukko` ja porttipaikan `~/scopes2-lukot/portti-<p>.lukko` koko ajon (yli 30 min odotus → `MAC-LUKKO: varattu` exit 1); jaetut vaiheet ovat omien lukkojensa takana: XCFramework `~/scopes2-rakennus/.lukko` (sama kuin ytimen gate.sh:n cargo), macOS-UI-testit ja kaksi laitetta `~/scopes2-lukot/naytto.lukko`, iOS-testit `~/scopes2-lukot/sim-<nimi>.lukko` (ensimmäinen vapaa `GATE_SIMIT`-listasta). Odotus enintään `GATE_LUKKO_ODOTUS` (oletus 2700 s). `<ajo>` = `GATE_AJO` tai ID. Ei launchd-agenttia eikä Keychainia (H-14, H-15 aamulla H-17:n yhteydessä). `gate.sh --tunnelitesti` (tarvitsee Macin) todistaa koeytimen, tunnelin ja lukon synnyn ja sulkeutumisen;
+T-48 + ScopesUI2 ja äppien build; T-49 + UI-testit. Koeydin, tunneli ja avain (P-14): T-47, T-49 ja T-52 käynnistävät palvelimelle koeytimen (koeportti oletus 18800, haku 18800–18819 (P-6), ei 8787/8797/18795/18796/18797, varattu → seuraava vapaa; oma tilapäinen `--data`, ajon aikana luotu kertakäyttöavain, RLIMIT_DATA, `--vanha http://127.0.0.1:8787` palvelimen vanhalla avaimella), avaavat Macilla tilapäisen tunnelin `-L <Mac-portti>:127.0.0.1:<koeportti>` (Mac-portti = ajon porttipaikka 18900–18919, testeille `SCOPES2_VERTAINEN`/`TEST_RUNNER_SCOPES2_VERTAINEN`) ja antavat koeytimen kertakäyttöavaimen stdinin kautta ympäristöön `SCOPES2_AVAIN` (ei komentorivillä, ei lokissa). Trap sammuttaa koeytimen ja tunnelin ja poistaa datan. Tuotannon V2-avain ja 8797 eivät ole mukana. Rinnakkaiset ajot (V-605): jokainen ajo pitää Macilla oman lukkonsa `~/scopes2-rakennus-<ajo>/.lukko` ja porttipaikan `~/scopes2-lukot/portti-<p>.lukko` koko ajon (yli 30 min odotus → `MAC-LUKKO: varattu` exit 1); jaetut vaiheet ovat omien lukkojensa takana: XCFramework `~/scopes2-rakennus/.lukko` (sama kuin ytimen gate.sh:n cargo), macOS-UI-testit ja kaksi laitetta `~/scopes2-lukot/naytto.lukko`, iOS-testit `~/scopes2-lukot/sim-<nimi>.lukko` (ensimmäinen vapaa `GATE_SIMIT`-listasta). Odotus enintään `GATE_LUKKO_ODOTUS` (oletus 2700 s). `<ajo>` = `GATE_AJO` tai ID. Ei launchd-agenttia eikä Keychainia (H-14, H-15 aamulla H-17:n yhteydessä). `gate.sh --tunnelitesti` (tarvitsee Macin) todistaa koeytimen, tunnelin ja lukon synnyn ja sulkeutumisen;
 T-52 + `shared/testit/kaksi-laitetta.sh`. Exit 0 vihreä, 1 tuntematon ID/testi punainen, 2 aita.
 
 - Palvelin ajaa aidat (lähtötila ajon alussa; `scopes/`-muutos → "VANHA PUU MUUTTUNUT"; `GATE_MAY`, oletus
@@ -38,6 +38,26 @@ T-52 + `shared/testit/kaksi-laitetta.sh`. Exit 0 vihreä, 1 tuntematon ID/testi 
 - Simulaattori: `SCOPES2_SIM` (oletus "iPhone 15 Pro", build-kohde) ja `GATE_SIMIT` (testien vaihtoehdot, oletus `$SCOPES2_SIM|iPhone 17 Pro|iPhone 17`). Jokaisella ssh-komennolla aikaraja `GATE_MAC_TIMEOUT` + `GATE_LUKKO_ODOTUS` (oletus 1800 + 2700 s).
 - Avain testeille (T-47 alkaen): palvelimen `~/.config/scopes2/avain` annetaan Macille stdinissä
   (`TEST_RUNNER_SCOPES2_AVAIN=$(cat)`), ei komentorivillä eikä lokissa.
+
+## Siemen (T-62)
+
+`koeydin_alku` kirjoittaa terveystarkistuksen jälkeen (ennen siirtoa ja testejä, tapaukset T-47, T-48, T-49, T-52 ja `--tunnelitesti`)
+koeytimeen yhden avoimen istunnon kiinteällä transkriptillä, koska `RunkoUITests.testViestitVastaavatPalvelinta` tarvitsee skoopin,
+jolla `/viestit` palauttaa viestejä, ja viestit tulevat vain palvelimella avoimesta istunnosta (scopes2-istunnot ajetaan Macilla).
+Testidata `testidata/`: `siemen-istunnot.json` (skooppi `test`, laite `koe-siemen`, istunto `62e0a5e1-0000-4000-8000-000000000062`,
+`pakattu:false`, `ruutu:"koe-siemen-ei-ruutua"` → `voiLahettaa:true` (ydin: `tosi(ruutu) && ruudullisia == 1`,
+`nakymat.rs:1844`), jotta KaksiLaitetta luonnos, vieritys ja headless löytävät skoopin; testit kirjoittavat vain luonnoksen eivätkä
+lähetä, ja arvo ei ole oikea tmux-ruutu), `siemen-agy.json` (tyhjä) ja `siemen-transkripti.jsonl` (ytimen fixturesta
+`peili-scopes macos.jsonl`, sessionId vaihdettu, rikkinäinen rivi pois; ei tuotannon dataa, sama joka ajossa, 16 riviä → 17 viestiä).
+Kirjoitusjärjestys kuten ytimen testeissä: `POST /api/lahde/istunnot`, `POST /api/lahde/agy`, `POST /api/peili` (`tiedosto`
+`koe-siemen/<uuid>.jsonl`, offset 0, `sha256` = rivit + "\n"). Avain kulkee Bearer-otsikkona tiedostosta (`curl -H @tiedosto`, tiedosto
+koeytimen 0700-hakemistossa), ei komentorivillä. Sen jälkeen odotetaan enintään `GATE_SIEMEN_ODOTUS` s (oletus 60) että sillan
+`/api/skoopit`-lista (rivit tulevat sillan välimuistista, kun ydin hakee 8787:stä) sisältää skoopin `test`, ja tarkistetaan
+`/api/skoopit/test/viestit`: viestimäärä n väliltä 10–120. Kun sekä `lahde/istunnot` että `lahde/agy` ovat ytimessä, ydin rakentaa
+`/viestit`in itse kaikille skoopeille; muiden skooppien viestit ovat tyhjiä, ja `vakaat()` ohittaa ne. Tuloste `SIEMEN: test <n> viestiä`;
+virhe `SIEMEN: ei (<syy>)` (esim. `test ei sillan listalla`) ja exit 1, ei hiljaista ohitusta. Siemen elää koeytimen tilapäisessä
+`--datassa`, ja trap poistaa sen koeytimen mukana. `--itsetesti` tarkistaa testidatan muodon ja siemenvaiheen haarat ilman verkkoa
+(curl korvattu funktiolla, avain ei kulje argv:ssa).
 
 ## Allekirjoitus (P-16)
 

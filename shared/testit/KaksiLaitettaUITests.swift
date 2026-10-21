@@ -207,15 +207,29 @@ final class KaksiLaitettaUITests: XCTestCase {
         // katoaa kesken napautuksen (T-52 ajo 10: "Failed to get matching snapshot"). Avattu skooppi kelpaa; rivi napautetaan vain osoitettavana.
         for _ in 0..<4 {
             if elementti(app, "avattu-\(nimi)").exists { return }
+            palaaSivupalkkiin(app)
             let r = rivi(app, nimi, avattuKelpaa: true)
             if elementti(app, "avattu-\(nimi)").exists { return }
-            if r.exists && r.isHittable { napauta(r) }
+            if r.exists && r.isHittable && r.frame.maxX > 0 { napauta(r) } else { palaaSivupalkkiin(app) }
             if elementti(app, "avattu-\(nimi)").waitForExistence(timeout: 8) { return }
         }
         if !elementti(app, "avattu-\(nimi)").waitForExistence(timeout: 60) {
             print("KL-DIAG skooppia \(nimi) ei avattu; ikkuna:\n" + String(app.debugDescription.prefix(6000)))
             XCTFail("skooppia \(nimi) ei avattu")
         }
+    }
+
+    /// iPhone: synkattu valinta voi avata toisen skoopin näkymän, jolloin sivupalkki on ruudun vasemmalla puolella (T-62 ajo 2:
+    /// skooppi-test x=-70, "Failed to scroll to visible"). Palataan sivupalkkiin navigointipalkin paluupainikkeella; Macilla ei mitään.
+    private func palaaSivupalkkiin(_ app: XCUIApplication) {
+        #if os(iOS)
+        let suodatin = elementti(app, "skooppi-suodatin")
+        let takaisin = app.navigationBars.buttons.firstMatch
+        if suodatin.exists && suodatin.frame.maxX <= 0 && takaisin.exists && takaisin.isHittable {
+            napauta(takaisin)
+            _ = odota(5, { suodatin.frame.maxX > 0 })
+        }
+        #endif
     }
 
     private func palvelin<T: Decodable>(_ polku: String, _ tyyppi: T.Type) async throws -> T? {
