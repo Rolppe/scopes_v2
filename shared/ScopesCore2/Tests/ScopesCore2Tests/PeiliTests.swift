@@ -150,6 +150,35 @@ final class PeiliTests: XCTestCase {
         XCTAssertEqual(req.value(forHTTPHeaderField: "Authorization"), "Bearer testiavain")
     }
 
+    // MARK: PeiliRaaka (S-9f)
+
+    func testPeiliRaakaDekoodaus() throws {
+        let jatkuu = #"{"rivi":1,"rivit":["{\"a\":1}","{\"b\":2}"],"seuraava":3}"#
+        let j = try JSONDecoder().decode(PeiliRaaka.self, from: Data(jatkuu.utf8))
+        XCTAssertEqual(j, PeiliRaaka(rivi: 1, rivit: [#"{"a":1}"#, #"{"b":2}"#], seuraava: 3))
+        let loppu = #"{"rivi":41,"rivit":["x"],"seuraava":null}"#
+        let l = try JSONDecoder().decode(PeiliRaaka.self, from: Data(loppu.utf8))
+        XCTAssertNil(l.seuraava)
+        XCTAssertEqual(l.rivit, ["x"])
+    }
+
+    func testAsiakasPeiliRaakaReitti() async throws {
+        let pyynnot = Pyynnot()
+        MockURLProtocol.kasittelija = { req in
+            pyynnot.lisaa(req)
+            return (MockURLProtocol.vastaus(req), Data(#"{"rivi":5,"rivit":["r5"],"seuraava":null}"#.utf8))
+        }
+        defer { MockURLProtocol.kasittelija = nil }
+        let a = Asiakas(osoite: URL(string: "http://127.0.0.1:18999")!, avain: "testiavain", session: MockURLProtocol.sessio())
+        let r = try await a.peiliRaaka(tiedosto: "scopes macos/abc.jsonl", rivi: 5, maara: 10)
+        XCTAssertEqual(r.rivi, 5)
+        XCTAssertNil(r.seuraava)
+        let req = try XCTUnwrap(pyynnot.kaikki.first)
+        XCTAssertEqual(req.httpMethod, "GET")
+        XCTAssertEqual(req.url?.absoluteString, "http://127.0.0.1:18999/api/peili/scopes%20macos%2Fabc.jsonl/raaka?rivi=5&maara=10")
+        XCTAssertEqual(req.value(forHTTPHeaderField: "Authorization"), "Bearer testiavain")
+    }
+
     // MARK: oikea ydin (T-54:n XCFramework)
 
     private func kokoYdimelta(ikkuna: Int?, katto: Int) async throws -> PeiliKoko {

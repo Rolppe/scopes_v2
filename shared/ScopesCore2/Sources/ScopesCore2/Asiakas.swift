@@ -87,6 +87,13 @@ public final class Asiakas: Sendable {
         return koko
     }
 
+    /// S-9f: GET /api/peili/<tiedosto>/raaka?rivi=&maara= (rivi 1-pohjainen, maara 1…200; ikkunoitu solmu välittää täydelle).
+    public func peiliRaaka(tiedosto: String, rivi: Int, maara: Int = 50) async throws -> PeiliRaaka {
+        let polku = "/api/peili/\(Asiakas.koodaa(tiedosto))/raaka?rivi=\(rivi)&maara=\(maara)"
+        let (raaka, _): (PeiliRaaka, lahde: String?) = try await hae(polku)
+        return raaka
+    }
+
     /// NDJSON-virta (esim. POST /api/chat/virta); yksi ChatTapahtuma per rivi, virta päättyy yhteyden loppuun.
     public func virta(_ polku: String, runko: Encodable) -> AsyncThrowingStream<ChatTapahtuma, Error> {
         AsyncThrowingStream { jatko in
