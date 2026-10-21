@@ -596,3 +596,111 @@ async fn tyhja_lista_tunnettu_mutta_ei_reitteja() {
     assert_eq!(v.status(), StatusCode::OK);
     assert_eq!(v.headers()["x-lahde"], "silta");
 }
+
+/// (k) T-91: adapterin ottama `GET /api/agentit` vastaa `x-lahde: adapteri`; runko ennallaan,
+/// `since` nollauksena kuten sillalla.
+#[tokio::test]
+async fn agentit_adapterilta_kantaa_lahteen_adapteri() {
+    let vanha = Mock::kaynnista("vanha", &[]).await;
+    let adapteri = Mock::kaynnista("adapteri", &["GET /api/agentit"]).await;
+    let ydin = Ydin::kaynnista(Some(vanha.osoite.clone()), Some(adapteri.osoite.clone())).await;
+    ydin.odota_lista().await;
+
+    let v = ydin
+        .pyynto(reqwest::Method::GET, "/api/agentit")
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(v.status(), 200);
+    assert_eq!(v.headers()["x-lahde"], "adapteri");
+    let j: Value = v.json().await.unwrap();
+    assert_eq!(j["kohde"], "adapteri");
+    assert_eq!(j["polku"], "/api/agentit");
+    assert_eq!(j["auth"], format!("Bearer {AVAIN}"));
+
+    let v = ydin
+        .pyynto(reqwest::Method::GET, "/api/agentit?since=0")
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(v.status(), 200);
+    assert_eq!(v.headers()["x-lahde"], "adapteri");
+    let j: Value = v.json().await.unwrap();
+    assert_eq!(j["nollaus"], true);
+    assert_eq!(j["poistetut"], json!([]));
+    let muuttuneet = j["muuttuneet"].as_array().unwrap();
+    assert_eq!(muuttuneet.len(), 1);
+    assert_eq!(muuttuneet[0]["kohde"], "adapteri");
+    assert_eq!(muuttuneet[0]["polku"], "/api/agentit");
+    assert_eq!(vanha.pyyntoja(), 0);
+}
+
+/// (l) T-91: adapteri julkaisee reitin mutta on sammutettu: 503 `adapteri` + `x-lahde: adapteri`,
+/// vanha ei saa pyyntöä.
+#[tokio::test]
+async fn agentit_adapteri_sammutettu_503_lahde_adapteri() {
+    let vanha = Mock::kaynnista("vanha", &[]).await;
+    let mut adapteri = Mock::kaynnista("adapteri", &["GET /api/agentit"]).await;
+    let ydin = Ydin::kaynnista(Some(vanha.osoite.clone()), Some(adapteri.osoite.clone())).await;
+    ydin.odota_lista().await;
+    adapteri.sammuta().await;
+    for polku in ["/api/agentit", "/api/agentit?since=0"] {
+        let v = ydin
+            .pyynto(reqwest::Method::GET, polku)
+            .send()
+            .await
+            .unwrap();
+        assert_eq!(v.status(), 503, "{polku}");
+        assert_eq!(v.headers()["x-lahde"], "adapteri", "{polku}");
+        let j: Value = v.json().await.unwrap();
+        assert_eq!(
+            j,
+            json!({"virhe": "adapteri", "kohde": adapteri.osoite}),
+            "{polku}"
+        );
+    }
+    assert_eq!(vanha.pyyntoja(), 0, "vanha sai pyynnön adapterin sijaan");
+}
+
+/// (m) T-91: ilman `--adapteria` tai kun adapteri ei julkaise reittiä `GET /api/agentit` vastaa
+/// `x-lahde: silta` vanhan mockin rungolla.
+#[tokio::test]
+async fn agentit_ilman_adapteria_lahde_silta() {
+    // Ilman adapteria.
+    let vanha = Mock::kaynnista("vanha", &[]).await;
+    let ydin = Ydin::kaynnista(Some(vanha.osoite.clone()), None).await;
+    let v = ydin
+        .pyynto(reqwest::Method::GET, "/api/agentit")
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(v.status(), 200);
+    assert_eq!(v.headers()["x-lahde"], "silta");
+    let j: Value = v.json().await.unwrap();
+    assert_eq!(j["kohde"], "vanha");
+
+    // Adapteri käynnissä, mutta ei julkaise reittiä.
+    for julkaisu in [vec![], vec!["POST /api/skoopit/*/viesti"]] {
+        let vanha = Mock::kaynnista("vanha", &[]).await;
+        let adapteri = Mock::kaynnista("adapteri", &julkaisu).await;
+        let ydin = Ydin::kaynnista(Some(vanha.osoite.clone()), Some(adapteri.osoite.clone())).await;
+        ydin.odota_lista().await;
+        for polku in ["/api/agentit", "/api/agentit?since=0"] {
+            let v = ydin
+                .pyynto(reqwest::Method::GET, polku)
+                .send()
+                .await
+                .unwrap();
+            assert_eq!(v.status(), 200, "{polku} {julkaisu:?}");
+            assert_eq!(v.headers()["x-lahde"], "silta", "{polku} {julkaisu:?}");
+            let j: Value = v.json().await.unwrap();
+            let j = if polku.contains("since") {
+                j["muuttuneet"][0].clone()
+            } else {
+                j
+            };
+            assert_eq!(j["kohde"], "vanha", "{polku} {julkaisu:?}");
+        }
+        assert_eq!(adapteri.pyyntoja(), 0, "{julkaisu:?}");
+    }
+}

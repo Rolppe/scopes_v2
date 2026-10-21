@@ -99,11 +99,12 @@ pub fn muistiloki(vaihe: &str) {
 
 // ---- vastaus -----------------------------------------------------------------------------------------------------
 
-/// Kumpi vastasi: ydin (johdettu) vai silta (vanha 8787).
+/// Kumpi vastasi: ydin (johdettu), silta (vanha 8787) vai adapteri (ARK-16, kun se on ottanut reitin).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Lahde {
     Ydin,
     Silta,
+    Adapteri,
 }
 
 /// Johdetun reitin vastaus. Sillan ei-JSON-runko kulkee merkkijonona alkuperäisellä sisältötyypillä.
@@ -140,6 +141,7 @@ impl IntoResponse for Vastaus {
         let lahde = HeaderValue::from_static(match self.lahde {
             Lahde::Ydin => "ydin",
             Lahde::Silta => "silta",
+            Lahde::Adapteri => "adapteri",
         });
         // Sisältötyyppi on vain sillan ei-JSON-rungolla: runko sellaisenaan.
         let mut r = match (self.runko, self.tyyppi) {
@@ -181,13 +183,20 @@ async fn silta_hae(tila: &Tila, polku: &str) -> Vastaus {
     };
     let r = silta::valita(tila, req).await;
     let koodi = r.status();
+    // Lähde perii `valita`n vastauksen `x-lahde`-otsakkeesta (adapteri vai vanha silta).
+    let lahde = if r.headers().get("x-lahde").map(|v| v.as_bytes()) == Some(b"adapteri".as_slice())
+    {
+        Lahde::Adapteri
+    } else {
+        Lahde::Silta
+    };
     let tyyppi = r.headers().get(header::CONTENT_TYPE).cloned();
     let tavut = match axum::body::to_bytes(r.into_body(), SILTA_RAJA).await {
         Ok(t) => t,
         Err(_) => {
             return Vastaus {
                 runko: json!({"virhe": "silta", "kohde": "8787"}),
-                lahde: Lahde::Silta,
+                lahde,
                 koodi: StatusCode::BAD_GATEWAY,
                 tyyppi: None,
             }
@@ -201,7 +210,7 @@ async fn silta_hae(tila: &Tila, polku: &str) -> Vastaus {
     };
     Vastaus {
         runko,
-        lahde: Lahde::Silta,
+        lahde,
         koodi,
         tyyppi,
     }
