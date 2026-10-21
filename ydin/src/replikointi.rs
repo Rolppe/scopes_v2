@@ -11,8 +11,9 @@ use crate::peili;
 use crate::vertaiset::Vertainen;
 use crate::yksikko::{vertaa, Hlc, Versio, Vertailu, Yksikko};
 use axum::{
+    body::{Body, Bytes},
     extract::{Query, State},
-    http::StatusCode,
+    http::{header, StatusCode},
     response::{IntoResponse, Response},
     routing::{get, post},
     Json, Router,
@@ -192,6 +193,7 @@ pub fn tiivisteet(tila: &Tila) -> crate::muutosloki::Result<(u64, BTreeMap<Strin
 
 /// `?polku=p` → yhden polun tiiviste; ilman polkua → `{"seq":…,"tiivisteet":{polku:tiiviste}}`.
 async fn tiiviste(State(t): State<Arc<Tila>>, Query(k): Query<PolkuKysely>) -> Response {
+    crate::nakymat::muistiloki_kerran("tiiviste_alku");
     match k.polku {
         Some(p) => match crate::tila::tiiviste(&t, &p) {
             Ok(h) => Json(json!({"polku": p, "tiiviste": h.unwrap_or_default()})).into_response(),
@@ -212,6 +214,7 @@ async fn tiiviste(State(t): State<Arc<Tila>>, Query(k): Query<PolkuKysely>) -> R
 }
 
 async fn listat(State(t): State<Arc<Tila>>, Query(k): Query<PolkuKysely>) -> Response {
+    crate::nakymat::muistiloki_kerran("listat_alku");
     let Some(p) = k.polku else {
         return virhe(StatusCode::BAD_REQUEST, "polku puuttuu");
     };
@@ -239,12 +242,27 @@ async fn listat(State(t): State<Arc<Tila>>, Query(k): Query<PolkuKysely>) -> Res
 }
 
 async fn hae(State(t): State<Arc<Tila>>, Json(p): Json<HaePyynto>) -> Response {
+    // T-76: ensimmäinen palveltu /api/hae; alussa huippu sisältää jo edeltävät /api/tiiviste ja /api/listat.
+    static ENSIMMAINEN: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(true);
+    let ensimmainen = crate::nakymat::muistiloki_paalla()
+        && ENSIMMAINEN.swap(false, std::sync::atomic::Ordering::Relaxed);
+    if ensimmainen {
+        crate::nakymat::muistiloki("hae_alku");
+    }
+    let vastaus = hae_vastaus(&t, &p);
+    if ensimmainen {
+        crate::nakymat::muistiloki("hae_ensimmainen");
+    }
+    vastaus
+}
+
+fn hae_vastaus(t: &Tila, p: &HaePyynto) -> Response {
     if p.idt.len() > ERA {
         return virhe(StatusCode::BAD_REQUEST, "enintään 300 tunnusta");
     }
     let mut ys = Vec::new();
     let mut tavut = 0usize;
-    if ei_lahde(&t, &p.polku) {
+    if ei_lahde(t, &p.polku) {
         return Json(YksikotUlos {
             yksikot: &ys,
             jatko: &[],
@@ -253,14 +271,10 @@ async fn hae(State(t): State<Arc<Tila>>, Json(p): Json<HaePyynto>) -> Response {
     }
     for (i, id) in p.idt.iter().enumerate() {
         match t.varasto.lue(&p.polku, id) {
-            Ok(Some(y)) if crate::tila::nakyy(&t, &y) => {
+            Ok(Some(y)) if crate::tila::nakyy(t, &y) => {
                 let koko = y.sisalto.as_ref().map_or(0, Vec::len);
                 if !ys.is_empty() && tavut + koko > HAE_TAVUT {
-                    return Json(YksikotUlos {
-                        yksikot: &ys,
-                        jatko: &p.idt[i..],
-                    })
-                    .into_response();
+                    return hae_runko(ys, &p.idt[i..]);
                 }
                 tavut += koko;
                 ys.push(y);
@@ -270,11 +284,148 @@ async fn hae(State(t): State<Arc<Tila>>, Json(p): Json<HaePyynto>) -> Response {
             Err(e) => return sisainen(e),
         }
     }
-    Json(YksikotUlos {
-        yksikot: &ys,
-        jatko: &[],
-    })
-    .into_response()
+    hae_runko(ys, &[])
+}
+
+/// `/api/hae`-vastauksen palan koko (T-76).
+const HAE_PALA: usize = 64 * 1024;
+
+/// `/api/hae`-vastauksen osa: valmis JSON tai sisällön tavutaulukko (`[n,n,…]`), joka kirjoitetaan
+/// paloina vasta lähetettäessä.
+enum HaeOsa {
+    Json(Vec<u8>),
+    Tavut(Vec<u8>),
+}
+
+/// Sisällöttömän yksikön JSONin loppu `null,"poistettu":<b>}` (kenttäjärjestys `Yksikko`n mukaan).
+fn tyhja_loppu(poistettu: bool) -> Vec<u8> {
+    format!("null,\"poistettu\":{poistettu}}}").into_bytes()
+}
+
+/// Tavutaulukon JSON-pituus kuten serde_jsonilla (`[` + luvut pilkuin + `]`).
+fn tavutaulukon_pituus(b: &[u8]) -> usize {
+    2 + b.len().saturating_sub(1)
+        + b.iter()
+            .map(|&x| 1 + usize::from(x >= 10) + usize::from(x >= 100))
+            .sum::<usize>()
+}
+
+/// T-76: `Json(YksikotUlos { .. })` tavulleen samana, mutta sisältöjen tavutaulukot (~3,6 × raakatavut)
+/// kirjoitetaan enintään `HAE_PALA`n paloina eikä koko vastausta koota yhteen puskuriin; Content-Length
+/// lasketaan etukäteen. Yksikön muu osa sarjallistetaan serde_jsonilla ilman sisältöä (`"sisalto":null`
+/// korvataan tavutaulukolla); odottamaton muoto → koko vastaus serde_jsonilla kuten ennen.
+fn hae_runko(ys: Vec<Yksikko>, jatko: &[String]) -> Response {
+    // Yksiköt ilman sisältöä serde_jsonilla; sisällöllisen on päätyttävä `null,"poistettu":<b>}`.
+    let mut alut: Vec<Vec<u8>> = Vec::with_capacity(ys.len());
+    for y in &ys {
+        let otsake = Yksikko {
+            polku: y.polku.clone(),
+            id: y.id.clone(),
+            versio: y.versio.clone(),
+            aika: y.aika.clone(),
+            sisalto: None,
+            poistettu: y.poistettu,
+        };
+        let Ok(alku) = serde_json::to_vec(&otsake) else {
+            return sisainen("hae: sarjallistus");
+        };
+        if y.sisalto.is_some() && !alku.ends_with(tyhja_loppu(y.poistettu).as_slice()) {
+            return Json(YksikotUlos {
+                yksikot: &ys,
+                jatko,
+            })
+            .into_response();
+        }
+        alut.push(alku);
+    }
+    let mut osat: Vec<HaeOsa> = vec![HaeOsa::Json(b"{\"yksikot\":[".to_vec())];
+    let mut pituus = 12usize;
+    for (i, (y, mut alku)) in ys.into_iter().zip(alut).enumerate() {
+        if i > 0 {
+            alku.insert(0, b',');
+        }
+        let Some(sisalto) = y.sisalto else {
+            pituus += alku.len();
+            osat.push(HaeOsa::Json(alku));
+            continue;
+        };
+        let tyhja = tyhja_loppu(y.poistettu);
+        alku.truncate(alku.len() - tyhja.len());
+        let loppu = tyhja[b"null".len()..].to_vec();
+        pituus += alku.len() + tavutaulukon_pituus(&sisalto) + loppu.len();
+        osat.push(HaeOsa::Json(alku));
+        osat.push(HaeOsa::Tavut(sisalto));
+        osat.push(HaeOsa::Json(loppu));
+    }
+    let mut loppu = b"]".to_vec();
+    if !jatko.is_empty() {
+        loppu.extend_from_slice(b",\"jatko\":");
+        match serde_json::to_vec(jatko) {
+            Ok(j) => loppu.extend_from_slice(&j),
+            Err(_) => return sisainen("hae: sarjallistus"),
+        }
+    }
+    loppu.push(b'}');
+    pituus += loppu.len();
+    osat.push(HaeOsa::Json(loppu));
+    let palat = osat
+        .into_iter()
+        .flat_map(|o| -> Box<dyn Iterator<Item = Bytes> + Send> {
+            match o {
+                HaeOsa::Json(j) => Box::new(std::iter::once(Bytes::from(j))),
+                HaeOsa::Tavut(b) => Box::new(TavuPalat { b, i: 0 }),
+            }
+        });
+    let runko = Body::from_stream(futures::stream::iter(
+        palat.map(Ok::<Bytes, std::convert::Infallible>),
+    ));
+    (
+        [
+            (header::CONTENT_TYPE, "application/json".to_string()),
+            (header::CONTENT_LENGTH, pituus.to_string()),
+        ],
+        runko,
+    )
+        .into_response()
+}
+
+/// Tavutaulukko `[n,n,…]` enintään `HAE_PALA`n paloina.
+struct TavuPalat {
+    b: Vec<u8>,
+    i: usize,
+}
+
+impl Iterator for TavuPalat {
+    type Item = Bytes;
+
+    fn next(&mut self) -> Option<Bytes> {
+        if self.i > self.b.len() {
+            return None;
+        }
+        let mut ulos = Vec::with_capacity(HAE_PALA + 8);
+        if self.i == 0 {
+            ulos.push(b'[');
+        }
+        while self.i < self.b.len() && ulos.len() < HAE_PALA {
+            if self.i > 0 {
+                ulos.push(b',');
+            }
+            let x = self.b[self.i];
+            if x >= 100 {
+                ulos.push(b'0' + x / 100);
+            }
+            if x >= 10 {
+                ulos.push(b'0' + x / 10 % 10);
+            }
+            ulos.push(b'0' + x % 10);
+            self.i += 1;
+        }
+        if self.i == self.b.len() {
+            ulos.push(b']');
+            self.i += 1;
+        }
+        Some(Bytes::from(ulos))
+    }
 }
 
 async fn laheta(State(t): State<Arc<Tila>>, Json(p): Json<LahetaPyynto>) -> Response {
