@@ -354,9 +354,10 @@ async fn johdetut_vastaavat_8787_fixtureita() {
     vastaa_fixturea(
         &r,
         &fixture_json("viestit-scopes macos.json"),
-        &["/istunto/nimi"],
+        &["/istunto/nimi", "/istunto/transkripti"],
     );
     assert_eq!(r["istunto"]["nimi"], Value::Null);
+    assert_eq!(r["istunto"]["transkripti"], TIEDOSTO);
     assert_eq!(r["viestit"].as_array().unwrap().len(), 17);
 
     let (k, l, r) = y.hae("/api/skoopit/test/viestit").await;
