@@ -69,7 +69,11 @@ struct ScopesV2App: App {
             vanha: vertainen,
             headless: UserDefaults.standard.bool(forKey: "scopes2.headless"),
             laite: Oletukset.laite(),
-            portti: Oletukset.testiPortti()
+            portti: Oletukset.testiPortti(),
+            // T-58 (S-9): laitekohtainen peilin ikkuna; oletus fyysisellä laitteella 7 vrk / 38 Mt, simulaattorissa täysi solmu (P-17).
+            // Argumentti -scopes2.peili-ikkuna-vrk <n> pakottaa ikkunan simulaattorissa (UI-testit).
+            peiliIkkunaVrk: Oletukset.peiliIkkunaVrk(),
+            peiliKattoMt: Oletukset.peiliKattoMt()
         )
     }
 }

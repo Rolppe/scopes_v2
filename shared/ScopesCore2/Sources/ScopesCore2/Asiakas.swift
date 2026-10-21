@@ -81,6 +81,12 @@ public final class Asiakas: Sendable {
         return try await laheta(req)
     }
 
+    /// S-9: GET /api/peili/koko; ikkunaVrk on nil täydellä solmulla.
+    public func peiliKoko() async throws -> PeiliKoko {
+        let (koko, _): (PeiliKoko, lahde: String?) = try await hae("/api/peili/koko")
+        return koko
+    }
+
     /// NDJSON-virta (esim. POST /api/chat/virta); yksi ChatTapahtuma per rivi, virta päättyy yhteyden loppuun.
     public func virta(_ polku: String, runko: Encodable) -> AsyncThrowingStream<ChatTapahtuma, Error> {
         AsyncThrowingStream { jatko in
