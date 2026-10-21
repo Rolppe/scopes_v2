@@ -283,10 +283,15 @@ impl Kohde<'_> {
     fn alas(&self) -> Response {
         match self {
             Kohde::Vanha(_) => silta_alas(),
-            Kohde::Adapteri(url) => virhe_vastaus(
-                StatusCode::SERVICE_UNAVAILABLE,
-                json!({"virhe": "adapteri", "kohde": url}),
-            ),
+            Kohde::Adapteri(url) => {
+                let mut r = virhe_vastaus(
+                    StatusCode::SERVICE_UNAVAILABLE,
+                    json!({"virhe": "adapteri", "kohde": url}),
+                );
+                r.headers_mut()
+                    .insert("x-lahde", HeaderValue::from_static("adapteri"));
+                r
+            }
         }
     }
 }
