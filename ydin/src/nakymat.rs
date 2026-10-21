@@ -2134,9 +2134,33 @@ pub fn kaynnista_valilla(tila: Arc<Tila>, vali: Duration) -> tokio::task::JoinHa
                 paivita_silta(&tila, &n).await;
             }
         };
+        // S-9d (T-75): pohja heti. Käynnistyksessä, tasauksen, virran erän ja karsinnan jälkeen merkityt tiedostot
+        // saavat pohjan (enintään `POHJAKIERROS` kierroksella); tallennettu pohja rakentaa näkymän uudelleen
+        // ilman näkymäpyyntöä. Virhe: lokiin, ei uusintasilmukkaa; seuraava herätys yrittää uudelleen.
+        let pohjat = async {
+            if tila.peili.ikkuna_vrk.is_none() {
+                return std::future::pending::<()>().await;
+            }
+            if let Err(e) = peili::merkitse_kaikki_pohjaa_vailla(&tila) {
+                eprintln!("nakymat: pohjien merkintä: {e}");
+            }
+            loop {
+                let kierros = peili::hae_pohjakierros(&tila).await;
+                if let Some(e) = &kierros.virhe {
+                    eprintln!("nakymat: pohjan haku: {e}");
+                }
+                if kierros.tallennettu > 0 {
+                    if let Err(e) = n.paivita(&tila) {
+                        eprintln!("nakymat: {e}");
+                    }
+                }
+                tila.peili.pohja_herate.notified().await;
+            }
+        };
         tokio::select! {
             _ = seuraa => {}
             _ = silta => {}
+            _ = pohjat => {}
         }
     })
 }

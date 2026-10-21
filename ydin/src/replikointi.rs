@@ -413,6 +413,8 @@ async fn veda_ikkunaan(
         .map(|r| r.id)
         .collect();
     hae_erissa(tila, v, http, p, &haettavat).await?;
+    // T-75: kirjoitetut tiedostot saavat pohjan heti samalta täydeltä vertaiselta (S-9d).
+    peili::merkitse_pohjaa_vailla(tila, haettavat.iter().map(String::as_str), Some(v));
     Ok(haettavat.len())
 }
 
@@ -538,6 +540,11 @@ async fn sovella(
     for (polku, idt) in ryhmat {
         let idt: Vec<String> = idt.into_iter().collect();
         hae_erissa(tila, v, http, &polku, &idt).await?;
+        // T-75: virran erän kirjoittamat tiedostot saavat pohjan heti; ikkunoitu vertainen ei ole lähde.
+        if polku == peili::POLKU {
+            let lahde = (!ohitettavat.contains(&polku)).then_some(v);
+            peili::merkitse_pohjaa_vailla(tila, idt.iter().map(String::as_str), lahde);
+        }
     }
     tila.varasto.aseta_kursori(&v.id, viimeinen)?;
     Ok(Some(viimeinen))
