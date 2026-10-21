@@ -310,6 +310,71 @@ fn tynkarivi(tyyppi: Option<&Value>) -> String {
     json!({"type": tyyppi, "karsittu": true}).to_string()
 }
 
+/// Työkalun `input`-avaimet, jotka näkymän `tyokalu_rivi` lukee (`nakymat.rs`); muut pudotetaan (S-9a T-74).
+const TYOKALUN_AVAIMET: [&str; 7] = [
+    "command",
+    "file_path",
+    "notebook_path",
+    "path",
+    "pattern",
+    "description",
+    "subagent_type",
+];
+
+/// Merkkijonon ensimmäinen rivi, enintään 2 000 merkkiä (UTF-8-rajalla).
+fn ensimmainen_rivi(s: &str) -> String {
+    s.split('\n')
+        .next()
+        .unwrap_or("")
+        .chars()
+        .take(2000)
+        .collect()
+}
+
+/// `tool_use`-lohko → `{type, id, name, input'}` (S-9a T-74): AskUserQuestionilla `input'` = `{questions}`
+/// kokonaan, muilla vain `TYOKALUN_AVAIMET`, merkkijonoista ensimmäinen rivi.
+fn riisu_tyokalu(l: &Value) -> Value {
+    let mut ulos = serde_json::Map::new();
+    for avain in ["type", "id", "name"] {
+        if let Some(v) = l.get(avain) {
+            ulos.insert(avain.to_string(), v.clone());
+        }
+    }
+    let mut syote = serde_json::Map::new();
+    if let Some(Value::Object(i)) = l.get("input") {
+        if l.get("name").and_then(Value::as_str) == Some("AskUserQuestion") {
+            if let Some(q) = i.get("questions") {
+                syote.insert("questions".to_string(), q.clone());
+            }
+        } else {
+            for avain in TYOKALUN_AVAIMET {
+                match i.get(avain) {
+                    Some(Value::String(s)) => {
+                        syote.insert(avain.to_string(), Value::String(ensimmainen_rivi(s)));
+                    }
+                    Some(v) => {
+                        syote.insert(avain.to_string(), v.clone());
+                    }
+                    None => {}
+                }
+            }
+        }
+    }
+    ulos.insert("input".to_string(), Value::Object(syote));
+    Value::Object(ulos)
+}
+
+/// `tool_result`-lohko → `{type, tool_use_id}`.
+fn riisu_tulos(l: &Value) -> Value {
+    let mut ulos = serde_json::Map::new();
+    for avain in ["type", "tool_use_id"] {
+        if let Some(v) = l.get(avain) {
+            ulos.insert(avain.to_string(), v.clone());
+        }
+    }
+    Value::Object(ulos)
+}
+
 fn riisu_rivi(rivi: &str) -> String {
     let Ok(Value::Object(o)) = serde_json::from_str::<Value>(rivi) else {
         return tynkarivi(None);
@@ -322,19 +387,49 @@ fn riisu_rivi(rivi: &str) -> String {
     let sisalto = match viesti.and_then(|m| m.get("content")) {
         Some(Value::String(s)) if !s.is_empty() => Some(Value::String(s.clone())),
         Some(Value::Array(a)) => {
-            let tekstit: Vec<Value> = a.iter().filter(|l| teksti_lohko(l)).cloned().collect();
-            (!tekstit.is_empty()).then_some(Value::Array(tekstit))
+            let lohkot: Vec<Value> = a
+                .iter()
+                .filter_map(|l| {
+                    if teksti_lohko(l) {
+                        return Some(l.clone());
+                    }
+                    match l.get("type").and_then(Value::as_str) {
+                        Some("tool_use") => Some(riisu_tyokalu(l)),
+                        Some("tool_result") => Some(riisu_tulos(l)),
+                        _ => None,
+                    }
+                })
+                .collect();
+            (!lohkot.is_empty()).then_some(Value::Array(lohkot))
         }
         _ => None,
     };
-    let Some(sisalto) = sisalto else {
+    // Lohkoton rivi, jolla on model tai effort, säilyy content []:lla (näkymä päivittää niistä mallin ja effortin).
+    let mallitieto = viesti.and_then(|m| m.get("model")).is_some()
+        || o.contains_key("effort")
+        || o.contains_key("perTurnEffort");
+    let Some(sisalto) = sisalto.or_else(|| mallitieto.then(|| Value::Array(Vec::new()))) else {
         return tynkarivi(tyyppi);
     };
     let mut ulos = serde_json::Map::new();
-    for avain in ["type", "timestamp", "uuid"] {
+    for avain in [
+        "type",
+        "timestamp",
+        "uuid",
+        "isSidechain",
+        "isMeta",
+        "perTurnEffort",
+        "effort",
+    ] {
         if let Some(v) = o.get(avain) {
             ulos.insert(avain.to_string(), v.clone());
         }
+    }
+    if let Some(vastaukset) = o.get("toolUseResult").and_then(|t| t.get("answers")) {
+        ulos.insert(
+            "toolUseResult".to_string(),
+            json!({ "answers": vastaukset }),
+        );
     }
     let mut viesti_ulos = serde_json::Map::new();
     for avain in ["role", "model"] {
@@ -347,10 +442,14 @@ fn riisu_rivi(rivi: &str) -> String {
     Value::Object(ulos).to_string()
 }
 
-/// S-9a: riisuu transkriptirivit viestiteksteiksi. Rivi, jonka type on "user" tai "assistant", säilyttää
-/// avaimet type, timestamp, uuid, message.role, message.model ja message.content (merkkijono sellaisenaan,
-/// taulukosta vain text-lohkot); muu rivi tai rivi, josta ei jää tekstiä, on tyngän
-/// `{"type":<alkuperäinen|null>,"karsittu":true}`. Pituus on sama kuin syötteen.
+/// S-9a (T-74): riisuu transkriptirivit näkymän tarpeeseen. Rivi, jonka type on "user" tai "assistant", säilyttää
+/// avaimet type, timestamp, uuid, isSidechain, isMeta, perTurnEffort, effort, toolUseResult.answers sekä
+/// message.role, message.model ja message.content. Content: merkkijono sellaisenaan; taulukosta text-lohko
+/// sellaisenaan, tool_use → {type, id, name, input} (AskUserQuestionilla input = {questions}, muilla vain
+/// command, file_path, notebook_path, path, pattern, description ja subagent_type, merkkijonosta ensimmäinen rivi
+/// enintään 2 000 merkkiä), tool_result → {type, tool_use_id}; muut lohkot pois. Rivi, josta ei jää yhtään lohkoa
+/// tai merkkijonoa mutta jolla on message.model, effort tai perTurnEffort, säilyy content []:lla; muu rivi tai
+/// lohkoton rivi ilman niitä on tyngän `{"type":<alkuperäinen|null>,"karsittu":true}`. Pituus on sama kuin syötteen.
 pub fn riisu(rivit: &[String]) -> Vec<String> {
     rivit.iter().map(|r| riisu_rivi(r)).collect()
 }

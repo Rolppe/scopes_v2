@@ -167,18 +167,26 @@ fn riisu_sailyttaa_tekstin_ja_tyngaa_muun() {
         json!({"type":"user","timestamp":"2026-10-20T10:00:00Z","uuid":"u1",
                "message":{"role":"user","content":"hei"}})
     );
-    // Taulukosta vain text-lohkot; model säilyy, id ja requestId pois.
+    // Taulukosta text- ja tool_use-lohkot (S-9a T-74); model säilyy, id, requestId ja thinking pois.
     assert_eq!(
         v[1],
         json!({"type":"assistant","timestamp":"2026-10-20T10:00:01Z","uuid":"a1",
-               "message":{"role":"assistant","model":"m-1","content":[{"type":"text","text":"moi"}]}})
+               "message":{"role":"assistant","model":"m-1","content":[{"type":"text","text":"moi"},
+                   {"type":"tool_use","id":"t","name":"Bash","input":{}}]}})
     );
-    // tool_result / tool_use ilman tekstiä, muu type ja ei-JSON -> tynkä.
-    assert_eq!(v[2], json!({"type":"user","karsittu":true}));
-    assert_eq!(v[3], json!({"type":"assistant","karsittu":true}));
+    // tool_result ilman sisältöä ja tool_use säilyvät; muu type ja ei-JSON -> tynkä.
+    assert_eq!(
+        v[2],
+        json!({"type":"user","uuid":"u2",
+               "message":{"role":"user","content":[{"type":"tool_result","tool_use_id":"t"}]}})
+    );
+    assert_eq!(
+        v[3],
+        json!({"type":"assistant","uuid":"a2",
+               "message":{"role":"assistant","content":[{"type":"tool_use","id":"t2","name":"Read","input":{}}]}})
+    );
     assert_eq!(v[4], json!({"type":"summary","karsittu":true}));
     assert_eq!(v[5], json!({"type":null,"karsittu":true}));
-    assert!(!ulos.concat().contains("tool_use"));
     assert!(!ulos.concat().contains("thinking"));
 }
 
