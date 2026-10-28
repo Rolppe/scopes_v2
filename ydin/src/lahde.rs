@@ -16,7 +16,14 @@ use axum::{
 use serde_json::{json, Value};
 use std::sync::{Arc, Mutex};
 
-const LAJIT: [&str; 5] = ["istunnot", "agy", "android", "kayttoraja", "asetukset"];
+const LAJIT: [&str; 6] = [
+    "istunnot",
+    "agy",
+    "android",
+    "kayttoraja",
+    "asetukset",
+    "jono",
+];
 
 /// Sarjoittaa lue-laske-kirjoita-jakson, jotta kaksi samanaikaista POST:ia ei saa samaa HLC:tä.
 static KIRJOITUS: Mutex<()> = Mutex::new(());

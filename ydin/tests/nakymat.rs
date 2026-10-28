@@ -28,6 +28,9 @@ use std::time::Duration;
 static LASKURI: AtomicU32 = AtomicU32::new(0);
 const AVAIN: &str = "koeavain-1234";
 const MACOS: &str = "scopes macos";
+const KORD: &str = "scopes kordinaattori";
+/// Sillan (mock) jonorivi: erottuu ytimen `lahde/jono`-julkaisusta.
+const SILTAJONO: &str = "silta-jono";
 const ISTUNTO: &str = "28f5f18b-5ca1-41d3-9ebd-680e09cfd7bd";
 const TIEDOSTO: &str = "-home-user-palvelin/28f5f18b-5ca1-41d3-9ebd-680e09cfd7bd.jsonl";
 
@@ -119,7 +122,7 @@ async fn mock_skooppi(Path(nimi): Path<String>) -> Response {
             .iter()
             .any(|s| s["nimi"] == muu) =>
         {
-            Json(json!({"nimi": muu, "istunnot": [], "jonossa": []})).into_response()
+            Json(json!({"nimi": muu, "istunnot": [], "jonossa": [SILTAJONO]})).into_response()
         }
         _ => (
             StatusCode::NOT_FOUND,
@@ -418,6 +421,57 @@ async fn lahde_puuttuu_silta_vastaa() {
 
     let (k, _, _) = y.hae("/api/skoopit?since=x").await;
     assert_eq!(k, StatusCode::BAD_REQUEST);
+}
+
+#[tokio::test]
+async fn jonossa_lahde_jonosta_muuten_sillasta() {
+    let y = Ydin::kaynnista().await;
+    y.syota().await;
+    let polku = format!("/api/skoopit/{}", KORD.replace(' ', "%20"));
+
+    // (a) Ei lahde/jono-julkaisua: kenttä sillasta kuten ennen.
+    let (k, l, r) = y.hae(&polku).await;
+    assert_eq!((k, l.as_str()), (StatusCode::OK, "ydin"));
+    assert_eq!(r["jonossa"], json!([SILTAJONO]));
+
+    // (b) lahde/jono julkaistu: kenttä siitä, X-Lahde: ydin; muut skoopit eivät saa toisen jonoa.
+    let s = y.seq().await;
+    let jono = json!([{"komento": "/pakkaa", "aika": "2026-10-28T10:00:00.000Z"}]);
+    y.lahde("jono", json!({"laite": "puhelin", "sisalto": {KORD: jono}}))
+        .await;
+    let (k, l, r) = y.hae(&polku).await;
+    assert_eq!((k, l.as_str()), (StatusCode::OK, "ydin"));
+    assert_eq!(r["jonossa"], jono);
+
+    // (c) Skooppi puuttuu julkaisusta: tyhjä lista.
+    let (k, l, r) = y.hae("/api/skoopit/test").await;
+    assert_eq!((k, l.as_str()), (StatusCode::OK, "ydin"));
+    assert_eq!(r["jonossa"], json!([]));
+
+    // since: jonon muutos tuo skoopin muuttuneisiin.
+    let (_, _, r) = y.hae(&format!("{polku}?since={s}")).await;
+    assert_eq!(r["muuttuneet"].as_array().unwrap().len(), 1, "{r}");
+    assert_eq!(r["muuttuneet"][0]["jonossa"], jono);
+    let s2 = y.seq().await;
+    let (_, _, r) = y.hae(&format!("{polku}?since={s2}")).await;
+    assert_eq!(r["muuttuneet"], json!([]));
+
+    // Uusi julkaisu (tyhjä jono = {}): kenttä tyhjenee.
+    y.lahde("jono", json!({"laite": "puhelin", "sisalto": {}}))
+        .await;
+    let (_, _, r) = y.hae(&format!("{polku}?since={s2}")).await;
+    assert_eq!(r["muuttuneet"][0]["jonossa"], json!([]));
+
+    // (d) Tuntematon laji yhä 400.
+    let v = y
+        .asiakas
+        .post(format!("{}/api/lahde/tuntematon", y.osoite))
+        .bearer_auth(AVAIN)
+        .json(&json!({"laite": "x", "sisalto": {}}))
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(v.status(), 400);
 }
 
 #[tokio::test]

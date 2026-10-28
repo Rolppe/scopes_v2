@@ -8,7 +8,7 @@
 //! Rekisterikentät (R-1): `seuraava`, `avoimet`, `viat` (yksityiskohta) ja `seuraava`, `avoimia`, `vikoja` (lista)
 //! sekä `/api/rekisterit/<p>`:n osat johdetaan ytimen `rekisterit/<p>`-yksiköistä (`lr::teksti`), kun päärekisteri
 //! `p` on ytimessä; muuten sillasta. Skooppi→rekisteri-kartta ja kontekstikentät (rekisterit, konteksti, jonossa)
-//! tulevat yhä sillasta. Ytimen lähteestä johdetaan istuntokentät.
+//! tulevat yhä sillasta; `jonossa` tulee ytimen `lahde/jono`sta, kun se on julkaistu, muuten sillasta. Ytimen lähteestä johdetaan istuntokentät.
 //! Lähde puuttuu (ei yhtään laitetta `lahde/istunnot`- tai `lahde/agy`-polussa) → koko vastaus sillasta.
 //!
 //! Sillan `/api/skoopit`- ja `/api/rekisterit`-vastaukset pidetään välimuistissa, jota `kaynnista` päivittää
@@ -1279,6 +1279,9 @@ struct Sisa {
     skoopit: BTreeMap<String, Skooppi>,
     viestit: HashMap<String, Keskustelu>,
     rekisterit_seq: u64,
+    /// Uusimman laitteen `lahde/jono`-sisältö (skooppi → jonolista); `None`, kun jonoa ei ole julkaistu.
+    jono: Option<Map<String, Value>>,
+    jono_seq: u64,
 }
 
 /// Sillan vastaukset, joita `GET /api/skoopit` käyttää (taustapäivitys, `SILTAVALI`).
@@ -1532,6 +1535,7 @@ impl Nakymat {
             s.alku = seq;
             s.seq_viimeisin = seq;
             s.paivita_lahteet(v, seq, ikkunoitu)?;
+            s.paivita_jono(v, seq)?;
             s.rakennettu = true;
         }
         loop {
@@ -1540,11 +1544,14 @@ impl Nakymat {
                 return Ok(());
             };
             let mut lahteet = false;
+            let mut jono = false;
             let mut tiedostot: Vec<String> = Vec::new();
             let mut rekisterit: Vec<&str> = Vec::new();
             for t in &era {
                 if t.polku == "lahde/istunnot" || t.polku == "lahde/agy" {
                     lahteet = true;
+                } else if t.polku == "lahde/jono" {
+                    jono = true;
                 } else if t.polku == "peili" {
                     if let Some((tiedosto, _)) = t.id.rsplit_once(':') {
                         if !tiedostot.iter().any(|x| x == tiedosto) {
@@ -1575,6 +1582,9 @@ impl Nakymat {
             }
             if lahteet {
                 s.paivita_lahteet(v, viimeinen, ikkunoitu)?;
+            }
+            if jono {
+                s.paivita_jono(v, viimeinen)?;
             }
             for tiedosto in tiedostot {
                 if let Some(k) = s.viestit.get_mut(&tiedosto) {
@@ -1723,6 +1733,20 @@ impl Sisa {
                 e.insert(k);
             }
         }
+        Ok(())
+    }
+
+    /// Lukee uusimman laitteen `lahde/jono`-sisällön (max HLC); muu kuin objekti → `None`.
+    fn paivita_jono(&mut self, v: &Varasto, seq: u64) -> crate::muutosloki::Result<()> {
+        self.jono = match lahde::lue(v, "jono")?
+            .into_iter()
+            .max_by(|a, b| a.1.cmp(&b.1))
+            .map(|x| x.2)
+        {
+            Some(Value::Object(m)) => Some(m),
+            _ => None,
+        };
+        self.jono_seq = seq;
         Ok(())
     }
 
@@ -1970,6 +1994,9 @@ pub async fn skooppi(tila: &Tila, nimi: &str, since: Option<u64>) -> Vastaus {
     if let Some(r) = paa.and_then(|p| n.rekisteri(&tila.varasto, &p)) {
         r.kentat_yksityiskohtaan(nimi, &mut runko);
     }
+    if let Some(j) = &s.jono {
+        runko["jonossa"] = j.get(nimi).cloned().unwrap_or(json!([]));
+    }
     match since {
         None => Vastaus::ydin(runko),
         Some(x) => {
@@ -1977,7 +2004,7 @@ pub async fn skooppi(tila: &Tila, nimi: &str, since: Option<u64>) -> Vastaus {
                 Ok(b) => b,
                 Err(e) => return Vastaus::virhe(StatusCode::INTERNAL_SERVER_ERROR, &e.to_string()),
             };
-            let muuttui = nollaus || sk.muutettu > x || s.rekisterit_seq > x;
+            let muuttui = nollaus || sk.muutettu > x || s.rekisterit_seq > x || s.jono_seq > x;
             let lista = if muuttui { vec![runko] } else { Vec::new() };
             Vastaus::ydin(since_runko(s.seq_viimeisin, lista, Vec::new(), nollaus))
         }
