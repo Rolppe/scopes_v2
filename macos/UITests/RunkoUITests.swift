@@ -246,6 +246,10 @@ final class RunkoUITests: XCTestCase {
                     paikallaan = 0
                 } else {
                     maara += nyt.count; avaimet += nyt.map(\.avain); aukkoja += 1; paikallaan = 0; loki.append("AUKKO \(nyt.count)")   // ei luotettavaa limitystä
+                    // T-72 diagnostiikka: ikkunoiden rivit AUKKO-hetkellä (vain loki, ei vaikuta laskentaan)
+                    loki.append("  edellinen: " + edellinen.map { "\($0.avain.prefix(40))@\(Int($0.y))" }.joined(separator: " | "))
+                    loki.append("  nyt:       " + nyt.map { "\($0.avain.prefix(40))@\(Int($0.y))" }.joined(separator: " | "))
+                    loki.append("  siirtyma=\(Int(siirtyma)) maksimi=\(Int(maksimiSiirtyma)) yhteisia=\(yhteiset.count)")
                 }
             }
             edellinen = nyt
