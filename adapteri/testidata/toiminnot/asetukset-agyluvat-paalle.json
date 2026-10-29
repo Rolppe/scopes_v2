@@ -1,0 +1,45 @@
+{
+  "tapaus": "asetukset-agyluvat-paalle",
+  "pyynto": {
+    "metodi": "POST",
+    "polku": "/api/asetukset/agyluvat/paalle",
+    "runko": {}
+  },
+  "ymparisto": {
+    "skooppitiedot": {
+      "a": [
+        "R.md"
+      ],
+      "b": [
+        "R.md"
+      ],
+      "scopes koe": [
+        "R.md"
+      ]
+    },
+    "istunnot": [],
+    "transkriptit": [],
+    "tmux": {
+      "display-message": "<PID>\n",
+      "capture-pane": "",
+      "list-panes": ""
+    },
+    "komennot": {}
+  },
+  "odotus": {
+    "status": 200,
+    "runko": {
+      "automaattijatko": false,
+      "autopack": false,
+      "automaattisiirto": false,
+      "agyluvat": true
+    },
+    "aja": [],
+    "asetuksetTila": [
+      {
+        "tiedosto": "agy-luvat.txt",
+        "sisalto": "true\n"
+      }
+    ]
+  }
+}

@@ -1,0 +1,53 @@
+{
+  "tapaus": "android-adb-ei-vastaa",
+  "pyynto": {
+    "metodi": "POST",
+    "polku": "/api/android/avaa",
+    "runko": {}
+  },
+  "ymparisto": {
+    "skooppitiedot": {
+      "a": [
+        "R.md"
+      ],
+      "b": [
+        "R.md"
+      ],
+      "scopes koe": [
+        "R.md"
+      ]
+    },
+    "istunnot": [],
+    "transkriptit": [],
+    "tmux": {
+      "display-message": "<PID>\n",
+      "capture-pane": "",
+      "list-panes": ""
+    },
+    "komennot": {
+      "vastaukset": [
+        {
+          "komento": "adb",
+          "sisaltaa": "dumpsys power",
+          "koodi": 1,
+          "stderr": "error: device offline"
+        }
+      ]
+    }
+  },
+  "odotus": {
+    "status": 502,
+    "runko": {
+      "virhe": "adb ei vastaa: error: device offline"
+    },
+    "aja": [
+      [
+        "adb",
+        "-s",
+        "127.0.0.1:5555",
+        "shell",
+        "dumpsys power | grep mWakefulness="
+      ]
+    ]
+  }
+}

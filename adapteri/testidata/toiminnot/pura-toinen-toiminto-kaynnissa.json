@@ -1,0 +1,44 @@
+{
+  "tapaus": "pura-toinen-toiminto-kaynnissa",
+  "pyynto": {
+    "metodi": "POST",
+    "polku": "/api/skoopit/b/pura",
+    "runko": {}
+  },
+  "ymparisto": {
+    "skooppitiedot": {
+      "a": [
+        "R.md"
+      ],
+      "b": [
+        "R.md"
+      ]
+    },
+    "istunnot": [],
+    "transkriptit": [],
+    "tmux": {
+      "display-message": "<PID>\n",
+      "capture-pane": "",
+      "list-panes": ""
+    },
+    "komennot": {
+      "pura-malliton --perhe": {
+        "koodi": 1,
+        "stdout": "PERHE: ei\n",
+        "stderr": ""
+      }
+    },
+    "samanaikainen": {
+      "metodi": "POST",
+      "polku": "/api/skoopit/b/pura",
+      "runko": {}
+    }
+  },
+  "odotus": {
+    "status": 429,
+    "runko": {
+      "virhe": "toinen toiminto on käynnissä (pura)"
+    },
+    "aja": []
+  }
+}

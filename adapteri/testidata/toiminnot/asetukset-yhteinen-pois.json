@@ -1,0 +1,59 @@
+{
+  "tapaus": "asetukset-yhteinen-pois",
+  "pyynto": {
+    "metodi": "POST",
+    "polku": "/api/asetukset/automaattijatko/pois",
+    "runko": {}
+  },
+  "ymparisto": {
+    "skooppitiedot": {
+      "a": [
+        "R.md"
+      ],
+      "b": [
+        "R.md"
+      ],
+      "scopes koe": [
+        "R.md"
+      ]
+    },
+    "istunnot": [],
+    "transkriptit": [],
+    "tmux": {
+      "display-message": "<PID>\n",
+      "capture-pane": "",
+      "list-panes": ""
+    },
+    "komennot": {},
+    "asetuksetTila": [
+      {
+        "tiedosto": "automaattivalinta.txt",
+        "sisalto": "true\n"
+      },
+      {
+        "tiedosto": "autopack.txt",
+        "sisalto": "true\n"
+      }
+    ]
+  },
+  "odotus": {
+    "status": 200,
+    "runko": {
+      "automaattijatko": false,
+      "autopack": true,
+      "automaattisiirto": false,
+      "agyluvat": false
+    },
+    "aja": [],
+    "asetuksetTila": [
+      {
+        "tiedosto": "automaattivalinta.txt",
+        "sisalto": "false\n"
+      },
+      {
+        "tiedosto": "autopack.txt",
+        "sisalto": "true\n"
+      }
+    ]
+  }
+}

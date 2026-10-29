@@ -1,0 +1,61 @@
+{
+  "tapaus": "linux-kaynnista-sammuksissa-kuiva",
+  "pyynto": {
+    "metodi": "POST",
+    "polku": "/api/palvelin/kaynnista",
+    "runko": {}
+  },
+  "ymparisto": {
+    "skooppitiedot": {
+      "a": [
+        "R.md"
+      ],
+      "b": [
+        "R.md"
+      ],
+      "scopes koe": [
+        "R.md"
+      ]
+    },
+    "istunnot": [],
+    "transkriptit": [],
+    "tmux": {
+      "display-message": "<PID>\n",
+      "capture-pane": "",
+      "list-panes": ""
+    },
+    "komennot": {
+      "vastaukset": []
+    },
+    "linux": {
+      "kuiva": true
+    }
+  },
+  "odotus": {
+    "status": 200,
+    "runko": {
+      "tila": "heratetty",
+      "lahto": "sammuksissa",
+      "viesti": "WoL lähetettäisiin",
+      "kuiva": "python3 <REPO>/Infra/linux/palvelin/herata-pc.py --odota 90"
+    },
+    "aja": [
+      [
+        "ping",
+        "-c",
+        "1",
+        "-W",
+        "2",
+        "192.0.2.99"
+      ],
+      [
+        "ping",
+        "-c",
+        "1",
+        "-W",
+        "2",
+        "192.0.2.99"
+      ]
+    ]
+  }
+}

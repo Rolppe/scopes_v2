@@ -1,0 +1,44 @@
+{
+  "tapaus": "uusi-virheellinen-nimi",
+  "pyynto": {
+    "metodi": "POST",
+    "polku": "/api/uusi",
+    "runko": {
+      "nimi": "Väärä Nimi!"
+    }
+  },
+  "ymparisto": {
+    "skooppitiedot": {
+      "a": [
+        "R.md"
+      ],
+      "b": [
+        "R.md"
+      ],
+      "scopes koe": [
+        "R.md"
+      ]
+    },
+    "istunnot": [],
+    "transkriptit": [],
+    "tmux": {
+      "display-message": "<PID>\n",
+      "capture-pane": "",
+      "list-panes": ""
+    },
+    "komennot": {
+      "autovaihto": {
+        "koodi": 0,
+        "stdout": "UUSI: …\nOK: https://claude.ai/code/session_abc123\n",
+        "stderr": ""
+      }
+    }
+  },
+  "odotus": {
+    "status": 400,
+    "runko": {
+      "virhe": "nimi: 1–4 sanaa pienaakkosia, numeroita tai viivoja"
+    },
+    "aja": []
+  }
+}

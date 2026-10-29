@@ -1,0 +1,39 @@
+{
+  "tapaus": "purkajat-pura-tuntematon-skooppi",
+  "pyynto": {
+    "metodi": "POST",
+    "polku": "/api/skoopit/ei-ole/pura",
+    "runko": {}
+  },
+  "ymparisto": {
+    "skooppitiedot": {
+      "a": [
+        "R.md"
+      ],
+      "b": [
+        "R.md"
+      ]
+    },
+    "istunnot": [],
+    "transkriptit": [],
+    "tmux": {
+      "display-message": "<PID>\n",
+      "capture-pane": "",
+      "list-panes": ""
+    },
+    "komennot": {
+      "pura-malliton --perhe": {
+        "koodi": 1,
+        "stdout": "PERHE: ei\n",
+        "stderr": ""
+      }
+    }
+  },
+  "odotus": {
+    "status": 404,
+    "runko": {
+      "virhe": "tuntematon skooppi"
+    },
+    "aja": []
+  }
+}

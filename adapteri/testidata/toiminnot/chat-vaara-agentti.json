@@ -1,0 +1,50 @@
+{
+  "tapaus": "chat-vaara-agentti",
+  "pyynto": {
+    "metodi": "POST",
+    "polku": "/api/chat",
+    "runko": {
+      "agentti": "ei-ole",
+      "viesti": "moi"
+    }
+  },
+  "ymparisto": {
+    "skooppitiedot": {
+      "a": [
+        "R.md"
+      ],
+      "b": [
+        "R.md"
+      ]
+    },
+    "istunnot": [],
+    "transkriptit": [],
+    "tmux": {
+      "display-message": "<PID>\n",
+      "capture-pane": "",
+      "list-panes": ""
+    },
+    "komennot": {
+      "claude": {
+        "koodi": 0,
+        "stdout": [
+          "{\"type\":\"system\",\"subtype\":\"init\",\"session_id\":\"38c487b9-3c36-4723-b2af-5f07b106c172\"}",
+          "{\"type\":\"stream_event\",\"event\":{\"type\":\"content_block_start\",\"content_block\":{\"type\":\"thinking\"}}}",
+          "{\"type\":\"stream_event\",\"event\":{\"type\":\"content_block_delta\",\"delta\":{\"type\":\"thinking_delta\",\"thinking\":\"mietin\"}}}",
+          "{\"type\":\"stream_event\",\"event\":{\"type\":\"content_block_start\",\"content_block\":{\"type\":\"text\"}}}",
+          "{\"type\":\"stream_event\",\"event\":{\"type\":\"content_block_delta\",\"delta\":{\"type\":\"text_delta\",\"text\":\"h\"}}}",
+          "{\"type\":\"stream_event\",\"event\":{\"type\":\"content_block_delta\",\"delta\":{\"type\":\"text_delta\",\"text\":\"ei\"}}}",
+          "ei json",
+          "{\"type\":\"result\",\"subtype\":\"success\",\"result\":\"hei\",\"session_id\":\"38c487b9-3c36-4723-b2af-5f07b106c172\",\"total_cost_usd\":0.01,\"is_error\":false}"
+        ]
+      }
+    }
+  },
+  "odotus": {
+    "status": 400,
+    "runko": {
+      "virhe": "tuntematon agentti"
+    },
+    "aja": []
+  }
+}

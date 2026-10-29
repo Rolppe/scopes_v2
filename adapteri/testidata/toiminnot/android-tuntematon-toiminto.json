@@ -1,0 +1,49 @@
+{
+  "tapaus": "android-tuntematon-toiminto",
+  "pyynto": {
+    "metodi": "POST",
+    "polku": "/api/android/ei-ole",
+    "runko": {}
+  },
+  "ymparisto": {
+    "skooppitiedot": {
+      "a": [
+        "R.md"
+      ],
+      "b": [
+        "R.md"
+      ],
+      "scopes koe": [
+        "R.md"
+      ]
+    },
+    "istunnot": [],
+    "transkriptit": [],
+    "tmux": {
+      "display-message": "<PID>\n",
+      "capture-pane": "",
+      "list-panes": ""
+    },
+    "komennot": {
+      "vastaukset": [
+        {
+          "komento": "adb",
+          "sisaltaa": "dumpsys power",
+          "stdout": "mWakefulness=Awake\n"
+        },
+        {
+          "komento": "adb",
+          "sisaltaa": "wm size",
+          "stdout": "Physical size: 1080x2400\n"
+        }
+      ]
+    }
+  },
+  "odotus": {
+    "status": 404,
+    "runko": {
+      "virhe": "tuntematon toiminto"
+    },
+    "aja": []
+  }
+}

@@ -1,0 +1,37 @@
+{
+  "tapaus": "asetukset-tuntematon-tila",
+  "pyynto": {
+    "metodi": "POST",
+    "polku": "/api/asetukset/autopack/ehka",
+    "runko": {}
+  },
+  "ymparisto": {
+    "skooppitiedot": {
+      "a": [
+        "R.md"
+      ],
+      "b": [
+        "R.md"
+      ],
+      "scopes koe": [
+        "R.md"
+      ]
+    },
+    "istunnot": [],
+    "transkriptit": [],
+    "tmux": {
+      "display-message": "<PID>\n",
+      "capture-pane": "",
+      "list-panes": ""
+    },
+    "komennot": {}
+  },
+  "odotus": {
+    "status": 404,
+    "runko": {
+      "virhe": "tuntematon toiminto"
+    },
+    "aja": [],
+    "asetuksetTila": []
+  }
+}

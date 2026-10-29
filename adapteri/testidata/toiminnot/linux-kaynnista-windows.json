@@ -1,0 +1,76 @@
+{
+  "tapaus": "linux-kaynnista-windows",
+  "pyynto": {
+    "metodi": "POST",
+    "polku": "/api/palvelin/kaynnista",
+    "runko": {}
+  },
+  "ymparisto": {
+    "skooppitiedot": {
+      "a": [
+        "R.md"
+      ],
+      "b": [
+        "R.md"
+      ],
+      "scopes koe": [
+        "R.md"
+      ]
+    },
+    "istunnot": [],
+    "transkriptit": [],
+    "tmux": {
+      "display-message": "<PID>\n",
+      "capture-pane": "",
+      "list-panes": ""
+    },
+    "komennot": {
+      "vastaukset": [
+        {
+          "komento": "ping",
+          "sisaltaa": "192.0.2.99",
+          "stdout": "64 bytes from 192.0.2.99: icmp_seq=1 ttl=128 time=0.4 ms\n"
+        },
+        {
+          "komento": "ssh",
+          "sisaltaa": "pc"
+        }
+      ]
+    }
+  },
+  "odotus": {
+    "status": 200,
+    "runko": {
+      "tila": "vaihtaa",
+      "lahto": "windows",
+      "viesti": "Windows käynnistyy Linuxiin, noin 45 s"
+    },
+    "aja": [
+      [
+        "ping",
+        "-c",
+        "1",
+        "-W",
+        "2",
+        "192.0.2.99"
+      ],
+      [
+        "ping",
+        "-c",
+        "1",
+        "-W",
+        "2",
+        "192.0.2.99"
+      ],
+      [
+        "ssh",
+        "-o",
+        "ConnectTimeout=5",
+        "-o",
+        "BatchMode=yes",
+        "pc",
+        "linux"
+      ]
+    ]
+  }
+}

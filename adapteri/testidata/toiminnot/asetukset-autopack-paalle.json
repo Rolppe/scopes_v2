@@ -1,0 +1,45 @@
+{
+  "tapaus": "asetukset-autopack-paalle",
+  "pyynto": {
+    "metodi": "POST",
+    "polku": "/api/asetukset/autopack/paalle",
+    "runko": {}
+  },
+  "ymparisto": {
+    "skooppitiedot": {
+      "a": [
+        "R.md"
+      ],
+      "b": [
+        "R.md"
+      ],
+      "scopes koe": [
+        "R.md"
+      ]
+    },
+    "istunnot": [],
+    "transkriptit": [],
+    "tmux": {
+      "display-message": "<PID>\n",
+      "capture-pane": "",
+      "list-panes": ""
+    },
+    "komennot": {}
+  },
+  "odotus": {
+    "status": 200,
+    "runko": {
+      "automaattijatko": false,
+      "autopack": true,
+      "automaattisiirto": false,
+      "agyluvat": false
+    },
+    "aja": [],
+    "asetuksetTila": [
+      {
+        "tiedosto": "autopack.txt",
+        "sisalto": "true\n"
+      }
+    ]
+  }
+}

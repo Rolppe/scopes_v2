@@ -1,0 +1,72 @@
+{
+  "tapaus": "pura-perhe",
+  "pyynto": {
+    "metodi": "POST",
+    "polku": "/api/skoopit/b/pura",
+    "runko": {}
+  },
+  "ymparisto": {
+    "skooppitiedot": {
+      "a": [
+        "R.md"
+      ],
+      "b": [
+        "R.md"
+      ]
+    },
+    "istunnot": [],
+    "transkriptit": [],
+    "tmux": {
+      "display-message": "<PID>\n",
+      "capture-pane": "",
+      "list-panes": ""
+    },
+    "komennot": {
+      "pura-malliton --perhe": {
+        "koodi": 0,
+        "stdout": "PERHE: kyllä\n",
+        "stderr": ""
+      },
+      "pura-malliton": {
+        "koodi": 0,
+        "stdout": "KIRJOITETTU: x\n",
+        "stderr": ""
+      }
+    }
+  },
+  "odotus": {
+    "status": 200,
+    "runko": {
+      "ok": true,
+      "toiminto": "pura",
+      "nimi": "b",
+      "osoite": "https://claude.ai/code/session_abc123",
+      "suljettiin": [],
+      "tiedosto": "<KOTI>/.local/state/pura/b.md"
+    },
+    "aja": [
+      [
+        "node",
+        "<JUURI>/claude/siirto/tools/pura-malliton.mjs",
+        "--perhe",
+        "b"
+      ],
+      [
+        "node",
+        "<JUURI>/claude/siirto/tools/pura-malliton.mjs",
+        "b",
+        "--kohde",
+        "claude"
+      ],
+      [
+        "bash",
+        "<JUURI>/claude/siirto/tools/autovaihto.sh",
+        "vaihda",
+        "b",
+        "--ei-sulje",
+        "--viesti",
+        "Malliton purku: lue <KOTI>/.local/state/pura/b.md ja noudata sitä."
+      ]
+    ]
+  }
+}

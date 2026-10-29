@@ -1,0 +1,69 @@
+{
+  "tapaus": "android-ui-ei-dumpia",
+  "pyynto": {
+    "metodi": "GET",
+    "polku": "/api/android/ui",
+    "runko": null
+  },
+  "ymparisto": {
+    "skooppitiedot": {
+      "a": [
+        "R.md"
+      ],
+      "b": [
+        "R.md"
+      ],
+      "scopes koe": [
+        "R.md"
+      ]
+    },
+    "istunnot": [],
+    "transkriptit": [],
+    "tmux": {
+      "display-message": "<PID>\n",
+      "capture-pane": "",
+      "list-panes": ""
+    },
+    "komennot": {
+      "vastaukset": [
+        {
+          "komento": "adb",
+          "sisaltaa": "dumpsys power",
+          "stdout": "mWakefulness=Awake\n"
+        },
+        {
+          "komento": "adb",
+          "sisaltaa": "wm size",
+          "stdout": "Physical size: 1080x2400\n"
+        },
+        {
+          "komento": "adb",
+          "sisaltaa": "uiautomator dump",
+          "stdout": "ERROR: could not get idle state."
+        }
+      ]
+    }
+  },
+  "odotus": {
+    "status": 502,
+    "runko": {
+      "virhe": "ruudun luku epäonnistui (uiautomator ei tuottanut dumpia)"
+    },
+    "aja": [
+      [
+        "adb",
+        "-s",
+        "127.0.0.1:5555",
+        "shell",
+        "dumpsys power | grep mWakefulness="
+      ],
+      [
+        "adb",
+        "-s",
+        "127.0.0.1:5555",
+        "shell",
+        "uiautomator dump /data/local/tmp/scopes-ui-1792569600000-i.xml >/dev/null 2>&1; cat /data/local/tmp/scopes-ui-1792569600000-i.xml; rm -f /data/local/tmp/scopes-ui-1792569600000-i.xml"
+      ]
+    ]
+  }
+}

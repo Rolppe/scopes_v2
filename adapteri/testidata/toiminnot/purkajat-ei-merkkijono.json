@@ -1,0 +1,46 @@
+{
+  "tapaus": "purkajat-ei-merkkijono",
+  "pyynto": {
+    "metodi": "POST",
+    "polku": "/api/skoopit/b/pura",
+    "runko": {
+      "malli": 5
+    }
+  },
+  "ymparisto": {
+    "skooppitiedot": {
+      "a": [
+        "R.md"
+      ],
+      "b": [
+        "R.md"
+      ]
+    },
+    "istunnot": [],
+    "transkriptit": [],
+    "tmux": {
+      "display-message": "<PID>\n",
+      "capture-pane": "",
+      "list-panes": ""
+    },
+    "komennot": {
+      "agy": {
+        "koodi": 0,
+        "stdout": "Fetching available models...\ngemini-9-pro\tGemini 9 Pro\nclaude-x-1\tClaude X 1\n",
+        "stderr": ""
+      },
+      "pura-malliton --perhe": {
+        "koodi": 1,
+        "stdout": "PERHE: ei\n",
+        "stderr": ""
+      }
+    }
+  },
+  "odotus": {
+    "status": 400,
+    "runko": {
+      "virhe": "purkaja ja malli ovat merkkijonoja"
+    },
+    "aja": []
+  }
+}

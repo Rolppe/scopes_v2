@@ -1,0 +1,33 @@
+#!/usr/bin/env node
+// tmux-mock (T-63-G, ARK-16). Kirjaa argv:n tiedostoon $TMUX_MOCK_LOKI ja vastaa hakemistosta $TMUX_MOCK_DATA.
+// Komennot, joita vanha koodi käyttää (vanhan palvelun viestit-, toiminnot- ja agy-istunto-moduulit):
+//   display-message -p -t <ruutu> '#{pane_pid}' | '#{pane_current_command}'   vastaus: display-message.txt
+//   capture-pane -p -t <ruutu>                                                vastaus: capture-pane.txt
+//   list-panes -a -F '#{session_name} #{pane_current_command} #{session_created} #{pane_pid}'   vastaus: list-panes.txt
+//   send-keys -t <ruutu> (-l <teksti> | Enter | Escape | C-u | Down | …)       vastaus: send-keys.txt (oletus tyhjä)
+// Jokaiselle komennolle <komento>.koodi = exit-koodi (oletus 0), <komento>.stderr = stderr. Tuntematon alikomento: exit 0, tyhjä.
+// Kenttäsimulaatio: jos datahakemistossa on transkripti.polku (yksi rivi: transkriptin polku), send-keys kerää -l-tekstit
+// kenttään (C-u tyhjentää) ja Enter liittää kentän transkriptiin käyttäjän viestinä (kuten istunto V-305), jolloin
+// "viesti perillä" -tarkistus onnistuu. Kenttä on tiedostossa $TMUX_MOCK_DATA/.kentta.
+import { appendFileSync, readFileSync, writeFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { kirjaa, lueData, onData, vastaa } from './mock-lib.mjs';
+
+const argv = process.argv.slice(2);
+kirjaa('tmux', argv);
+const alikomento = argv[0] ?? '';
+
+if (alikomento === 'send-keys' && onData('transkripti', 'polku')) {
+  const kentta = join(process.env.TMUX_MOCK_DATA, '.kentta');
+  let teksti = '';
+  try { teksti = readFileSync(kentta, 'utf8'); } catch { /* tyhjä kenttä */ }
+  const avaimet = argv.slice(argv.indexOf('-t') + 2);
+  if (avaimet[0] === 'C-u') teksti = '';
+  else if (avaimet[0] === '-l') teksti += avaimet[1] ?? '';
+  else if (avaimet[0] === 'Enter' && teksti) {
+    appendFileSync(lueData('transkripti', 'polku').trim(), `\n${JSON.stringify({ type: 'user', message: { content: teksti } })}`);
+    teksti = '';
+  }
+  writeFileSync(kentta, teksti);
+}
+process.exitCode = vastaa(alikomento || 'tmux');

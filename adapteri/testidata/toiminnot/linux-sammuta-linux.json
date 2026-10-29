@@ -1,0 +1,78 @@
+{
+  "tapaus": "linux-sammuta-linux",
+  "pyynto": {
+    "metodi": "POST",
+    "polku": "/api/palvelin/sammuta",
+    "runko": {}
+  },
+  "ymparisto": {
+    "skooppitiedot": {
+      "a": [
+        "R.md"
+      ],
+      "b": [
+        "R.md"
+      ],
+      "scopes koe": [
+        "R.md"
+      ]
+    },
+    "istunnot": [],
+    "transkriptit": [],
+    "tmux": {
+      "display-message": "<PID>\n",
+      "capture-pane": "",
+      "list-panes": ""
+    },
+    "komennot": {
+      "vastaukset": [
+        {
+          "komento": "ping",
+          "sisaltaa": "192.0.2.99",
+          "stdout": "64 bytes from 192.0.2.99: icmp_seq=1 ttl=64 time=0.4 ms\n"
+        },
+        {
+          "komento": "ssh",
+          "sisaltaa": "poweroff",
+          "koodi": 255,
+          "stderr": "Connection to 192.0.2.99 closed by remote host."
+        }
+      ]
+    }
+  },
+  "odotus": {
+    "status": 200,
+    "runko": {
+      "tila": "sammuu",
+      "lahto": "linux",
+      "viesti": "palvelin sammuu"
+    },
+    "aja": [
+      [
+        "ping",
+        "-c",
+        "1",
+        "-W",
+        "2",
+        "192.0.2.99"
+      ],
+      [
+        "ping",
+        "-c",
+        "1",
+        "-W",
+        "2",
+        "192.0.2.99"
+      ],
+      [
+        "ssh",
+        "-o",
+        "ConnectTimeout=5",
+        "-o",
+        "BatchMode=yes",
+        "palvelin",
+        "sudo -n /usr/sbin/poweroff"
+      ]
+    ]
+  }
+}

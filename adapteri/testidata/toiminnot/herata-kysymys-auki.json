@@ -1,0 +1,110 @@
+{
+  "tapaus": "herata-kysymys-auki",
+  "pyynto": {
+    "metodi": "POST",
+    "polku": "/api/skoopit/a/herata",
+    "runko": {}
+  },
+  "ymparisto": {
+    "skooppitiedot": {
+      "a": [
+        "R.md"
+      ],
+      "b": [
+        "R.md"
+      ]
+    },
+    "istunnot": [
+      {
+        "tiedosto": "<PID>.json",
+        "sisalto": {
+          "pid": "<PID>",
+          "sessionId": "s1",
+          "cwd": "/x",
+          "name": "a",
+          "status": "waiting",
+          "tmux": "siirto-a-1:@1.%5",
+          "waitingFor": "input needed"
+        }
+      }
+    ],
+    "transkriptit": [
+      {
+        "kohde": "istunto",
+        "cwd": "/x",
+        "id": "s1",
+        "rivit": [
+          {
+            "type": "user",
+            "timestamp": "2026-10-21T08:00:00.000Z",
+            "message": {
+              "content": "/pura a"
+            }
+          },
+          {
+            "type": "assistant",
+            "timestamp": "2026-10-21T08:00:01.000Z",
+            "message": {
+              "stop_reason": "end_turn",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Purku valmis."
+                }
+              ]
+            }
+          },
+          {
+            "type": "assistant",
+            "timestamp": "2026-10-21T08:00:02.000Z",
+            "message": {
+              "content": [
+                {
+                  "type": "tool_use",
+                  "id": "k1",
+                  "name": "AskUserQuestion",
+                  "input": {
+                    "questions": [
+                      {
+                        "question": "Mitä tehdään?",
+                        "header": "Jatko",
+                        "multiSelect": false,
+                        "options": [
+                          {
+                            "label": "Aloita",
+                            "description": "paketti"
+                          },
+                          {
+                            "label": "Ei mitään"
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                }
+              ]
+            }
+          }
+        ]
+      }
+    ],
+    "tmux": {
+      "display-message": "<PID>\n",
+      "capture-pane": "",
+      "list-panes": ""
+    },
+    "komennot": {}
+  },
+  "odotus": {
+    "status": 200,
+    "runko": {
+      "ok": true,
+      "toiminto": "herata",
+      "nimi": "a",
+      "istunto": "s1",
+      "komento": "/sa",
+      "jonossa": true
+    },
+    "aja": []
+  }
+}

@@ -1,0 +1,91 @@
+{
+  "tapaus": "android-ruutu-muunnos-epaonnistuu",
+  "pyynto": {
+    "metodi": "GET",
+    "polku": "/api/android/ruutu",
+    "runko": null
+  },
+  "ymparisto": {
+    "skooppitiedot": {
+      "a": [
+        "R.md"
+      ],
+      "b": [
+        "R.md"
+      ],
+      "scopes koe": [
+        "R.md"
+      ]
+    },
+    "istunnot": [],
+    "transkriptit": [],
+    "tmux": {
+      "display-message": "<PID>\n",
+      "capture-pane": "",
+      "list-panes": ""
+    },
+    "komennot": {
+      "vastaukset": [
+        {
+          "komento": "adb",
+          "sisaltaa": "dumpsys power",
+          "stdout": "mWakefulness=Awake\n"
+        },
+        {
+          "komento": "adb",
+          "sisaltaa": "wm size",
+          "stdout": "Physical size: 1080x2400\n"
+        },
+        {
+          "komento": "adb",
+          "sisaltaa": "screencap",
+          "stdoutBase64": "BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc="
+        },
+        {
+          "komento": "python3",
+          "sisaltaa": "Image",
+          "koodi": 1,
+          "stderr": "ModuleNotFoundError: PIL"
+        }
+      ]
+    }
+  },
+  "odotus": {
+    "status": 500,
+    "runko": {
+      "virhe": "JPEG-muunnos epäonnistui: ModuleNotFoundError: PIL"
+    },
+    "aja": [
+      [
+        "adb",
+        "-s",
+        "127.0.0.1:5555",
+        "shell",
+        "dumpsys power | grep mWakefulness="
+      ],
+      [
+        "adb",
+        "-s",
+        "127.0.0.1:5555",
+        "exec-out",
+        "screencap",
+        "-p"
+      ],
+      [
+        "python3",
+        "-P",
+        "-c",
+        "import sys,io\nfrom PIL import Image\nim=Image.open(io.BytesIO(sys.stdin.buffer.read())).convert('RGB')\nw=int(sys.argv[1])\nif w<im.width: im=im.resize((w,round(im.height*w/im.width)))\nim.save(sys.stdout.buffer,'JPEG',quality=int(sys.argv[2]))",
+        "720",
+        "70"
+      ]
+    ],
+    "ajaValinnat": [
+      {},
+      {},
+      {
+        "syote": "<200 tavua>"
+      }
+    ]
+  }
+}

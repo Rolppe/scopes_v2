@@ -1,0 +1,12 @@
+#!/usr/bin/env node
+// ssh-mock (T-63-G, laajennettu T-79-G): kirjaa argv ja stdin lokiin. Vastaus: ssh.json (säännöt, kts. mock-saannot.mjs:
+// sisaltaa = kohde tai etäkomennon osa, esim. "pc", "palvelin", "curl -s -m 5 http://127.0.0.1:1234/v1/models" eli
+// LM Studion mallilista, "poweroff"), muuten ssh.txt, ssh.stderr, ssh.koodi (oletus tyhjä, exit 0).
+// Vanha koodi käyttää ssh:ta chatin paikallisiin malleihin (palvelin, LM Studio), Nebiukseen, mac-agy-hakuihin sekä
+// palvelimen sammutukseen (`ssh palvelin sudo -n /usr/sbin/poweroff`) ja Windowsin kertabootiin (`ssh pc linux`).
+import { kirjaa, lueStdin } from './mock-lib.mjs';
+import { vastaaSaannoilla } from './mock-saannot.mjs';
+
+const argv = process.argv.slice(2);
+kirjaa('ssh', argv, lueStdin());
+process.exitCode = vastaaSaannoilla('ssh', argv);

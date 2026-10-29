@@ -1,0 +1,43 @@
+# scopes2 macos — toteutushistoria
+
+## Toteutushistoria
+
+- 28.10.2026 — T-72 osa B (kohdat 2 ja 3) ajettu klo 9.25–10.15 käyttäjän ollessa Macin ääressä (vahvisti AskUserQuestionilla); koordinaattori c2 hyväksyi T-72:n.
+  - Ajopaikka worktree ~/sessions-repo-t71d (HEAD b3f9ed1f). Raportti ja lokit: ~/agy-raportit/T-72/ (RAPORTTI.md, ajo2/t49.log, edellinen/).
+  - Ajo 1 (näyttö sammutettu `pmset displaysleepnow`, lukitus avattu): portti T-49 PUNAINEN, exit 1; macOS UI -testi `RunkoUITests/testViestitVastaavatPalvelinta` kaatui (`limitys katkesi 1 kertaa`), iOS-UI-testejä ei ajettu. Kohta (2): 0 caffeinate-riviä, LOCKED=0 9/9 näytteessä.
+  - Diagnostiikka: 4 lokiriviä `laske()`:n AUKKO-haaraan, scopes2/macos/UITests/RunkoUITests.swift (ei logiikkamuutosta). Commit paikallinen 5e642c15, origin 541db0ca (cherry-pick väliaikaisessa worktreessä, koska originin haara oli edellä ja jaetun kloonin likaiset tiedostot menivät päällekkäin saapuvien kanssa).
+  - Ajo 2 (c2 hyväksyi, näyttöä ei sammutettu): portti T-49 VIHREÄ, exit 0, macOS-UI ja iOS-UI (iPhone 15 Pro) läpi. Kaikki neljä T-72-kohtaa OK.
+  - Worktree t71d poistettu ilman --force (status vain committoitu diagnostiikka, palautettu `git checkout --`). Mac-UI-lukko vapaa. Autopack kytketty päälle tähän keskusteluun käyttäjän valinnalla.
+  - ratkennut (Avoimet asiat): T-72 ARK-18 hyväksyntä (osa B, kohdat 2 ja 3) — portti T-49 vihreä 28.10.2026, c2 hyväksyi.
+  - todettu (ei rekisteriin): `limitys katkesi` ei ole yhteyskatko vaan testin oma vierityslaskenta (`RunkoUITests.swift:197`, `laske()`), joka yhdistää vieritettyjä näkymäikkunoita limityksen mukaan. xcresultin laskenta-liite ajossa 1: k=5→7→10→12→12 (s=101), sitten `AUKKO 12` (yht 16→28).
+  - todettu (ei rekisteriin): Koeytimen ja 8787-sillan lokit poistuvat `koeydin_loppu`ssa (`rm -rf /tmp/scopes2-koe.*`, gate.sh:346), joten ydin/silta-puolta ei voi lukea; t49.logissa ei KOEYDIN-virheitä.
+  - todettu (ei rekisteriin): Aiemmat T-49-ajot kaatuivat muuhun (21.10.: lista ei latautunut 60 s:ssa, 3 fail; uusinta: Failed to activate application, 4 fail). Ajo 1 oli ensimmäinen, jossa testi pääsi laskentaan; AUKKO ei toistunut ajossa 2.
+  - todettu (ei rekisteriin): `sysadminctl -screenLock status`: screenLock delay is immediate. Awake-äppi pitää näytön hereillä (PreventUserIdleDisplaySleep 1 kpl).
+  - todettu (ei rekisteriin): Overseer (28.10.2026 klo 10.02) valtuutti raportin lähettämisen c2:lle; macos-skooppi ei muuten raportoi SendMessagella ilman pyyntöä.
+- 28.10.2026 — SCOPES2-PALUU-1735 (koordinaattori, Sonnet high) ja T-71-diagnoosiajo (overseer b3f9ed1f, koordinaattorin Mac-UI-vuoro).
+  - T-100 (1cfce137, agy Flash 21.10.) tarkistettu lähteestä: `git show 1cfce137` = kaksi kommenttiriviä (scopes2/macos/UITests/RunkoUITests.swift, scopes2/shared/testit/KaksiLaitettaUITests.swift), `grep -rniE caffeinate scopes2/macos/UITests scopes2/shared/testit` 0 osumaa → uudelleentekoa ei tarvita. Kirjattu rekisteriin (cdccb0a2).
+  - T-71-diagnoosiajo: tuore worktree ~/sessions-repo-t71d (detached HEAD b3f9ed1f). ENNEN: `pgrep -x ScopesV2Mac` tyhjä, `sysadminctl -screenLock status` = immediate, näyttö auki, ei Mac-lukkoja. Ajo `GATE_AJO=t71d perl -e 'alarm 2700; exec @ARGV' bash scopes2/shared/gate.sh T-71`: EXIT=0 08.34, NAYTTO-HEREILLA: ok, KEHITYS-OSIO: ok, PORTTI VIHREÄ: T-71; XCFramework ja koe-solmu (cargo) rakennettiin uudelleen ajossa. Loki scratchpad t71d/gate.log (väliaikainen). Kirjattu rekisteriin (7bc052bd).
+  - Viestit: overseerille (sessions-repo-15) ihmisvaihe T-72 B:tä varten; koordinaattorille (e0, sitten uusi nimi c2) rivi "Mac-UI-vuoro päättyi, ios voi ajaa".
+  - todettu (ei rekisteriin): T-71 vihreä tuoreilla artefakteilla, vaikka 21.10. testKehitysOsio kaatui 4/4 ajossa osan A jälkeen vanhoilla (8bb9fb03-worktree, 18.50–18.56) artefakteilla → vanhat artefaktit ainoa todettu ero; syy jäi todentamatta.
+  - todettu (ei rekisteriin): Tarkkailuskripti (pgrep -x ScopesV2Mac + lsof/sample 20/45 s) sai vain gate.sh:n pmset-vaiheen äpin (pid 41878); testiäpin näytteitä ei tarvittu.
+  - todettu (ei rekisteriin): Koordinaattorin uusi sessionimi on sessions-repo-c2 (e0/21/91 eivät enää päde).
+  - Aiempi rekisterin Historia-rivi (overseer b3f9ed1f, T-71-diagnoosiajo) siirretty tähän; sisältö ylhäällä.
+- 20.10.2026 — MACOS-T49-KUORI valmis: `bash scopes2/shared/gate.sh T-49` VIHREÄ (exit 0, 2420 s; GATE_MAC_TIMEOUT=3300, GATE_MAY + claude/siirto/mittaukset/). macOS UI-testit 4/4 (Viestit 12 min), iOS UI-testit läpi.
+  - Koodi vain scopes2/macos/UITests/RunkoUITests.swift: commitit 7f8fc908, 919842fe, 0c664ebd (ks. git log). Sources ja project.yml koskematta.
+  - Vikakirjaukset: V-582 (scopes2 ydin, oma virhe), V-583 (scopes architecture, vahinko), V-584 (scopes macos, vaatimus).
+  - Tulos ja luvun 7 mittaustiedot lähetetty koordinaattorille (palvelin-e5); tehtavat.jsonl:ää en kirjoittanut.
+  - ratkennut (Avoimet asiat): Skooppi on vasta luotu — T-49 macOS-runko valmis ja portti vihreä 20.10.2026 (0c664ebd).
+  - viat (ratkaistu, ei rekisteriin): V-582 ratkaistu käyttäjän päätöksellä 20.10.2026 (851b0343): uusi V2-binääri jää, varmuuskopio säilyy, T-44 käyttäjän ollessa paikalla.
+  - viat (ratkaistu, ei rekisteriin): V-583 oli vahinkokirjaus (sama vaatimus kuin V-584); ei ajeta architecturen kautta.
+  - viat (ratkaistu, ei rekisteriin): T-49:n punainen portti ratkaistu (kuusi syytä, ks. Todettu).
+  - todettu (ei rekisteriin): Gate-ajot 11 (1 pysäytetty, 1 aita exit 2, 3 × automaatiotila-aikakatkaisu, 5 × UI-testit punaisia, viimeinen exit 0); kesto 22:47 → 09:15; konteksti 230 k (konteksti-nyt.mjs), työkalukutsut ~190 (arvio).
+  - todettu (ei rekisteriin): Punaisen portin syyt (xcresulttool get test-results tests): lukittu tai sammunut näyttö (tarvitaan `ssh dev-host caffeinate -u -t 2` + `caffeinate -d`), UI-automaation kehote hyväksyttävä käsin, vanhentunut koeydinbinääri (V-582-korjaus 8f51a66c: target/koe), List näyttää vain näkyvät rivit (vieritys; snapshot 22 s vs elementtikyselyt 26 min), macOS raportoi tyokalu-rivin tyypillä any (iOS:n
+  - todettu (ei rekisteriin): .image-suodatin pudotti: 37/66 vs 120).
+  - todettu (ei rekisteriin): Ikkunamittaus (/tmp/ikkunat.swift) suodatti omistajanimen "Scopes", äpin nimi on "scopes-V2" (P-11): koordinaattorin ja oman bisektioni "ei ikkunaa" -päätelmä oli väärä.
+  - todettu (ei rekisteriin): Mac: macOS 26A434, Xcode 27A9275; `log` on zsh-builtin → /usr/bin/log. Ydinrakennus: cargo ~/.cargo/bin, OPENSSL_LIB_DIR=/usr/lib/aarch64-linux-gnu, OPENSSL_INCLUDE_DIR=/usr/include, flock /tmp/scopes2-cargo.lock.
+  - todettu (ei rekisteriin): V-582: käänsin target/release/scopes-solmu:n 19.10.2026 23.51; cron (/etc/cron.d/scopes2) käynnistää V2:n siitä (8797), pid 17756 pyörii vanhalla (exe deleted). Vanha binääri talteen scratchpad scopes-solmu.tuotanto-20-31 (10539664 t, sha256 39f21bc8f52adbf0…); palautus käyttäjän päätös.
+  - todettu (ei rekisteriin): GATE_MAC_TIMEOUT-oletus 1800 s ei riitä (2420 s); gate.sh T-45 ei kelpaa vertailuun (ajaa nykyiset macos/UITests ilman koeydintä).
+- 19.10.2026 — Skoopin poluissa muuttuneita tiedostoja (4 kpl): scopes2/macos/Sources/ScopesV2MacApp.swift, scopes2/macos/UITests/RunkoUITests.swift, scopes2/macos/project.yml, scopes2/macos/Sources/SolmunElinkaari.swift
+  - Käsitelty käyttäjän pyyntö: Malliton purku: lue ~/.local/state/pura/scopes2-macos.md ja noudata sitä.
+  - todettu (ei rekisteriin): Git-tila: claude/charming-brahmagupta-p9hmm7, muokattuja tiedostoja yhteensä 55 kpl
+  - todettu (ei rekisteriin): Testiajoja ei löytynyt transkriptista — testitulosta ei väitetä

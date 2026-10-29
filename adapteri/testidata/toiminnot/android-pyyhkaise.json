@@ -1,0 +1,77 @@
+{
+  "tapaus": "android-pyyhkaise",
+  "pyynto": {
+    "metodi": "POST",
+    "polku": "/api/android/pyyhkaise",
+    "runko": {
+      "x1": 0.5,
+      "y1": 0.8,
+      "x2": 0.5,
+      "y2": 0.2,
+      "kesto": 500
+    }
+  },
+  "ymparisto": {
+    "skooppitiedot": {
+      "a": [
+        "R.md"
+      ],
+      "b": [
+        "R.md"
+      ],
+      "scopes koe": [
+        "R.md"
+      ]
+    },
+    "istunnot": [],
+    "transkriptit": [],
+    "tmux": {
+      "display-message": "<PID>\n",
+      "capture-pane": "",
+      "list-panes": ""
+    },
+    "komennot": {
+      "vastaukset": [
+        {
+          "komento": "adb",
+          "sisaltaa": "dumpsys power",
+          "stdout": "mWakefulness=Awake\n"
+        },
+        {
+          "komento": "adb",
+          "sisaltaa": "wm size",
+          "stdout": "Physical size: 1080x2400\n"
+        }
+      ]
+    }
+  },
+  "odotus": {
+    "status": 200,
+    "runko": {
+      "ok": true
+    },
+    "aja": [
+      [
+        "adb",
+        "-s",
+        "127.0.0.1:5555",
+        "shell",
+        "dumpsys power | grep mWakefulness="
+      ],
+      [
+        "adb",
+        "-s",
+        "127.0.0.1:5555",
+        "shell",
+        "wm size"
+      ],
+      [
+        "adb",
+        "-s",
+        "127.0.0.1:5555",
+        "shell",
+        "input swipe 540 1919 540 480 500"
+      ]
+    ]
+  }
+}

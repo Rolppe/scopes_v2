@@ -1,0 +1,55 @@
+{
+  "tapaus": "linux-sammuta-sammuksissa",
+  "pyynto": {
+    "metodi": "POST",
+    "polku": "/api/palvelin/sammuta",
+    "runko": {}
+  },
+  "ymparisto": {
+    "skooppitiedot": {
+      "a": [
+        "R.md"
+      ],
+      "b": [
+        "R.md"
+      ],
+      "scopes koe": [
+        "R.md"
+      ]
+    },
+    "istunnot": [],
+    "transkriptit": [],
+    "tmux": {
+      "display-message": "<PID>\n",
+      "capture-pane": "",
+      "list-panes": ""
+    },
+    "komennot": {
+      "vastaukset": []
+    }
+  },
+  "odotus": {
+    "status": 409,
+    "runko": {
+      "virhe": "palvelin on jo sammuksissa"
+    },
+    "aja": [
+      [
+        "ping",
+        "-c",
+        "1",
+        "-W",
+        "2",
+        "192.0.2.99"
+      ],
+      [
+        "ping",
+        "-c",
+        "1",
+        "-W",
+        "2",
+        "192.0.2.99"
+      ]
+    ]
+  }
+}

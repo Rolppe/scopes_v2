@@ -1,0 +1,106 @@
+{
+  "tapaus": "android-nukutus",
+  "pyynto": {
+    "metodi": "POST",
+    "polku": "/api/android/nappi",
+    "runko": {
+      "nimi": "koti"
+    }
+  },
+  "ymparisto": {
+    "skooppitiedot": {
+      "a": [
+        "R.md"
+      ],
+      "b": [
+        "R.md"
+      ],
+      "scopes koe": [
+        "R.md"
+      ]
+    },
+    "istunnot": [],
+    "transkriptit": [],
+    "tmux": {
+      "display-message": "<PID>\n",
+      "capture-pane": "",
+      "list-panes": ""
+    },
+    "komennot": {
+      "vastaukset": [
+        {
+          "komento": "adb",
+          "sisaltaa": "dumpsys power",
+          "jarjestys": [
+            {
+              "stdout": "mWakefulness=Asleep\n"
+            },
+            {
+              "stdout": "mWakefulness=Awake\n"
+            }
+          ]
+        },
+        {
+          "komento": "adb",
+          "sisaltaa": "wm size",
+          "stdout": "Physical size: 1080x2400\n"
+        }
+      ]
+    },
+    "android": {
+      "myohemmin": 61000
+    }
+  },
+  "odotus": {
+    "status": 200,
+    "runko": {
+      "ok": true
+    },
+    "aja": [
+      [
+        "adb",
+        "-s",
+        "127.0.0.1:5555",
+        "shell",
+        "dumpsys power | grep mWakefulness="
+      ],
+      [
+        "adb",
+        "-s",
+        "127.0.0.1:5555",
+        "shell",
+        "input keyevent KEYCODE_WAKEUP"
+      ],
+      [
+        "adb",
+        "-s",
+        "127.0.0.1:5555",
+        "shell",
+        "input keyevent KEYCODE_HOME"
+      ]
+    ],
+    "viiveet": [
+      600
+    ],
+    "myohemmin": {
+      "ms": 61000,
+      "nukutettu": true,
+      "aja": [
+        [
+          "adb",
+          "-s",
+          "127.0.0.1:5555",
+          "shell",
+          "dumpsys power | grep mWakefulness="
+        ],
+        [
+          "adb",
+          "-s",
+          "127.0.0.1:5555",
+          "shell",
+          "input keyevent KEYCODE_SLEEP"
+        ]
+      ]
+    }
+  }
+}

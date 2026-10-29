@@ -1,0 +1,63 @@
+{
+  "tapaus": "android-tuotos-ei-loydy",
+  "pyynto": {
+    "metodi": "GET",
+    "polku": "/api/android/tuotos?polku=%2Fsdcard%2FDownload%2Fei-ole.txt",
+    "runko": null
+  },
+  "ymparisto": {
+    "skooppitiedot": {
+      "a": [
+        "R.md"
+      ],
+      "b": [
+        "R.md"
+      ],
+      "scopes koe": [
+        "R.md"
+      ]
+    },
+    "istunnot": [],
+    "transkriptit": [],
+    "tmux": {
+      "display-message": "<PID>\n",
+      "capture-pane": "",
+      "list-panes": ""
+    },
+    "komennot": {
+      "vastaukset": [
+        {
+          "komento": "adb",
+          "sisaltaa": "dumpsys power",
+          "stdout": "mWakefulness=Awake\n"
+        },
+        {
+          "komento": "adb",
+          "sisaltaa": "wm size",
+          "stdout": "Physical size: 1080x2400\n"
+        },
+        {
+          "komento": "adb",
+          "sisaltaa": "exec-out",
+          "koodi": 1,
+          "stderr": "cat: No such file"
+        }
+      ]
+    }
+  },
+  "odotus": {
+    "status": 404,
+    "runko": {
+      "virhe": "tiedostoa ei saatu: cat: No such file"
+    },
+    "aja": [
+      [
+        "adb",
+        "-s",
+        "127.0.0.1:5555",
+        "exec-out",
+        "cat '/sdcard/Download/ei-ole.txt'"
+      ]
+    ]
+  }
+}

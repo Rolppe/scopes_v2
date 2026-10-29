@@ -1,0 +1,57 @@
+{
+  "tapaus": "uusi-ok",
+  "pyynto": {
+    "metodi": "POST",
+    "polku": "/api/uusi",
+    "runko": {
+      "nimi": "uusi koe"
+    }
+  },
+  "ymparisto": {
+    "skooppitiedot": {
+      "a": [
+        "R.md"
+      ],
+      "b": [
+        "R.md"
+      ],
+      "scopes koe": [
+        "R.md"
+      ]
+    },
+    "istunnot": [],
+    "transkriptit": [],
+    "tmux": {
+      "display-message": "<PID>\n",
+      "capture-pane": "",
+      "list-panes": ""
+    },
+    "komennot": {
+      "autovaihto": {
+        "koodi": 0,
+        "stdout": "UUSI: …\nOK: https://claude.ai/code/session_abc123\n",
+        "stderr": ""
+      }
+    }
+  },
+  "odotus": {
+    "status": 200,
+    "runko": {
+      "ok": true,
+      "toiminto": "uusi",
+      "nimi": "uusi koe",
+      "osoite": "https://claude.ai/code/session_abc123"
+    },
+    "aja": [
+      [
+        "bash",
+        "<JUURI>/claude/siirto/tools/autovaihto.sh",
+        "vaihda",
+        "uusi koe",
+        "--ei-sulje",
+        "--viesti",
+        "/pura uusi uusi koe"
+      ]
+    ]
+  }
+}

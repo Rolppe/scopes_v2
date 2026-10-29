@@ -1,0 +1,69 @@
+{
+  "tapaus": "linux-kaynnista-sammuksissa",
+  "pyynto": {
+    "metodi": "POST",
+    "polku": "/api/palvelin/kaynnista",
+    "runko": {}
+  },
+  "ymparisto": {
+    "skooppitiedot": {
+      "a": [
+        "R.md"
+      ],
+      "b": [
+        "R.md"
+      ],
+      "scopes koe": [
+        "R.md"
+      ]
+    },
+    "istunnot": [],
+    "transkriptit": [],
+    "tmux": {
+      "display-message": "<PID>\n",
+      "capture-pane": "",
+      "list-panes": ""
+    },
+    "komennot": {
+      "vastaukset": [
+        {
+          "komento": "python3",
+          "sisaltaa": "herata-pc.py",
+          "stdout": "WoL lähetetty\nLinux vastaa 192.0.2.99 (34 s)\n"
+        }
+      ]
+    }
+  },
+  "odotus": {
+    "status": 200,
+    "runko": {
+      "tila": "linux",
+      "lahto": "sammuksissa",
+      "viesti": "Linux vastaa 192.0.2.99 (34 s)"
+    },
+    "aja": [
+      [
+        "ping",
+        "-c",
+        "1",
+        "-W",
+        "2",
+        "192.0.2.99"
+      ],
+      [
+        "ping",
+        "-c",
+        "1",
+        "-W",
+        "2",
+        "192.0.2.99"
+      ],
+      [
+        "python3",
+        "<REPO>/Infra/linux/palvelin/herata-pc.py",
+        "--odota",
+        "90"
+      ]
+    ]
+  }
+}

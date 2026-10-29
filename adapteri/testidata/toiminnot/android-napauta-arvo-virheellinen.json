@@ -1,0 +1,67 @@
+{
+  "tapaus": "android-napauta-arvo-virheellinen",
+  "pyynto": {
+    "metodi": "POST",
+    "polku": "/api/android/napauta",
+    "runko": {
+      "x": 1.5,
+      "y": 0
+    }
+  },
+  "ymparisto": {
+    "skooppitiedot": {
+      "a": [
+        "R.md"
+      ],
+      "b": [
+        "R.md"
+      ],
+      "scopes koe": [
+        "R.md"
+      ]
+    },
+    "istunnot": [],
+    "transkriptit": [],
+    "tmux": {
+      "display-message": "<PID>\n",
+      "capture-pane": "",
+      "list-panes": ""
+    },
+    "komennot": {
+      "vastaukset": [
+        {
+          "komento": "adb",
+          "sisaltaa": "dumpsys power",
+          "stdout": "mWakefulness=Awake\n"
+        },
+        {
+          "komento": "adb",
+          "sisaltaa": "wm size",
+          "stdout": "Physical size: 1080x2400\n"
+        }
+      ]
+    }
+  },
+  "odotus": {
+    "status": 400,
+    "runko": {
+      "virhe": "x pitää olla luku 0–1"
+    },
+    "aja": [
+      [
+        "adb",
+        "-s",
+        "127.0.0.1:5555",
+        "shell",
+        "dumpsys power | grep mWakefulness="
+      ],
+      [
+        "adb",
+        "-s",
+        "127.0.0.1:5555",
+        "shell",
+        "wm size"
+      ]
+    ]
+  }
+}

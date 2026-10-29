@@ -1,0 +1,87 @@
+{
+  "tapaus": "malli-vaara-ruutu",
+  "pyynto": {
+    "metodi": "POST",
+    "polku": "/api/skoopit/a/malli",
+    "runko": {
+      "malli": "claude-sonnet-5-5"
+    }
+  },
+  "ymparisto": {
+    "skooppitiedot": {
+      "a": [
+        "R.md"
+      ],
+      "b": [
+        "R.md"
+      ],
+      "scopes koe": [
+        "R.md"
+      ]
+    },
+    "istunnot": [
+      {
+        "tiedosto": "<PID>.json",
+        "sisalto": {
+          "pid": "<PID>",
+          "sessionId": "sessio-a-0001",
+          "cwd": "/x",
+          "name": "a",
+          "status": "idle",
+          "tmux": "siirto-a-1:@1.%5"
+        }
+      }
+    ],
+    "transkriptit": [
+      {
+        "kohde": "istunto",
+        "cwd": "/x",
+        "id": "sessio-a-0001",
+        "rivit": [
+          {
+            "type": "user",
+            "timestamp": "2026-10-21T08:00:00.000Z",
+            "message": {
+              "content": "/pura a"
+            }
+          },
+          {
+            "type": "assistant",
+            "timestamp": "2026-10-21T08:00:01.000Z",
+            "message": {
+              "stop_reason": "end_turn",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Purku valmis."
+                }
+              ]
+            }
+          }
+        ]
+      }
+    ],
+    "tmux": {
+      "display-message": "424242\n",
+      "capture-pane": "",
+      "list-panes": ""
+    },
+    "komennot": {}
+  },
+  "odotus": {
+    "status": 409,
+    "runko": {
+      "virhe": "istunnon tmux-ruutu ei täsmää"
+    },
+    "aja": [
+      [
+        "tmux",
+        "display-message",
+        "-p",
+        "-t",
+        "%5",
+        "#{pane_pid}"
+      ]
+    ]
+  }
+}

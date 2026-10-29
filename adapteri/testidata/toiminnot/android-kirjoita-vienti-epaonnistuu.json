@@ -1,0 +1,84 @@
+{
+  "tapaus": "android-kirjoita-vienti-epaonnistuu",
+  "pyynto": {
+    "metodi": "POST",
+    "polku": "/api/android/kirjoita",
+    "runko": {
+      "teksti": "Hei"
+    }
+  },
+  "ymparisto": {
+    "skooppitiedot": {
+      "a": [
+        "R.md"
+      ],
+      "b": [
+        "R.md"
+      ],
+      "scopes koe": [
+        "R.md"
+      ]
+    },
+    "istunnot": [],
+    "transkriptit": [],
+    "tmux": {
+      "display-message": "<PID>\n",
+      "capture-pane": "",
+      "list-panes": ""
+    },
+    "komennot": {
+      "vastaukset": [
+        {
+          "komento": "adb",
+          "sisaltaa": "dumpsys power",
+          "stdout": "mWakefulness=Awake\n"
+        },
+        {
+          "komento": "adb",
+          "sisaltaa": "wm size",
+          "stdout": "Physical size: 1080x2400\n"
+        },
+        {
+          "komento": "adb",
+          "sisaltaa": "uiautomator dump",
+          "stdout": "<?xml version='1.0' encoding='UTF-8' standalone='yes' ?><hierarchy rotation=\"0\"><node index=\"0\" text=\"Gemini\" resource-id=\"\" class=\"android.widget.TextView\" content-desc=\"\" clickable=\"false\" bounds=\"[0][0][100][100]\" /></hierarchy>"
+        },
+        {
+          "komento": "adb",
+          "sisaltaa": "android.intent.action.SEND",
+          "koodi": 1,
+          "stderr": "Error: Activity not started"
+        }
+      ]
+    }
+  },
+  "odotus": {
+    "status": 502,
+    "runko": {
+      "virhe": "tekstin vienti epäonnistui: Error: Activity not started"
+    },
+    "aja": [
+      [
+        "adb",
+        "-s",
+        "127.0.0.1:5555",
+        "shell",
+        "dumpsys power | grep mWakefulness="
+      ],
+      [
+        "adb",
+        "-s",
+        "127.0.0.1:5555",
+        "shell",
+        "uiautomator dump /data/local/tmp/scopes-ui-1792569600000-i.xml >/dev/null 2>&1; cat /data/local/tmp/scopes-ui-1792569600000-i.xml; rm -f /data/local/tmp/scopes-ui-1792569600000-i.xml"
+      ],
+      [
+        "adb",
+        "-s",
+        "127.0.0.1:5555",
+        "shell",
+        "am start -a android.intent.action.SEND -t text/plain --es android.intent.extra.TEXT 'Hei' -n com.google.android.apps.bard/.shellapp.BardEntryPointActivity"
+      ]
+    ]
+  }
+}

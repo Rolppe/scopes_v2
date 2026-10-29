@@ -1,0 +1,140 @@
+{
+  "tapaus": "purkajat-pura-malliton-varoitus",
+  "pyynto": {
+    "metodi": "POST",
+    "polku": "/api/skoopit/a/pura",
+    "runko": {}
+  },
+  "ymparisto": {
+    "skooppitiedot": {
+      "a": [
+        "R.md"
+      ],
+      "b": [
+        "R.md"
+      ]
+    },
+    "istunnot": [
+      {
+        "tiedosto": "<PID>.json",
+        "sisalto": {
+          "pid": "<PID>",
+          "sessionId": "s1",
+          "cwd": "/x",
+          "name": "a",
+          "status": "idle",
+          "tmux": "siirto-a-1:@1.%5"
+        }
+      }
+    ],
+    "transkriptit": [
+      {
+        "kohde": "istunto",
+        "cwd": "/x",
+        "id": "s1",
+        "rivit": [
+          {
+            "type": "user",
+            "timestamp": "2026-10-21T08:00:00.000Z",
+            "message": {
+              "content": "/pakkaa"
+            }
+          },
+          {
+            "type": "assistant",
+            "timestamp": "2026-10-21T08:00:01.000Z",
+            "message": {
+              "stop_reason": "end_turn",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "PAKKAUS: vahvistettu — commit abc1234"
+                }
+              ]
+            }
+          }
+        ]
+      }
+    ],
+    "tmux": {
+      "display-message": "<PID>\n",
+      "capture-pane": "",
+      "list-panes": ""
+    },
+    "komennot": {
+      "pura-malliton --perhe": {
+        "koodi": 0,
+        "stdout": "PERHE: kyllä\n",
+        "stderr": ""
+      },
+      "pura-malliton": {
+        "koodi": 4,
+        "stdout": "KIRJOITETTU: x\n",
+        "stderr": "VAROITUS: y\n"
+      }
+    }
+  },
+  "odotus": {
+    "status": 200,
+    "runko": {
+      "ok": true,
+      "toiminto": "pura",
+      "nimi": "a",
+      "osoite": "https://claude.ai/code/session_abc123",
+      "suljettiin": [
+        "s1"
+      ],
+      "tiedosto": "<KOTI>/.local/state/pura/a.md",
+      "varoitus": true
+    },
+    "aja": [
+      [
+        "node",
+        "<JUURI>/claude/siirto/tools/pura-malliton.mjs",
+        "--perhe",
+        "a"
+      ],
+      [
+        "node",
+        "<JUURI>/claude/siirto/tools/pura-malliton.mjs",
+        "a",
+        "--kohde",
+        "claude",
+        "--suljettavat",
+        "s1"
+      ],
+      [
+        "tmux",
+        "display-message",
+        "-p",
+        "-t",
+        "%5",
+        "#{pane_pid}"
+      ],
+      [
+        "tmux",
+        "send-keys",
+        "-t",
+        "%5",
+        "-l",
+        "/exit"
+      ],
+      [
+        "tmux",
+        "send-keys",
+        "-t",
+        "%5",
+        "Enter"
+      ],
+      [
+        "bash",
+        "<JUURI>/claude/siirto/tools/autovaihto.sh",
+        "vaihda",
+        "a",
+        "--ei-sulje",
+        "--viesti",
+        "Malliton purku: lue <KOTI>/.local/state/pura/a.md ja noudata sitä."
+      ]
+    ]
+  }
+}

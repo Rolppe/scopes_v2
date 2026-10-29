@@ -1,0 +1,206 @@
+{
+  "tapaus": "malli-malli-ja-effort-ok",
+  "pyynto": {
+    "metodi": "POST",
+    "polku": "/api/skoopit/a/malli",
+    "runko": {
+      "malli": "claude-sonnet-5-5",
+      "effort": "xhigh"
+    }
+  },
+  "ymparisto": {
+    "skooppitiedot": {
+      "a": [
+        "R.md"
+      ],
+      "b": [
+        "R.md"
+      ],
+      "scopes koe": [
+        "R.md"
+      ]
+    },
+    "istunnot": [
+      {
+        "tiedosto": "<PID>.json",
+        "sisalto": {
+          "pid": "<PID>",
+          "sessionId": "sessio-a-0001",
+          "cwd": "/x",
+          "name": "a",
+          "status": "idle",
+          "tmux": "siirto-a-1:@1.%5"
+        }
+      }
+    ],
+    "transkriptit": [
+      {
+        "kohde": "istunto",
+        "cwd": "/x",
+        "id": "sessio-a-0001",
+        "rivit": [
+          {
+            "type": "user",
+            "timestamp": "2026-10-21T08:00:00.000Z",
+            "message": {
+              "content": "/pura a"
+            }
+          },
+          {
+            "type": "assistant",
+            "timestamp": "2026-10-21T08:00:01.000Z",
+            "message": {
+              "stop_reason": "end_turn",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Purku valmis."
+                }
+              ]
+            }
+          }
+        ]
+      }
+    ],
+    "tmux": {
+      "display-message": "<PID>\n",
+      "capture-pane": [
+        " Select model\n   1. Fable 5.1\n ❯ 2. Opus 5.5 ✔\n   3. Sonnet 5.5\n   4. Haiku 5.5\n Enter to confirm · Esc to exit",
+        " Set model to Sonnet 5.5 (for this session only)",
+        " Set effort level to xhigh (this session only)"
+      ],
+      "list-panes": ""
+    },
+    "komennot": {}
+  },
+  "odotus": {
+    "status": 200,
+    "runko": {
+      "ok": true,
+      "istunto": "sessio-a-0001"
+    },
+    "aja": [
+      [
+        "tmux",
+        "display-message",
+        "-p",
+        "-t",
+        "%5",
+        "#{pane_pid}"
+      ],
+      [
+        "tmux",
+        "send-keys",
+        "-t",
+        "%5",
+        "C-u"
+      ],
+      [
+        "tmux",
+        "send-keys",
+        "-t",
+        "%5",
+        "-l",
+        "/model"
+      ],
+      [
+        "tmux",
+        "send-keys",
+        "-t",
+        "%5",
+        "Enter"
+      ],
+      [
+        "tmux",
+        "capture-pane",
+        "-p",
+        "-t",
+        "%5"
+      ],
+      [
+        "tmux",
+        "send-keys",
+        "-t",
+        "%5",
+        "Down"
+      ],
+      [
+        "tmux",
+        "send-keys",
+        "-t",
+        "%5",
+        "-l",
+        "s"
+      ],
+      [
+        "tmux",
+        "capture-pane",
+        "-p",
+        "-t",
+        "%5"
+      ],
+      [
+        "tmux",
+        "send-keys",
+        "-t",
+        "%5",
+        "C-u"
+      ],
+      [
+        "tmux",
+        "send-keys",
+        "-t",
+        "%5",
+        "-l",
+        "/effort"
+      ],
+      [
+        "tmux",
+        "send-keys",
+        "-t",
+        "%5",
+        "Enter"
+      ],
+      [
+        "tmux",
+        "send-keys",
+        "-t",
+        "%5",
+        "Left",
+        "Left",
+        "Left",
+        "Left"
+      ],
+      [
+        "tmux",
+        "send-keys",
+        "-t",
+        "%5",
+        "Right",
+        "Right",
+        "Right"
+      ],
+      [
+        "tmux",
+        "send-keys",
+        "-t",
+        "%5",
+        "-l",
+        "s"
+      ],
+      [
+        "tmux",
+        "capture-pane",
+        "-p",
+        "-t",
+        "%5"
+      ]
+    ],
+    "viiveet": [
+      1000,
+      1000,
+      1000,
+      1000
+    ]
+  }
+}

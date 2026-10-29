@@ -1,0 +1,50 @@
+{
+  "tapaus": "linux-kaynnista-toinen-toiminto-kaynnissa",
+  "pyynto": {
+    "metodi": "POST",
+    "polku": "/api/palvelin/kaynnista",
+    "runko": {}
+  },
+  "ymparisto": {
+    "skooppitiedot": {
+      "a": [
+        "R.md"
+      ],
+      "b": [
+        "R.md"
+      ],
+      "scopes koe": [
+        "R.md"
+      ]
+    },
+    "istunnot": [],
+    "transkriptit": [],
+    "tmux": {
+      "display-message": "<PID>\n",
+      "capture-pane": "",
+      "list-panes": ""
+    },
+    "komennot": {
+      "vastaukset": [
+        {
+          "komento": "python3",
+          "sisaltaa": "herata-pc.py",
+          "stdout": "Linux vastaa 192.0.2.99 (34 s)\n"
+        }
+      ]
+    },
+    "samanaikainen": {
+      "metodi": "POST",
+      "polku": "/api/palvelin/kaynnista",
+      "runko": {},
+      "pito": "python3"
+    }
+  },
+  "odotus": {
+    "status": 429,
+    "runko": {
+      "virhe": "kaynnista on jo käynnissä"
+    },
+    "aja": []
+  }
+}
