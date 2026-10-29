@@ -4,13 +4,11 @@ Rust-crate `scopes-ydin`, binääri `scopes-solmu`. Portti oletuksena 8797, reit
 
 ## Käännös ja portti
 
-- Käännös aina: `flock /tmp/scopes2-cargo.lock cargo ...` (yksi käännös kerrallaan). `.cargo/config.toml`: `jobs = 2`.
-- Verkko estetty: `CARGO_NET_OFFLINE=true`. Riippuvuudet ovat välimuistissa `~/.cargo/registry`.
-- `bash scopes2/ydin/gate.sh <T-ID>` ajaa fmt, clippy, testit ja aidat; `--pohja` kirjoittaa lähtötilan; `--itsetesti` testaa aidat.
-- openssl-sys (reqwest:in oletus-TLS) tarvitsee `OPENSSL_LIB_DIR=/usr/lib/aarch64-linux-gnu` ja `OPENSSL_INCLUDE_DIR=/usr/include`, koska `pkg-config` puuttuu koneelta; gate.sh asettaa ne, jos ne ovat asettamatta. Käsin ajettaessa aseta samat.
+- Käännös: `cargo build --release` crate-hakemistossa. `.cargo/config.toml` rajaa rinnakkaiset työt (`jobs = 2`) pienen muistin koneita varten.
+- Testit: `cargo test`.
+- openssl-sys (reqwest:in oletus-TLS) löytää OpenSSL:n `pkg-config`illa. Jos sitä ei ole, aseta `OPENSSL_LIB_DIR` ja `OPENSSL_INCLUDE_DIR` koneen OpenSSL-polkuihin.
 
 ## Ensimmäisen käännöksen mittaus (cargo build, jobs=2, kylmä target)
 
-- Maximum resident set size: 420740 kB (noin 411 MiB)
+- Maximum resident set size: noin 411 MiB
 - Kesto: 69 s
-- Raaka rivi: `kaannos-mittaus.txt`

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # rakenna-xcframework.sh - rakentaa apple/ScopesSolmu.xcframework:n kolmelle kohteelle (T-46).
-# Ajetaan Macilla ytimen juuressa ($MAC_PROJ/scopes_2/scopes2-rakennus/ydin). Kayttö: bash apple/rakenna-xcframework.sh
+# Ajetaan Macilla ytimen juuressa (ydin/). Kayttö: bash apple/rakenna-xcframework.sh
 # Exit: 0 ok, 1 jokin kohde tai xcodebuild kaatui.
 set -uo pipefail
 
