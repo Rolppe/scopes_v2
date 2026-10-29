@@ -227,7 +227,7 @@ async function ajaTapaus([nimi, pyynto, ymparisto]) {
     }
     if (komento === 'bash' && argv[0].endsWith('autovaihto.sh')) {
       if (ctx.pito && !ctx.pito.otettu) { ctx.pito.otettu = true; ctx.pito.saavutettu(); await ctx.pito.esto; }
-      return tulos(ymp2.komennot.autovaihto ?? { stdout: 'UUSI: …\nOK: https://claude.ai/code/session_abc123\n' });
+      return tulos(ymp2.komennot.autovaihto ?? { stdout: 'UUSI: …\nOK: https://claude.ai/code/session_REDACTED\n' });
     }
     if (komento === 'node' && argv[0].endsWith('pura-malliton.mjs')) {
       return tulos(ymp2.komennot[argv[1] === '--perhe' ? 'pura-malliton --perhe' : 'pura-malliton'] ?? { koodi: 1 });

@@ -27,7 +27,7 @@
     "komennot": {
       "autovaihto": {
         "koodi": 0,
-        "stdout": "UUSI: …\nOK: https://claude.ai/code/session_abc123\n",
+        "stdout": "UUSI: …\nOK: https://claude.ai/code/session_REDACTED\n",
         "stderr": ""
       }
     }
