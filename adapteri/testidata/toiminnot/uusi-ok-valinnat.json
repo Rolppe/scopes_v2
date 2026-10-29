@@ -31,7 +31,7 @@
     "komennot": {
       "autovaihto": {
         "koodi": 0,
-        "stdout": "UUSI: …\nOK: https://claude.ai/code/session_abc123\n",
+        "stdout": "UUSI: …\nOK: https://claude.ai/code/session_REDACTED\n",
         "stderr": ""
       },
       "vastaukset": [
@@ -48,7 +48,7 @@
       "ok": true,
       "toiminto": "uusi",
       "nimi": "uusi koe",
-      "osoite": "https://claude.ai/code/session_abc123",
+      "osoite": "https://claude.ai/code/session_REDACTED",
       "purkaja": "claude-cli:claude-haiku-5-5",
       "malli": "claude-opus-5-5"
     },

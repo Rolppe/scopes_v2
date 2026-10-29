@@ -46,7 +46,7 @@ function luoAja(ymp2, ctx) {
       if (argv[0] === 'send-keys' && tm.sendKeysKoodi) return tulos({ koodi: tm.sendKeysKoodi });
       return tulos({ stdout: tm[argv[0]] ?? '' });
     }
-    if (komento === 'bash' && argv[0].endsWith('autovaihto.sh')) return tulos(ymp2.komennot.autovaihto ?? { stdout: 'UUSI: …\nOK: https://claude.ai/code/session_abc123\n' });
+    if (komento === 'bash' && argv[0].endsWith('autovaihto.sh')) return tulos(ymp2.komennot.autovaihto ?? { stdout: 'UUSI: …\nOK: https://claude.ai/code/session_REDACTED\n' });
     if (komento === 'node' && argv[0].endsWith('pura-malliton.mjs')) return tulos(ymp2.komennot[argv[1] === '--perhe' ? 'pura-malliton --perhe' : 'pura-malliton'] ?? { koodi: 1 });
     if (komento === 'agy') return tulos(ymp2.komennot.agy ?? { koodi: 127, stderr: 'agy: komentoa ei löydy' });
     if (komento === 'scp') return tulos(ymp2.komennot.scp ?? { koodi: 0 });
@@ -283,7 +283,7 @@ test('429: toinen pura kesken → hylätty-rivi lokiin; lukko vapautuu, kun ensi
     pito.vapauta();
     assert.equal((await kesken).status, 200);
     assert.equal(toimintoKaynnissa(p.ymp), null);
-    assert.deepEqual(p.ctx.loki.at(-1), { toiminto: 'pura', nimi: 'b', tulos: 'ok', osoite: 'https://claude.ai/code/session_abc123', suljettiin: [] });
+    assert.deepEqual(p.ctx.loki.at(-1), { toiminto: 'pura', nimi: 'b', tulos: 'ok', osoite: 'https://claude.ai/code/session_REDACTED', suljettiin: [] });
     assert.equal((await p.havainto(fix.pyynto)).status, 200);
   } finally {
     await p.sulje();

@@ -93,7 +93,7 @@ const DIALOGI = [' Change effort level?', ' Changing effort invalidates the prom
 const vain = (capture) => ({ 'capture-pane': capture });
 
 // ---------- uusi ----------
-const OK_RC = { autovaihto: { koodi: 0, stdout: 'UUSI: …\nOK: https://claude.ai/code/session_abc123\n', stderr: '' } };
+const OK_RC = { autovaihto: { koodi: 0, stdout: 'UUSI: …\nOK: https://claude.ai/code/session_REDACTED\n', stderr: '' } };
 const AGY_LISTA = { komento: 'agy', stdout: 'gemini-3.8-flash-low\tGemini 3.8 Flash (Low)\ngemini-3.8-flash-high\tGemini 3.8 Flash (High)\n' };
 const LUO_SKOOPPI = { koodi: 0, stdout: 'KIRJOITETTU: scopes-koe/REKISTERI.md\nKIRJOITETTU: scopes-koe/HISTORIA.md\n', stderr: '' };
 const AGY_AUTOVAIHTO = { autovaihto: { koodi: 0, stdout: 'UUSI: …\nOK: agy tmux siirto-scopes-koe-1\n', stderr: '' } };
@@ -399,7 +399,7 @@ async function ajaTapaus([nimi, pyynto, ymparisto]) {
       return tulos({ stdout: tmuxVastaus(argv[0]) });
     }
     await pidaTarvittaessa(komento, argv);
-    if (komento === 'bash' && argv[0].endsWith('autovaihto.sh')) return tulos(ymp2.komennot.autovaihto ?? { stdout: 'UUSI: …\nOK: https://claude.ai/code/session_abc123\n' });
+    if (komento === 'bash' && argv[0].endsWith('autovaihto.sh')) return tulos(ymp2.komennot.autovaihto ?? { stdout: 'UUSI: …\nOK: https://claude.ai/code/session_REDACTED\n' });
     if (komento === 'node' && argv[0].endsWith('luo-skooppi.mjs')) return tulos(ymp2.komennot['luo-skooppi'] ?? LUO_SKOOPPI);
     if (komento === 'agy') {
       if (!saanto('agy', argv)) throw new Error(`tallenna-lisa: agy-vastaus puuttuu: ${argv.join(' ')}`);

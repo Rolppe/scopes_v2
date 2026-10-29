@@ -43,7 +43,7 @@
       "ok": true,
       "toiminto": "pura",
       "nimi": "b",
-      "osoite": "https://claude.ai/code/session_abc123",
+      "osoite": "https://claude.ai/code/session_REDACTED",
       "suljettiin": [],
       "purkaja": "claude-agent:siirtaja-sonnet",
       "malli": "claude-sonnet-5-5"
