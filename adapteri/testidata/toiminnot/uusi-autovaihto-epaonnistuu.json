@@ -1,0 +1,54 @@
+{
+  "tapaus": "uusi-autovaihto-epaonnistuu",
+  "pyynto": {
+    "metodi": "POST",
+    "polku": "/api/uusi",
+    "runko": {
+      "nimi": "uusi koe"
+    }
+  },
+  "ymparisto": {
+    "skooppitiedot": {
+      "a": [
+        "R.md"
+      ],
+      "b": [
+        "R.md"
+      ],
+      "scopes koe": [
+        "R.md"
+      ]
+    },
+    "istunnot": [],
+    "transkriptit": [],
+    "tmux": {
+      "display-message": "<PID>\n",
+      "capture-pane": "",
+      "list-panes": ""
+    },
+    "komennot": {
+      "autovaihto": {
+        "koodi": 1,
+        "stdout": "",
+        "stderr": "tmux ei vastaa\n"
+      }
+    }
+  },
+  "odotus": {
+    "status": 502,
+    "runko": {
+      "virhe": "istunto ei käynnistynyt: tmux ei vastaa"
+    },
+    "aja": [
+      [
+        "bash",
+        "<JUURI>/claude/siirto/tools/autovaihto.sh",
+        "vaihda",
+        "uusi koe",
+        "--ei-sulje",
+        "--viesti",
+        "/pura uusi uusi koe"
+      ]
+    ]
+  }
+}

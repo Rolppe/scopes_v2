@@ -1,0 +1,123 @@
+{
+  "tapaus": "purkajat-pura-autovaihto-epaonnistuu",
+  "pyynto": {
+    "metodi": "POST",
+    "polku": "/api/skoopit/a/pura",
+    "runko": {}
+  },
+  "ymparisto": {
+    "skooppitiedot": {
+      "a": [
+        "R.md"
+      ],
+      "b": [
+        "R.md"
+      ]
+    },
+    "istunnot": [
+      {
+        "tiedosto": "<PID>.json",
+        "sisalto": {
+          "pid": "<PID>",
+          "sessionId": "s1",
+          "cwd": "/x",
+          "name": "a",
+          "status": "idle",
+          "tmux": "siirto-a-1:@1.%5"
+        }
+      }
+    ],
+    "transkriptit": [
+      {
+        "kohde": "istunto",
+        "cwd": "/x",
+        "id": "s1",
+        "rivit": [
+          {
+            "type": "user",
+            "timestamp": "2026-10-21T08:00:00.000Z",
+            "message": {
+              "content": "/pakkaa"
+            }
+          },
+          {
+            "type": "assistant",
+            "timestamp": "2026-10-21T08:00:01.000Z",
+            "message": {
+              "stop_reason": "end_turn",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "PAKKAUS: vahvistettu — commit abc1234"
+                }
+              ]
+            }
+          }
+        ]
+      }
+    ],
+    "tmux": {
+      "display-message": "<PID>\n",
+      "capture-pane": "",
+      "list-panes": ""
+    },
+    "komennot": {
+      "pura-malliton --perhe": {
+        "koodi": 1,
+        "stdout": "PERHE: ei\n",
+        "stderr": ""
+      },
+      "autovaihto": {
+        "koodi": 1,
+        "stdout": "",
+        "stderr": "tmux ei käynnisty\n"
+      }
+    }
+  },
+  "odotus": {
+    "status": 502,
+    "runko": {
+      "virhe": "istunto ei käynnistynyt: tmux ei käynnisty"
+    },
+    "aja": [
+      [
+        "node",
+        "<JUURI>/claude/siirto/tools/pura-malliton.mjs",
+        "--perhe",
+        "a"
+      ],
+      [
+        "tmux",
+        "display-message",
+        "-p",
+        "-t",
+        "%5",
+        "#{pane_pid}"
+      ],
+      [
+        "tmux",
+        "send-keys",
+        "-t",
+        "%5",
+        "-l",
+        "/exit"
+      ],
+      [
+        "tmux",
+        "send-keys",
+        "-t",
+        "%5",
+        "Enter"
+      ],
+      [
+        "bash",
+        "<JUURI>/claude/siirto/tools/autovaihto.sh",
+        "vaihda",
+        "a",
+        "--ei-sulje",
+        "--viesti",
+        "/pura a"
+      ]
+    ]
+  }
+}

@@ -1,0 +1,101 @@
+{
+  "tapaus": "automaattisiirto-vapaa",
+  "pyynto": {
+    "metodi": "POST",
+    "polku": "/api/skoopit/a/automaattisiirto",
+    "runko": {}
+  },
+  "ymparisto": {
+    "skooppitiedot": {
+      "a": [
+        "R.md"
+      ],
+      "b": [
+        "R.md"
+      ]
+    },
+    "istunnot": [
+      {
+        "tiedosto": "<PID>.json",
+        "sisalto": {
+          "pid": "<PID>",
+          "sessionId": "s1",
+          "cwd": "/x",
+          "name": "a",
+          "status": "idle",
+          "tmux": "siirto-a-1:@1.%5"
+        }
+      }
+    ],
+    "transkriptit": [
+      {
+        "kohde": "istunto",
+        "cwd": "/x",
+        "id": "s1",
+        "rivit": [
+          {
+            "type": "user",
+            "timestamp": "2026-10-21T08:00:00.000Z",
+            "message": {
+              "content": "/pura a"
+            }
+          },
+          {
+            "type": "assistant",
+            "timestamp": "2026-10-21T08:00:01.000Z",
+            "message": {
+              "stop_reason": "end_turn",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Purku valmis."
+                }
+              ]
+            }
+          }
+        ]
+      }
+    ],
+    "tmux": {
+      "display-message": "<PID>\n",
+      "capture-pane": "",
+      "list-panes": ""
+    },
+    "komennot": {}
+  },
+  "odotus": {
+    "status": 200,
+    "runko": {
+      "ok": true,
+      "toiminto": "automaattisiirto",
+      "nimi": "a",
+      "istunto": "s1",
+      "komento": "/automaattisiirto"
+    },
+    "aja": [
+      [
+        "tmux",
+        "display-message",
+        "-p",
+        "-t",
+        "%5",
+        "#{pane_pid}"
+      ],
+      [
+        "tmux",
+        "send-keys",
+        "-t",
+        "%5",
+        "-l",
+        "/automaattisiirto"
+      ],
+      [
+        "tmux",
+        "send-keys",
+        "-t",
+        "%5",
+        "Enter"
+      ]
+    ]
+  }
+}

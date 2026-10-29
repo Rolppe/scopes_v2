@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>Label</key>
+	<string>com.example.scopes-v2-asennus</string>
+	<key>ProgramArguments</key>
+	<array>
+		<string>@MAC_PROJ@/scopes_2/scopes2-ios-asennus/scopes-v2-asennus.sh</string>
+		<string>--agentti</string>
+	</array>
+	<key>StartInterval</key>
+	<integer>1800</integer>
+	<key>RunAtLoad</key>
+	<true/>
+	<key>LimitLoadToSessionType</key>
+	<string>Aqua</string>
+	<key>StandardOutPath</key>
+	<string>@MAC_PROJ@/scopes_2/scopes2-ios-asennus/agentti.out</string>
+	<key>StandardErrorPath</key>
+	<string>@MAC_PROJ@/scopes_2/scopes2-ios-asennus/agentti.out</string>
+	<key>EnvironmentVariables</key>
+	<dict>
+		<key>MAC_PROJ</key>
+		<string>@MAC_PROJ@</string>
+	</dict>
+</dict>
+</plist>

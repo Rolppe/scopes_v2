@@ -1,0 +1,33 @@
+{
+  "tapaus": "chat-stop-ei-ajoa",
+  "pyynto": {
+    "metodi": "POST",
+    "polku": "/api/chat/stop",
+    "runko": {}
+  },
+  "ymparisto": {
+    "skooppitiedot": {
+      "a": [
+        "R.md"
+      ],
+      "b": [
+        "R.md"
+      ]
+    },
+    "istunnot": [],
+    "transkriptit": [],
+    "tmux": {
+      "display-message": "<PID>\n",
+      "capture-pane": "",
+      "list-panes": ""
+    },
+    "komennot": {}
+  },
+  "odotus": {
+    "status": 409,
+    "runko": {
+      "virhe": "ei käynnissä olevaa vastausta"
+    },
+    "aja": []
+  }
+}

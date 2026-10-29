@@ -1,0 +1,4 @@
+41a42,44
+>         if (process.platform !== 'darwin') {
+>           spawnSync('ssh', ['-o', 'BatchMode=yes', '-o', 'ConnectTimeout=3', 'mac', `mkdir -p ~/.claude/skills/keskustelun-siirto/state && echo '${arvo ? 'true' : 'false'}' > ~/.claude/skills/keskustelun-siirto/state/${ASETUKSET[nimi]}`]);
+>         }

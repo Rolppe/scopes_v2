@@ -1,0 +1,86 @@
+{
+  "tapaus": "purkajat-pura-perhe-tunnistus-epaonnistuu",
+  "pyynto": {
+    "metodi": "POST",
+    "polku": "/api/skoopit/a/pura",
+    "runko": {}
+  },
+  "ymparisto": {
+    "skooppitiedot": {
+      "a": [
+        "R.md"
+      ],
+      "b": [
+        "R.md"
+      ]
+    },
+    "istunnot": [
+      {
+        "tiedosto": "<PID>.json",
+        "sisalto": {
+          "pid": "<PID>",
+          "sessionId": "s1",
+          "cwd": "/x",
+          "name": "a",
+          "status": "idle",
+          "tmux": "siirto-a-1:@1.%5"
+        }
+      }
+    ],
+    "transkriptit": [
+      {
+        "kohde": "istunto",
+        "cwd": "/x",
+        "id": "s1",
+        "rivit": [
+          {
+            "type": "user",
+            "timestamp": "2026-10-21T08:00:00.000Z",
+            "message": {
+              "content": "/pakkaa"
+            }
+          },
+          {
+            "type": "assistant",
+            "timestamp": "2026-10-21T08:00:01.000Z",
+            "message": {
+              "stop_reason": "end_turn",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "PAKKAUS: vahvistettu — commit abc1234"
+                }
+              ]
+            }
+          }
+        ]
+      }
+    ],
+    "tmux": {
+      "display-message": "<PID>\n",
+      "capture-pane": "",
+      "list-panes": ""
+    },
+    "komennot": {
+      "pura-malliton --perhe": {
+        "koodi": 2,
+        "stdout": "",
+        "stderr": "rivi 1\nskooppikartta rikki\n"
+      }
+    }
+  },
+  "odotus": {
+    "status": 500,
+    "runko": {
+      "virhe": "skooppikartta rikki"
+    },
+    "aja": [
+      [
+        "node",
+        "<JUURI>/claude/siirto/tools/pura-malliton.mjs",
+        "--perhe",
+        "a"
+      ]
+    ]
+  }
+}

@@ -1,0 +1,10 @@
+#!/usr/bin/env node
+// ping-mock (T-79-G, ARK-19): kirjaa argv lokiin, ei lähetä paketteja. Vastaus: ping.json (säännöt, sisaltaa = osoite, esim.
+// "192.0.2.99") tai ping.txt, ping.koodi. Oletus: ei vastausta (exit 1, tyhjä stdout) eli kone on sammuksissa.
+// palvelin.mjs päättelee järjestelmän TTL:stä: ttl=64 → linux, ttl=128 → windows.
+import { kirjaa } from './mock-lib.mjs';
+import { vastaaSaannoilla } from './mock-saannot.mjs';
+
+const argv = process.argv.slice(2);
+kirjaa('ping', argv);
+process.exitCode = vastaaSaannoilla('ping', argv, { koodi: 1 });

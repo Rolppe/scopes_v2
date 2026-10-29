@@ -1,0 +1,7 @@
+31,32d30
+< // T-88, tietoinen ero vanhaan (android.mjs.ero): laitteen toinen näyttö (TV) tuottaa screencapin alkuun varoitustekstin ennen PNG:tä; hylätään PNG-allekirjoitusta edeltävät tavut (ei allekirjoitusta = ennallaan → vanha 500).
+< export const pngAlusta = (tavut) => { const i = tavut.indexOf(Buffer.from([0x89, 0x50, 0x4e, 0x47])); return i > 0 ? tavut.subarray(i) : tavut; };
+239c237
+<     const jpg = await aja('python3', ['-P', '-c', JPEG, String(w), '70'], { syote: pngAlusta(png.stdout), aikaraja: 15_000 });
+---
+>     const jpg = await aja('python3', ['-P', '-c', JPEG, String(w), '70'], { syote: png.stdout, aikaraja: 15_000 });

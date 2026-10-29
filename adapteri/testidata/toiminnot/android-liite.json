@@ -1,0 +1,156 @@
+{
+  "tapaus": "android-liite",
+  "pyynto": {
+    "metodi": "POST",
+    "polku": "/api/android/liite?nimi=muistio.txt",
+    "runko": "liitteen sisältö"
+  },
+  "ymparisto": {
+    "skooppitiedot": {
+      "a": [
+        "R.md"
+      ],
+      "b": [
+        "R.md"
+      ],
+      "scopes koe": [
+        "R.md"
+      ]
+    },
+    "istunnot": [],
+    "transkriptit": [],
+    "tmux": {
+      "display-message": "<PID>\n",
+      "capture-pane": "",
+      "list-panes": ""
+    },
+    "komennot": {
+      "vastaukset": [
+        {
+          "komento": "adb",
+          "sisaltaa": "dumpsys power",
+          "stdout": "mWakefulness=Awake\n"
+        },
+        {
+          "komento": "adb",
+          "sisaltaa": "wm size",
+          "stdout": "Physical size: 1080x2400\n"
+        },
+        {
+          "komento": "adb",
+          "sisaltaa": "uiautomator dump",
+          "stdout": "<?xml version='1.0' encoding='UTF-8' standalone='yes' ?><hierarchy rotation=\"0\"><node index=\"0\" text=\"\" resource-id=\"\" class=\"android.widget.Button\" content-desc=\"Add attachments\" clickable=\"true\" bounds=\"[100][2000][300][2100]\" /><node index=\"0\" text=\"Files\" resource-id=\"\" class=\"android.widget.TextView\" content-desc=\"\" clickable=\"false\" bounds=\"[0][1500][500][1600]\" /><node index=\"0\" text=\"scopes-080000-muistio.txt\" resource-id=\"\" class=\"android.widget.TextView\" content-desc=\"\" clickable=\"false\" bounds=\"[0][1700][900][1800]\" /><node index=\"0\" text=\"\" resource-id=\"\" class=\"android.widget.Button\" content-desc=\"Send\" clickable=\"true\" bounds=\"[100][2000][300][2100]\" /></hierarchy>"
+        }
+      ]
+    }
+  },
+  "odotus": {
+    "status": 200,
+    "runko": {
+      "ok": true,
+      "nimi": "scopes-080000-muistio.txt",
+      "liitetty": true,
+      "lahetetty": false
+    },
+    "aja": [
+      [
+        "adb",
+        "-s",
+        "127.0.0.1:5555",
+        "shell",
+        "dumpsys power | grep mWakefulness="
+      ],
+      [
+        "adb",
+        "-s",
+        "127.0.0.1:5555",
+        "shell",
+        "mkdir -p /sdcard/Download/Scopes"
+      ],
+      [
+        "adb",
+        "-s",
+        "127.0.0.1:5555",
+        "push",
+        "<LIITTEET>/android/20261021T080000-abcdef-muistio.txt",
+        "/sdcard/Download/Scopes/scopes-080000-muistio.txt"
+      ],
+      [
+        "adb",
+        "-s",
+        "127.0.0.1:5555",
+        "shell",
+        "content call --uri content://media --method scan_file --arg '/sdcard/Download/Scopes/scopes-080000-muistio.txt'"
+      ],
+      [
+        "adb",
+        "-s",
+        "127.0.0.1:5555",
+        "shell",
+        "am start -n com.google.android.apps.bard/.shellapp.BardEntryPointActivity"
+      ],
+      [
+        "adb",
+        "-s",
+        "127.0.0.1:5555",
+        "shell",
+        "uiautomator dump /data/local/tmp/scopes-ui-1792569600000-i.xml >/dev/null 2>&1; cat /data/local/tmp/scopes-ui-1792569600000-i.xml; rm -f /data/local/tmp/scopes-ui-1792569600000-i.xml"
+      ],
+      [
+        "adb",
+        "-s",
+        "127.0.0.1:5555",
+        "shell",
+        "uiautomator dump /data/local/tmp/scopes-ui-1792569600000-i.xml >/dev/null 2>&1; cat /data/local/tmp/scopes-ui-1792569600000-i.xml; rm -f /data/local/tmp/scopes-ui-1792569600000-i.xml"
+      ],
+      [
+        "adb",
+        "-s",
+        "127.0.0.1:5555",
+        "shell",
+        "input tap 200 2050"
+      ],
+      [
+        "adb",
+        "-s",
+        "127.0.0.1:5555",
+        "shell",
+        "uiautomator dump /data/local/tmp/scopes-ui-1792569600000-i.xml >/dev/null 2>&1; cat /data/local/tmp/scopes-ui-1792569600000-i.xml; rm -f /data/local/tmp/scopes-ui-1792569600000-i.xml"
+      ],
+      [
+        "adb",
+        "-s",
+        "127.0.0.1:5555",
+        "shell",
+        "input tap 250 1550"
+      ],
+      [
+        "adb",
+        "-s",
+        "127.0.0.1:5555",
+        "shell",
+        "uiautomator dump /data/local/tmp/scopes-ui-1792569600000-i.xml >/dev/null 2>&1; cat /data/local/tmp/scopes-ui-1792569600000-i.xml; rm -f /data/local/tmp/scopes-ui-1792569600000-i.xml"
+      ],
+      [
+        "adb",
+        "-s",
+        "127.0.0.1:5555",
+        "shell",
+        "input tap 450 1750"
+      ],
+      [
+        "adb",
+        "-s",
+        "127.0.0.1:5555",
+        "shell",
+        "uiautomator dump /data/local/tmp/scopes-ui-1792569600000-i.xml >/dev/null 2>&1; cat /data/local/tmp/scopes-ui-1792569600000-i.xml; rm -f /data/local/tmp/scopes-ui-1792569600000-i.xml"
+      ]
+    ],
+    "viiveet": [
+      1200,
+      1200,
+      2000,
+      2000
+    ]
+  }
+}

@@ -1,0 +1,56 @@
+{
+  "tapaus": "uusi-agy-ei-scopes-perhe",
+  "pyynto": {
+    "metodi": "POST",
+    "polku": "/api/uusi",
+    "runko": {
+      "nimi": "koe",
+      "malli": "agy/gemini-3.8-flash-low"
+    }
+  },
+  "ymparisto": {
+    "skooppitiedot": {
+      "a": [
+        "R.md"
+      ],
+      "b": [
+        "R.md"
+      ],
+      "scopes koe": [
+        "R.md"
+      ]
+    },
+    "istunnot": [],
+    "transkriptit": [],
+    "tmux": {
+      "display-message": "<PID>\n",
+      "capture-pane": "",
+      "list-panes": ""
+    },
+    "komennot": {
+      "autovaihto": {
+        "koodi": 0,
+        "stdout": "UUSI: …\nOK: agy tmux siirto-scopes-koe-1\n",
+        "stderr": ""
+      },
+      "vastaukset": [
+        {
+          "komento": "agy",
+          "stdout": "gemini-3.8-flash-low\tGemini 3.8 Flash (Low)\ngemini-3.8-flash-high\tGemini 3.8 Flash (High)\n"
+        }
+      ]
+    }
+  },
+  "odotus": {
+    "status": 400,
+    "runko": {
+      "virhe": "agy-istunto kuuluu vain scopes-perheen skoopeille: nimi alkaa sanalla scopes"
+    },
+    "aja": [
+      [
+        "agy",
+        "models"
+      ]
+    ]
+  }
+}

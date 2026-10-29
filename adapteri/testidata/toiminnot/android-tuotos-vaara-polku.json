@@ -1,0 +1,49 @@
+{
+  "tapaus": "android-tuotos-vaara-polku",
+  "pyynto": {
+    "metodi": "GET",
+    "polku": "/api/android/tuotos?polku=%2Fdata%2Fdata%2Fsalaisuus.txt",
+    "runko": null
+  },
+  "ymparisto": {
+    "skooppitiedot": {
+      "a": [
+        "R.md"
+      ],
+      "b": [
+        "R.md"
+      ],
+      "scopes koe": [
+        "R.md"
+      ]
+    },
+    "istunnot": [],
+    "transkriptit": [],
+    "tmux": {
+      "display-message": "<PID>\n",
+      "capture-pane": "",
+      "list-panes": ""
+    },
+    "komennot": {
+      "vastaukset": [
+        {
+          "komento": "adb",
+          "sisaltaa": "dumpsys power",
+          "stdout": "mWakefulness=Awake\n"
+        },
+        {
+          "komento": "adb",
+          "sisaltaa": "wm size",
+          "stdout": "Physical size: 1080x2400\n"
+        }
+      ]
+    }
+  },
+  "odotus": {
+    "status": 400,
+    "runko": {
+      "virhe": "polku ei ole tuotoskansiossa"
+    },
+    "aja": []
+  }
+}

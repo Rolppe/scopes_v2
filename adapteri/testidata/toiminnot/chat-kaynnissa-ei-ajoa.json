@@ -1,0 +1,33 @@
+{
+  "tapaus": "chat-kaynnissa-ei-ajoa",
+  "pyynto": {
+    "metodi": "GET",
+    "polku": "/api/chat/kaynnissa",
+    "runko": null
+  },
+  "ymparisto": {
+    "skooppitiedot": {
+      "a": [
+        "R.md"
+      ],
+      "b": [
+        "R.md"
+      ]
+    },
+    "istunnot": [],
+    "transkriptit": [],
+    "tmux": {
+      "display-message": "<PID>\n",
+      "capture-pane": "",
+      "list-panes": ""
+    },
+    "komennot": {}
+  },
+  "odotus": {
+    "status": 404,
+    "runko": {
+      "virhe": "ei käynnissä olevaa vastausta"
+    },
+    "aja": []
+  }
+}

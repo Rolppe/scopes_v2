@@ -1,0 +1,98 @@
+{
+  "tapaus": "purkajat-lista-agy-ei-vastaa",
+  "pyynto": {
+    "metodi": "GET",
+    "polku": "/api/purkajat",
+    "runko": null
+  },
+  "ymparisto": {
+    "skooppitiedot": {
+      "a": [
+        "R.md"
+      ],
+      "b": [
+        "R.md"
+      ]
+    },
+    "istunnot": [],
+    "transkriptit": [],
+    "tmux": {
+      "display-message": "<PID>\n",
+      "capture-pane": "",
+      "list-panes": ""
+    },
+    "komennot": {
+      "agy": {
+        "koodi": 1,
+        "stdout": "",
+        "stderr": "ei kirjautunut\n"
+      }
+    }
+  },
+  "odotus": {
+    "status": 200,
+    "runko": {
+      "purkajat": [
+        {
+          "tunnus": "",
+          "kuvaus": "Oletus (ajaja.json)",
+          "ryhma": "oletus"
+        },
+        {
+          "tunnus": "claude-cli:claude-fable-5-1",
+          "kuvaus": "Fable 5.1",
+          "ryhma": "Claude"
+        },
+        {
+          "tunnus": "claude-cli:claude-opus-5-5",
+          "kuvaus": "Opus 5.5",
+          "ryhma": "Claude"
+        },
+        {
+          "tunnus": "claude-cli:claude-sonnet-5-5",
+          "kuvaus": "Sonnet 5.5",
+          "ryhma": "Claude"
+        },
+        {
+          "tunnus": "claude-cli:claude-haiku-5-5",
+          "kuvaus": "Haiku 5.5",
+          "ryhma": "Claude"
+        },
+        {
+          "tunnus": "claude-agent:siirtaja-sonnet",
+          "kuvaus": "siirtaja-sonnet-agentti",
+          "ryhma": "Claude"
+        }
+      ],
+      "mallit": [
+        {
+          "nimi": "claude-fable-5-1",
+          "kuvaus": "Fable 5.1",
+          "ryhma": "Claude"
+        },
+        {
+          "nimi": "claude-opus-5-5",
+          "kuvaus": "Opus 5.5",
+          "ryhma": "Claude"
+        },
+        {
+          "nimi": "claude-sonnet-5-5",
+          "kuvaus": "Sonnet 5.5",
+          "ryhma": "Claude"
+        },
+        {
+          "nimi": "claude-haiku-5-5",
+          "kuvaus": "Haiku 5.5",
+          "ryhma": "Claude"
+        }
+      ],
+      "oletusMalli": "claude-opus-5-5"
+    },
+    "aja": [
+      [
+        "agy",
+        "models"
+      ]
+    ]
+  }
+}

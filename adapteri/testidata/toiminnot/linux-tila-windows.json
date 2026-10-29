@@ -1,0 +1,62 @@
+{
+  "tapaus": "linux-tila-windows",
+  "pyynto": {
+    "metodi": "GET",
+    "polku": "/api/palvelin",
+    "runko": null
+  },
+  "ymparisto": {
+    "skooppitiedot": {
+      "a": [
+        "R.md"
+      ],
+      "b": [
+        "R.md"
+      ],
+      "scopes koe": [
+        "R.md"
+      ]
+    },
+    "istunnot": [],
+    "transkriptit": [],
+    "tmux": {
+      "display-message": "<PID>\n",
+      "capture-pane": "",
+      "list-panes": ""
+    },
+    "komennot": {
+      "vastaukset": [
+        {
+          "komento": "ping",
+          "sisaltaa": "192.0.2.99",
+          "stdout": "64 bytes from 192.0.2.99: icmp_seq=1 ttl=128 time=0.4 ms\n"
+        }
+      ]
+    }
+  },
+  "odotus": {
+    "status": 200,
+    "runko": {
+      "tila": "windows",
+      "osoite": "192.0.2.99"
+    },
+    "aja": [
+      [
+        "ping",
+        "-c",
+        "1",
+        "-W",
+        "2",
+        "192.0.2.99"
+      ],
+      [
+        "ping",
+        "-c",
+        "1",
+        "-W",
+        "2",
+        "192.0.2.99"
+      ]
+    ]
+  }
+}

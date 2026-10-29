@@ -1,0 +1,146 @@
+{
+  "tapaus": "android-ui",
+  "pyynto": {
+    "metodi": "GET",
+    "polku": "/api/android/ui",
+    "runko": null
+  },
+  "ymparisto": {
+    "skooppitiedot": {
+      "a": [
+        "R.md"
+      ],
+      "b": [
+        "R.md"
+      ],
+      "scopes koe": [
+        "R.md"
+      ]
+    },
+    "istunnot": [],
+    "transkriptit": [],
+    "tmux": {
+      "display-message": "<PID>\n",
+      "capture-pane": "",
+      "list-panes": ""
+    },
+    "komennot": {
+      "vastaukset": [
+        {
+          "komento": "adb",
+          "sisaltaa": "dumpsys power",
+          "stdout": "mWakefulness=Awake\n"
+        },
+        {
+          "komento": "adb",
+          "sisaltaa": "wm size",
+          "stdout": "Physical size: 1080x2400\n"
+        },
+        {
+          "komento": "adb",
+          "sisaltaa": "uiautomator dump",
+          "stdout": "<?xml version='1.0' encoding='UTF-8' standalone='yes' ?><hierarchy rotation=\"0\"><node index=\"0\" text=\"Moi Gemini\" resource-id=\"com.google.android.apps.bard:id/assistant_robin_user_message_text\" class=\"android.widget.TextView\" content-desc=\"\" clickable=\"false\" bounds=\"[0][100][1080][200]\" /><node index=\"0\" text=\"Hei! Miten voin auttaa?\" resource-id=\"com.google.android.apps.bard:id/assistant_robin_text\" class=\"android.widget.TextView\" content-desc=\"\" clickable=\"false\" bounds=\"[0][300][1080][400]\" /><node index=\"0\" text=\"\" resource-id=\"\" class=\"android.widget.Button\" content-desc=\"Send\" clickable=\"true\" bounds=\"[100][2000][300][2100]\" /><node index=\"0\" text=\"\" resource-id=\"\" class=\"android.widget.TextView\" content-desc=\"Stop generating response\" clickable=\"false\" bounds=\"[0][0][100][100]\" /></hierarchy>"
+        }
+      ]
+    }
+  },
+  "odotus": {
+    "status": 200,
+    "runko": {
+      "koko": [
+        1080,
+        2400
+      ],
+      "solmut": [
+        {
+          "teksti": "Moi Gemini",
+          "kuvaus": "",
+          "id": "assistant_robin_user_message_text",
+          "luokka": "TextView",
+          "napautettava": false,
+          "alue": [
+            0,
+            100,
+            1080,
+            200
+          ]
+        },
+        {
+          "teksti": "Hei! Miten voin auttaa?",
+          "kuvaus": "",
+          "id": "assistant_robin_text",
+          "luokka": "TextView",
+          "napautettava": false,
+          "alue": [
+            0,
+            300,
+            1080,
+            400
+          ]
+        },
+        {
+          "teksti": "",
+          "kuvaus": "Send",
+          "id": "",
+          "luokka": "Button",
+          "napautettava": true,
+          "alue": [
+            100,
+            2000,
+            300,
+            2100
+          ]
+        },
+        {
+          "teksti": "",
+          "kuvaus": "Stop generating response",
+          "id": "",
+          "luokka": "TextView",
+          "napautettava": false,
+          "alue": [
+            0,
+            0,
+            100,
+            100
+          ]
+        }
+      ],
+      "gemini": {
+        "viestit": [
+          {
+            "rooli": "kayttaja",
+            "teksti": "Moi Gemini"
+          },
+          {
+            "rooli": "gemini",
+            "teksti": "Hei! Miten voin auttaa?"
+          }
+        ],
+        "kaynnissa": true
+      }
+    },
+    "aja": [
+      [
+        "adb",
+        "-s",
+        "127.0.0.1:5555",
+        "shell",
+        "dumpsys power | grep mWakefulness="
+      ],
+      [
+        "adb",
+        "-s",
+        "127.0.0.1:5555",
+        "shell",
+        "uiautomator dump /data/local/tmp/scopes-ui-1792569600000-i.xml >/dev/null 2>&1; cat /data/local/tmp/scopes-ui-1792569600000-i.xml; rm -f /data/local/tmp/scopes-ui-1792569600000-i.xml"
+      ],
+      [
+        "adb",
+        "-s",
+        "127.0.0.1:5555",
+        "shell",
+        "wm size"
+      ]
+    ]
+  }
+}

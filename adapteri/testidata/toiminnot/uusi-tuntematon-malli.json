@@ -1,0 +1,56 @@
+{
+  "tapaus": "uusi-tuntematon-malli",
+  "pyynto": {
+    "metodi": "POST",
+    "polku": "/api/uusi",
+    "runko": {
+      "nimi": "uusi koe",
+      "malli": "ei-ole/malli"
+    }
+  },
+  "ymparisto": {
+    "skooppitiedot": {
+      "a": [
+        "R.md"
+      ],
+      "b": [
+        "R.md"
+      ],
+      "scopes koe": [
+        "R.md"
+      ]
+    },
+    "istunnot": [],
+    "transkriptit": [],
+    "tmux": {
+      "display-message": "<PID>\n",
+      "capture-pane": "",
+      "list-panes": ""
+    },
+    "komennot": {
+      "autovaihto": {
+        "koodi": 0,
+        "stdout": "UUSI: …\nOK: https://claude.ai/code/session_abc123\n",
+        "stderr": ""
+      },
+      "vastaukset": [
+        {
+          "komento": "agy",
+          "stdout": "gemini-3.8-flash-low\tGemini 3.8 Flash (Low)\ngemini-3.8-flash-high\tGemini 3.8 Flash (High)\n"
+        }
+      ]
+    }
+  },
+  "odotus": {
+    "status": 400,
+    "runko": {
+      "virhe": "tuntematon istunnon malli ei-ole/malli"
+    },
+    "aja": [
+      [
+        "agy",
+        "models"
+      ]
+    ]
+  }
+}

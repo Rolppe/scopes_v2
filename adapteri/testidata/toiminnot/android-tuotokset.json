@@ -1,0 +1,75 @@
+{
+  "tapaus": "android-tuotokset",
+  "pyynto": {
+    "metodi": "GET",
+    "polku": "/api/android/tuotokset",
+    "runko": null
+  },
+  "ymparisto": {
+    "skooppitiedot": {
+      "a": [
+        "R.md"
+      ],
+      "b": [
+        "R.md"
+      ],
+      "scopes koe": [
+        "R.md"
+      ]
+    },
+    "istunnot": [],
+    "transkriptit": [],
+    "tmux": {
+      "display-message": "<PID>\n",
+      "capture-pane": "",
+      "list-panes": ""
+    },
+    "komennot": {
+      "vastaukset": [
+        {
+          "komento": "adb",
+          "sisaltaa": "dumpsys power",
+          "stdout": "mWakefulness=Awake\n"
+        },
+        {
+          "komento": "adb",
+          "sisaltaa": "wm size",
+          "stdout": "Physical size: 1080x2400\n"
+        },
+        {
+          "komento": "adb",
+          "sisaltaa": "find",
+          "stdout": "1760000000|1234|/sdcard/Download/raportti.txt\n1760000100|99|/sdcard/Pictures/kuva.png\nroska\n"
+        }
+      ]
+    }
+  },
+  "odotus": {
+    "status": 200,
+    "runko": {
+      "tiedostot": [
+        {
+          "polku": "/sdcard/Pictures/kuva.png",
+          "nimi": "kuva.png",
+          "koko": 99,
+          "aika": "2025-10-09T08:55:00.000Z"
+        },
+        {
+          "polku": "/sdcard/Download/raportti.txt",
+          "nimi": "raportti.txt",
+          "koko": 1234,
+          "aika": "2025-10-09T08:53:20.000Z"
+        }
+      ]
+    },
+    "aja": [
+      [
+        "adb",
+        "-s",
+        "127.0.0.1:5555",
+        "shell",
+        "for d in /sdcard/Download /sdcard/Pictures /sdcard/Movies /sdcard/Documents /sdcard/DCIM; do find \"$d\" -type f -mtime -14 2>/dev/null; done | grep -v -e '^/sdcard/Download/Scopes/' -e '/\\.' | while IFS= read -r f; do stat -c '%Y|%s|%n' \"$f\"; done"
+      ]
+    ]
+  }
+}

@@ -1,0 +1,30 @@
+{
+  "tapaus": "palvelin-rikkinainen-koodaus",
+  "pyynto": {
+    "metodi": "GET",
+    "polku": "/api/chat/keskustelut/%E0%A4%A",
+    "runko": null
+  },
+  "ymparisto": {
+    "skooppitiedot": {
+      "a": [
+        "R.md"
+      ]
+    },
+    "istunnot": [],
+    "transkriptit": [],
+    "tmux": {
+      "display-message": "<PID>\n",
+      "capture-pane": "",
+      "list-panes": ""
+    },
+    "komennot": {}
+  },
+  "odotus": {
+    "status": 500,
+    "runko": {
+      "virhe": "URI malformed"
+    },
+    "aja": []
+  }
+}

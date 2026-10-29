@@ -1,0 +1,107 @@
+{
+  "tapaus": "agentit-android-mukana",
+  "pyynto": {
+    "metodi": "GET",
+    "polku": "/api/agentit",
+    "runko": null
+  },
+  "ymparisto": {
+    "skooppitiedot": {
+      "a": [
+        "R.md"
+      ],
+      "b": [
+        "R.md"
+      ],
+      "scopes koe": [
+        "R.md"
+      ]
+    },
+    "istunnot": [],
+    "transkriptit": [],
+    "tmux": {
+      "display-message": "<PID>\n",
+      "capture-pane": "",
+      "list-panes": ""
+    },
+    "komennot": {},
+    "androidMukana": true
+  },
+  "odotus": {
+    "status": 200,
+    "runko": [
+      {
+        "nimi": "claude-fable-5-1",
+        "kuvaus": "Fable 5.1",
+        "tyyppi": "malli"
+      },
+      {
+        "nimi": "claude-opus-5-5",
+        "kuvaus": "Opus 5.5",
+        "tyyppi": "malli"
+      },
+      {
+        "nimi": "claude-sonnet-5-5",
+        "kuvaus": "Sonnet 5.5",
+        "tyyppi": "malli"
+      },
+      {
+        "nimi": "claude-haiku-5-5",
+        "kuvaus": "Haiku 5.5",
+        "tyyppi": "malli"
+      },
+      {
+        "nimi": "mac-agy/gemini-3.8-flash-low",
+        "kuvaus": "Gemini 3.8 Flash (Low)",
+        "tyyppi": "agy",
+        "malliId": "gemini-3.8-flash-low"
+      },
+      {
+        "nimi": "mac-agy/gemini-3.8-flash-medium",
+        "kuvaus": "Gemini 3.8 Flash (Medium)",
+        "tyyppi": "agy",
+        "malliId": "gemini-3.8-flash-medium"
+      },
+      {
+        "nimi": "mac-agy/gemini-3.8-flash-high",
+        "kuvaus": "Gemini 3.8 Flash (High)",
+        "tyyppi": "agy",
+        "malliId": "gemini-3.8-flash-high"
+      },
+      {
+        "nimi": "mac-agy/claude-sonnet-4-6",
+        "kuvaus": "Claude Sonnet 4.6",
+        "tyyppi": "agy",
+        "malliId": "claude-sonnet-4-6"
+      },
+      {
+        "nimi": "mac-agy/claude-opus-4-6-thinking",
+        "kuvaus": "Claude Opus 4.6 (Thinking)",
+        "tyyppi": "agy",
+        "malliId": "claude-opus-4-6-thinking"
+      },
+      {
+        "nimi": "mac-agy/gpt-oss-120b-medium",
+        "kuvaus": "GPT-OSS 120B (Medium)",
+        "tyyppi": "agy",
+        "malliId": "gpt-oss-120b-medium"
+      },
+      {
+        "nimi": "android/gemini",
+        "kuvaus": "Gemini",
+        "tyyppi": "gemini"
+      }
+    ],
+    "aja": [
+      [
+        "ssh",
+        "-o",
+        "ConnectTimeout=3",
+        "-o",
+        "BatchMode=yes",
+        "palvelin",
+        "curl -s -m 5 http://127.0.0.1:1234/v1/models"
+      ]
+    ]
+  }
+}

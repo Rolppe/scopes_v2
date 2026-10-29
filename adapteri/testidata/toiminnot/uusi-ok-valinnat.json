@@ -1,0 +1,73 @@
+{
+  "tapaus": "uusi-ok-valinnat",
+  "pyynto": {
+    "metodi": "POST",
+    "polku": "/api/uusi",
+    "runko": {
+      "nimi": "uusi koe",
+      "purkaja": "claude-cli:claude-haiku-5-5",
+      "malli": "claude-opus-5-5"
+    }
+  },
+  "ymparisto": {
+    "skooppitiedot": {
+      "a": [
+        "R.md"
+      ],
+      "b": [
+        "R.md"
+      ],
+      "scopes koe": [
+        "R.md"
+      ]
+    },
+    "istunnot": [],
+    "transkriptit": [],
+    "tmux": {
+      "display-message": "<PID>\n",
+      "capture-pane": "",
+      "list-panes": ""
+    },
+    "komennot": {
+      "autovaihto": {
+        "koodi": 0,
+        "stdout": "UUSI: …\nOK: https://claude.ai/code/session_abc123\n",
+        "stderr": ""
+      },
+      "vastaukset": [
+        {
+          "komento": "agy",
+          "stdout": "gemini-3.8-flash-low\tGemini 3.8 Flash (Low)\ngemini-3.8-flash-high\tGemini 3.8 Flash (High)\n"
+        }
+      ]
+    }
+  },
+  "odotus": {
+    "status": 200,
+    "runko": {
+      "ok": true,
+      "toiminto": "uusi",
+      "nimi": "uusi koe",
+      "osoite": "https://claude.ai/code/session_abc123",
+      "purkaja": "claude-cli:claude-haiku-5-5",
+      "malli": "claude-opus-5-5"
+    },
+    "aja": [
+      [
+        "agy",
+        "models"
+      ],
+      [
+        "bash",
+        "<JUURI>/claude/siirto/tools/autovaihto.sh",
+        "vaihda",
+        "uusi koe",
+        "--ei-sulje",
+        "--model",
+        "claude-opus-5-5",
+        "--viesti",
+        "/pura uusi uusi koe --ajaja=claude-cli:claude-haiku-5-5"
+      ]
+    ]
+  }
+}

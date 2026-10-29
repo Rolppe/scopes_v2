@@ -1,0 +1,51 @@
+{
+  "tapaus": "uusi-toinen-toiminto-kaynnissa",
+  "pyynto": {
+    "metodi": "POST",
+    "polku": "/api/uusi",
+    "runko": {
+      "nimi": "uusi koe"
+    }
+  },
+  "ymparisto": {
+    "skooppitiedot": {
+      "a": [
+        "R.md"
+      ],
+      "b": [
+        "R.md"
+      ],
+      "scopes koe": [
+        "R.md"
+      ]
+    },
+    "istunnot": [],
+    "transkriptit": [],
+    "tmux": {
+      "display-message": "<PID>\n",
+      "capture-pane": "",
+      "list-panes": ""
+    },
+    "komennot": {
+      "autovaihto": {
+        "koodi": 0,
+        "stdout": "UUSI: …\nOK: https://claude.ai/code/session_abc123\n",
+        "stderr": ""
+      }
+    },
+    "samanaikainen": {
+      "metodi": "POST",
+      "polku": "/api/uusi",
+      "runko": {
+        "nimi": "toinen koe"
+      }
+    }
+  },
+  "odotus": {
+    "status": 429,
+    "runko": {
+      "virhe": "toinen toiminto on käynnissä (uusi)"
+    },
+    "aja": []
+  }
+}

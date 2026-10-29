@@ -1,0 +1,11 @@
+#!/usr/bin/env node
+// adb-mock (T-79-G, ARK-19): kirjaa argv ja stdin lokiin, ei koske oikeaan laitteeseen (127.0.0.1:5555 pysyy koskemattomana).
+// Vastaus: adb.json (säännöt, kts. mock-saannot.mjs; stdoutBase64 tavuvastauksiin kuten screencap) tai adb.txt, adb.stderr, adb.koodi
+// (oletus tyhjä, exit 0). Vanha android.mjs kutsuu: `adb -s <laite> shell <rivi>`, `adb -s <laite> exec-out screencap -p | cat <polku>`
+// ja `adb -s <laite> push <paikallinen> <kohde>`.
+import { kirjaa, lueStdin } from './mock-lib.mjs';
+import { vastaaSaannoilla } from './mock-saannot.mjs';
+
+const argv = process.argv.slice(2);
+kirjaa('adb', argv, lueStdin());
+process.exitCode = vastaaSaannoilla('adb', argv);

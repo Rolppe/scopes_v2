@@ -1,0 +1,138 @@
+{
+  "tapaus": "purkajat-lista",
+  "pyynto": {
+    "metodi": "GET",
+    "polku": "/api/purkajat",
+    "runko": null
+  },
+  "ymparisto": {
+    "skooppitiedot": {
+      "a": [
+        "R.md"
+      ],
+      "b": [
+        "R.md"
+      ]
+    },
+    "istunnot": [],
+    "transkriptit": [],
+    "tmux": {
+      "display-message": "<PID>\n",
+      "capture-pane": "",
+      "list-panes": ""
+    },
+    "komennot": {
+      "agy": {
+        "koodi": 0,
+        "stdout": "Fetching available models...\ngemini-9-pro\tGemini 9 Pro\nclaude-x-1\tClaude X 1\n",
+        "stderr": ""
+      }
+    }
+  },
+  "odotus": {
+    "status": 200,
+    "runko": {
+      "purkajat": [
+        {
+          "tunnus": "",
+          "kuvaus": "Oletus (ajaja.json)",
+          "ryhma": "oletus"
+        },
+        {
+          "tunnus": "claude-cli:claude-fable-5-1",
+          "kuvaus": "Fable 5.1",
+          "ryhma": "Claude"
+        },
+        {
+          "tunnus": "claude-cli:claude-opus-5-5",
+          "kuvaus": "Opus 5.5",
+          "ryhma": "Claude"
+        },
+        {
+          "tunnus": "claude-cli:claude-sonnet-5-5",
+          "kuvaus": "Sonnet 5.5",
+          "ryhma": "Claude"
+        },
+        {
+          "tunnus": "claude-cli:claude-haiku-5-5",
+          "kuvaus": "Haiku 5.5",
+          "ryhma": "Claude"
+        },
+        {
+          "tunnus": "claude-agent:siirtaja-sonnet",
+          "kuvaus": "siirtaja-sonnet-agentti",
+          "ryhma": "Claude"
+        },
+        {
+          "tunnus": "mac-agy:gemini-9-pro",
+          "kuvaus": "Gemini 9 Pro · macos",
+          "ryhma": "Mac AGY"
+        },
+        {
+          "tunnus": "mac-agy:claude-x-1",
+          "kuvaus": "Claude X 1 · macos",
+          "ryhma": "Mac AGY"
+        },
+        {
+          "tunnus": "agy:gemini-9-pro",
+          "kuvaus": "Gemini 9 Pro · oneplus linux",
+          "ryhma": "OnePlus Linux AGY"
+        },
+        {
+          "tunnus": "agy:claude-x-1",
+          "kuvaus": "Claude X 1 · oneplus linux",
+          "ryhma": "OnePlus Linux AGY"
+        }
+      ],
+      "mallit": [
+        {
+          "nimi": "claude-fable-5-1",
+          "kuvaus": "Fable 5.1",
+          "ryhma": "Claude"
+        },
+        {
+          "nimi": "claude-opus-5-5",
+          "kuvaus": "Opus 5.5",
+          "ryhma": "Claude"
+        },
+        {
+          "nimi": "claude-sonnet-5-5",
+          "kuvaus": "Sonnet 5.5",
+          "ryhma": "Claude"
+        },
+        {
+          "nimi": "claude-haiku-5-5",
+          "kuvaus": "Haiku 5.5",
+          "ryhma": "Claude"
+        },
+        {
+          "nimi": "mac-agy/gemini-9-pro",
+          "kuvaus": "Gemini 9 Pro · macos",
+          "ryhma": "Mac AGY"
+        },
+        {
+          "nimi": "mac-agy/claude-x-1",
+          "kuvaus": "Claude X 1 · macos",
+          "ryhma": "Mac AGY"
+        },
+        {
+          "nimi": "agy/gemini-9-pro",
+          "kuvaus": "Gemini 9 Pro · oneplus linux",
+          "ryhma": "OnePlus Linux AGY"
+        },
+        {
+          "nimi": "agy/claude-x-1",
+          "kuvaus": "Claude X 1 · oneplus linux",
+          "ryhma": "OnePlus Linux AGY"
+        }
+      ],
+      "oletusMalli": "claude-opus-5-5"
+    },
+    "aja": [
+      [
+        "agy",
+        "models"
+      ]
+    ]
+  }
+}

@@ -1,0 +1,14 @@
+#!/usr/bin/env node
+// python3-mock (T-79-G, ARK-19): kirjaa argv ja stdinin koon lokiin (stdin voi olla PNG-tavuja), ei aja Pythonia.
+// Kaksi käyttöä vanhassa koodissa: herata-pc.py (`python3 …/herata-pc.py --odota <s>`, WoL) ja screencap-muunnos
+// (`python3 -P -c <PIL-koodi> <leveys> 70`, stdin PNG → stdout JPEG). Vastaus: python3.json (säännöt, sisaltaa = "herata-pc.py"
+// tai "PIL"/"Image", stdoutBase64 JPEG:lle) tai python3.txt, python3.stderr, python3.koodi (oletus tyhjä, exit 0).
+import { readFileSync } from 'node:fs';
+import { kirjaa } from './mock-lib.mjs';
+import { vastaaSaannoilla } from './mock-saannot.mjs';
+
+const argv = process.argv.slice(2);
+let tavuja = 0;
+try { tavuja = readFileSync(0).length; } catch { /* ei stdiniä */ }
+kirjaa('python3', argv, tavuja ? `<stdin ${tavuja} tavua>` : undefined);
+process.exitCode = vastaaSaannoilla('python3', argv);

@@ -1,0 +1,91 @@
+{
+  "tapaus": "purkajat-pura-agy-perhe",
+  "pyynto": {
+    "metodi": "POST",
+    "polku": "/api/skoopit/b/pura",
+    "runko": {
+      "malli": "agy/gemini-9-pro"
+    }
+  },
+  "ymparisto": {
+    "skooppitiedot": {
+      "a": [
+        "R.md"
+      ],
+      "b": [
+        "R.md"
+      ]
+    },
+    "istunnot": [],
+    "transkriptit": [],
+    "tmux": {
+      "display-message": "<PID>\n",
+      "capture-pane": "",
+      "list-panes": ""
+    },
+    "komennot": {
+      "agy": {
+        "koodi": 0,
+        "stdout": "Fetching available models...\ngemini-9-pro\tGemini 9 Pro\nclaude-x-1\tClaude X 1\n",
+        "stderr": ""
+      },
+      "pura-malliton --perhe": {
+        "koodi": 0,
+        "stdout": "PERHE: kyllä\n",
+        "stderr": ""
+      },
+      "pura-malliton": {
+        "koodi": 0,
+        "stdout": "KIRJOITETTU: x\n",
+        "stderr": ""
+      },
+      "autovaihto": {
+        "koodi": 0,
+        "stdout": "OK: agy tmux siirto-b-1\n",
+        "stderr": ""
+      }
+    }
+  },
+  "odotus": {
+    "status": 200,
+    "runko": {
+      "ok": true,
+      "toiminto": "pura",
+      "nimi": "b",
+      "tmux": "siirto-b-1",
+      "suljettiin": [],
+      "tiedosto": "<KOTI>/.local/state/pura/b.md",
+      "malli": "agy/gemini-9-pro"
+    },
+    "aja": [
+      [
+        "agy",
+        "models"
+      ],
+      [
+        "node",
+        "<JUURI>/claude/siirto/tools/pura-malliton.mjs",
+        "--perhe",
+        "b"
+      ],
+      [
+        "node",
+        "<JUURI>/claude/siirto/tools/pura-malliton.mjs",
+        "b",
+        "--kohde",
+        "neutraali"
+      ],
+      [
+        "bash",
+        "<JUURI>/claude/siirto/tools/autovaihto.sh",
+        "vaihda",
+        "b",
+        "--ei-sulje",
+        "--model",
+        "agy/gemini-9-pro",
+        "--viesti",
+        "Malliton purku: lue <KOTI>/.local/state/pura/b.md ja noudata sitä."
+      ]
+    ]
+  }
+}

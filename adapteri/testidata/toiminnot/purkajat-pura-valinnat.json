@@ -1,0 +1,75 @@
+{
+  "tapaus": "purkajat-pura-valinnat",
+  "pyynto": {
+    "metodi": "POST",
+    "polku": "/api/skoopit/b/pura",
+    "runko": {
+      "purkaja": "claude-agent:siirtaja-sonnet",
+      "malli": "claude-sonnet-5-5"
+    }
+  },
+  "ymparisto": {
+    "skooppitiedot": {
+      "a": [
+        "R.md"
+      ],
+      "b": [
+        "R.md"
+      ]
+    },
+    "istunnot": [],
+    "transkriptit": [],
+    "tmux": {
+      "display-message": "<PID>\n",
+      "capture-pane": "",
+      "list-panes": ""
+    },
+    "komennot": {
+      "agy": {
+        "koodi": 0,
+        "stdout": "Fetching available models...\ngemini-9-pro\tGemini 9 Pro\nclaude-x-1\tClaude X 1\n",
+        "stderr": ""
+      },
+      "pura-malliton --perhe": {
+        "koodi": 1,
+        "stdout": "PERHE: ei\n",
+        "stderr": ""
+      }
+    }
+  },
+  "odotus": {
+    "status": 200,
+    "runko": {
+      "ok": true,
+      "toiminto": "pura",
+      "nimi": "b",
+      "osoite": "https://claude.ai/code/session_abc123",
+      "suljettiin": [],
+      "purkaja": "claude-agent:siirtaja-sonnet",
+      "malli": "claude-sonnet-5-5"
+    },
+    "aja": [
+      [
+        "agy",
+        "models"
+      ],
+      [
+        "node",
+        "<JUURI>/claude/siirto/tools/pura-malliton.mjs",
+        "--perhe",
+        "b"
+      ],
+      [
+        "bash",
+        "<JUURI>/claude/siirto/tools/autovaihto.sh",
+        "vaihda",
+        "b",
+        "--ei-sulje",
+        "--model",
+        "claude-sonnet-5-5",
+        "--viesti",
+        "/pura b --ajaja=claude-agent:siirtaja-sonnet"
+      ]
+    ]
+  }
+}

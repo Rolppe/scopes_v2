@@ -1,0 +1,68 @@
+{
+  "tapaus": "linux-kaynnista-sammuksissa-herata-epaonnistuu",
+  "pyynto": {
+    "metodi": "POST",
+    "polku": "/api/palvelin/kaynnista",
+    "runko": {}
+  },
+  "ymparisto": {
+    "skooppitiedot": {
+      "a": [
+        "R.md"
+      ],
+      "b": [
+        "R.md"
+      ],
+      "scopes koe": [
+        "R.md"
+      ]
+    },
+    "istunnot": [],
+    "transkriptit": [],
+    "tmux": {
+      "display-message": "<PID>\n",
+      "capture-pane": "",
+      "list-panes": ""
+    },
+    "komennot": {
+      "vastaukset": [
+        {
+          "komento": "python3",
+          "sisaltaa": "herata-pc.py",
+          "koodi": 1,
+          "stderr": "ei vastausta"
+        }
+      ]
+    }
+  },
+  "odotus": {
+    "status": 504,
+    "runko": {
+      "virhe": "PC ei vastannut 90 s kuluessa herätyksestä"
+    },
+    "aja": [
+      [
+        "ping",
+        "-c",
+        "1",
+        "-W",
+        "2",
+        "192.0.2.99"
+      ],
+      [
+        "ping",
+        "-c",
+        "1",
+        "-W",
+        "2",
+        "192.0.2.99"
+      ],
+      [
+        "python3",
+        "<REPO>/Infra/linux/palvelin/herata-pc.py",
+        "--odota",
+        "90"
+      ]
+    ]
+  }
+}

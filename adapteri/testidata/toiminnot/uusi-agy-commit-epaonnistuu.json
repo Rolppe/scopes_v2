@@ -1,0 +1,108 @@
+{
+  "tapaus": "uusi-agy-commit-epaonnistuu",
+  "pyynto": {
+    "metodi": "POST",
+    "polku": "/api/uusi",
+    "runko": {
+      "nimi": "scopes uusi",
+      "malli": "agy/gemini-3.8-flash-low"
+    }
+  },
+  "ymparisto": {
+    "skooppitiedot": {
+      "a": [
+        "R.md"
+      ],
+      "b": [
+        "R.md"
+      ],
+      "scopes koe": [
+        "R.md"
+      ]
+    },
+    "istunnot": [],
+    "transkriptit": [],
+    "tmux": {
+      "display-message": "<PID>\n",
+      "capture-pane": "",
+      "list-panes": ""
+    },
+    "komennot": {
+      "autovaihto": {
+        "koodi": 0,
+        "stdout": "UUSI: …\nOK: agy tmux siirto-scopes-koe-1\n",
+        "stderr": ""
+      },
+      "luo-skooppi": {
+        "koodi": 0,
+        "stdout": "KIRJOITETTU: scopes-koe/REKISTERI.md\nKIRJOITETTU: scopes-koe/HISTORIA.md\n",
+        "stderr": ""
+      },
+      "vastaukset": [
+        {
+          "komento": "agy",
+          "stdout": "gemini-3.8-flash-low\tGemini 3.8 Flash (Low)\ngemini-3.8-flash-high\tGemini 3.8 Flash (High)\n"
+        },
+        {
+          "komento": "git",
+          "sisaltaa": "commit",
+          "koodi": 1,
+          "stderr": "nothing to commit"
+        }
+      ]
+    }
+  },
+  "odotus": {
+    "status": 500,
+    "runko": {
+      "virhe": "skooppi luotu, mutta commit epäonnistui: nothing to commit"
+    },
+    "aja": [
+      [
+        "agy",
+        "models"
+      ],
+      [
+        "node",
+        "<JUURI>/claude/siirto/tools/luo-skooppi.mjs",
+        "scopes uusi"
+      ],
+      [
+        "bash",
+        "<JUURI>/Infra/skills/install.sh"
+      ],
+      [
+        "git",
+        "add",
+        "--",
+        "scopes-koe/REKISTERI.md",
+        "scopes-koe/HISTORIA.md"
+      ],
+      [
+        "git",
+        "commit",
+        "-q",
+        "-m",
+        "feat(siirto): uusi skooppi scopes uusi (Scopes-äppi)",
+        "--",
+        "scopes-koe/REKISTERI.md",
+        "scopes-koe/HISTORIA.md"
+      ]
+    ],
+    "ajaValinnat": [
+      {},
+      {
+        "cwd": "<JUURI>"
+      },
+      {
+        "cwd": "<JUURI>"
+      },
+      {
+        "cwd": "<JUURI>"
+      },
+      {
+        "cwd": "<JUURI>"
+      }
+    ]
+  }
+}

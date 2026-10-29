@@ -1,0 +1,15 @@
+#!/usr/bin/env node
+// claude-mock (T-63-G): `claude -p --output-format stream-json …` chat-taustana. Kirjaa argv ja stdin (viesti) lokiin.
+// Vastaus: claude.txt (stream-json-rivit stdoutiin), claude.stderr, claude.koodi. Oletus: init, yksi tekstilohko "hei" ja
+// onnistunut result-rivi (session_id 38c487b9-3c36-4723-b2af-5f07b106c172, total_cost_usd 0.01).
+import { kirjaa, lueStdin, vastaa } from './mock-lib.mjs';
+
+kirjaa('claude', process.argv.slice(2), lueStdin());
+const rivi = (o) => JSON.stringify(o);
+const OLETUS = [
+  rivi({ type: 'system', subtype: 'init', session_id: '38c487b9-3c36-4723-b2af-5f07b106c172' }),
+  rivi({ type: 'stream_event', event: { type: 'content_block_start', content_block: { type: 'text' } } }),
+  rivi({ type: 'stream_event', event: { type: 'content_block_delta', delta: { type: 'text_delta', text: 'hei' } } }),
+  rivi({ type: 'result', subtype: 'success', result: 'hei', session_id: '38c487b9-3c36-4723-b2af-5f07b106c172', total_cost_usd: 0.01, is_error: false }),
+].join('\n') + '\n';
+process.exitCode = vastaa('claude', { stdout: OLETUS });

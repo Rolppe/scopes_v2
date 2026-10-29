@@ -1,0 +1,87 @@
+{
+  "tapaus": "chat-keskustelut-vaara-tunnus",
+  "pyynto": {
+    "metodi": "GET",
+    "polku": "/api/chat/keskustelut/ei-tunnus",
+    "runko": null
+  },
+  "ymparisto": {
+    "skooppitiedot": {
+      "a": [
+        "R.md"
+      ],
+      "b": [
+        "R.md"
+      ]
+    },
+    "istunnot": [],
+    "transkriptit": [
+      {
+        "kohde": "chat",
+        "id": "38c487b9-3c36-4723-b2af-5f07b106c172",
+        "rivit": [
+          {
+            "type": "user",
+            "timestamp": "2026-10-21T09:00:00.000Z",
+            "message": {
+              "content": "eka kysymys"
+            }
+          },
+          {
+            "type": "assistant",
+            "timestamp": "2026-10-21T09:00:01.000Z",
+            "message": {
+              "model": "claude-haiku-5-5",
+              "stop_reason": "end_turn",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "vastaus"
+                }
+              ]
+            }
+          }
+        ]
+      },
+      {
+        "kohde": "chat",
+        "id": "00000000-0000-4000-8000-000000000002",
+        "rivit": [
+          {
+            "type": "user",
+            "timestamp": "2026-10-21T09:05:00.000Z",
+            "message": {
+              "content": "toinen"
+            }
+          },
+          {
+            "type": "assistant",
+            "timestamp": "2026-10-21T09:05:01.000Z",
+            "message": {
+              "stop_reason": "end_turn",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "moi"
+                }
+              ]
+            }
+          }
+        ]
+      }
+    ],
+    "tmux": {
+      "display-message": "<PID>\n",
+      "capture-pane": "",
+      "list-panes": ""
+    },
+    "komennot": {}
+  },
+  "odotus": {
+    "status": 400,
+    "runko": {
+      "virhe": "keskustelun tunnus ei kelpaa"
+    },
+    "aja": []
+  }
+}
