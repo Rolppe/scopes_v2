@@ -1,5 +1,7 @@
 # Scopes V2
 
+[![CI](https://github.com/Rolppe/scopes_v2/actions/workflows/ci.yml/badge.svg)](https://github.com/Rolppe/scopes_v2/actions/workflows/ci.yml)
+
 Monitoring and remote control of many parallel Claude Code sessions ("scopes") from an iPhone, a Mac or a browser, for a developer who runs a lot of agent sessions at once.
 
 Every client embeds its own Rust node (HTTP server plus SQLite). The nodes replicate with each other, so each client reads and writes local data and there is no central database to keep up. Around the nodes sit a Node.js adapter that mirrors Claude Code transcripts into the system, a SwiftUI app for iOS and macOS, and a framework-less TypeScript web app. V2 replaces a working V1 service piece by piece instead of in one cut-over.
@@ -17,7 +19,15 @@ Names in code, file names and internal notes are Finnish; [docs/DEVELOPMENT.md](
 
 ## Visual
 
-There are no screenshots in this repository, only the architecture.
+![Web client at desktop width: scope list on the left, message history with a question card on the right](docs/images/web-desktop.png)
+
+*Web client at 1280x800 (UI text is Finnish). Produced by [web/test/kuvakaappaus.ts](web/test/kuvakaappaus.ts): the web client is served by the mock node (`web/test/mock-ydin.mjs`) from the fixtures in `ydin/tests/fixture/` and captured with Playwright and Chrome. Scope names and messages come from those test fixtures, not from a live system.*
+
+![Web client at 390x844 phone width](docs/images/web-phone.png)
+
+*The same page at 390x844. The layout does not yet adapt to narrow screens: the scope list keeps its width and squeezes the message pane.*
+
+The architecture:
 
 ```mermaid
 flowchart LR
@@ -121,7 +131,7 @@ What the system needs beyond this repository: a running V1 service for any bridg
 
 ## Tests
 
-Rust and web counts are from real runs; the Swift and adapter counts are from grepping the test attributes (see limitations).
+Rust and web counts are from real runs; the Swift and adapter counts are from grepping the test attributes (see limitations). CI (GitHub Actions) runs the Rust suite and the web unit tests and build on every push. In CI the Rust run skips only the snapshot test `taysi_solmu_muisti_ja_viestit` (see limitations), and the other 193 tests pass.
 
 | Suite | Count | Notes |
 |---|---|---|
