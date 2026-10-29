@@ -1,5 +1,7 @@
 # scopes2 adapteri
 
+Huom: tekstin polut `scopes2/...` ovat alkuperäisen monorepon etuliite; tässä repossa ne alkavat repon juuresta (esim. `node adapteri/adapteri.mjs`). Adapteri on tässä repossa; osa sen testeistä ja `vertailu/`-skripteistä tarvitsee kuitenkin monorepon `claude/siirto/tools/`- ja `scopes/`-hakemistoja (V1).
+
 Peilaa Claude Coden transkriptit (`~/.claude/projects/**/*.jsonl`) scopes2-ytimeen (S-5a). Vanhaa palvelua
 (`scopes/`) vain luetaan ja tuodaan (`import`), sitä ei muuteta (K-9, P-9).
 

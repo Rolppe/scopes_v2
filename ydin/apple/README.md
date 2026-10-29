@@ -5,7 +5,7 @@ ja `127.0.0.1`-API äpin omassa prosessissa.
 
 ## Rakennus
 
-Macilla, ytimen juuressa (`~/scopes2-rakennus/ydin`):
+Macilla, ytimen juuressa (`ydin/`):
 
     bash apple/rakenna-xcframework.sh
 
@@ -24,7 +24,7 @@ Tuotos on gitignoressa (`/apple/*.xcframework`, `/apple/build`).
 - `SystemConfiguration.framework`
 - `libresolv` (`-lresolv`)
 
-(`reqwest` native-tls ja system-configuration.) Moduuli: `import ScopesSolmu`.
+`Security` on käytössä, koska `Avain.swift` tallettaa avaimen Keychainiin. `SystemConfiguration` ja `libresolv` jäivät `shared/ScopesCore2/Package.swift`iin ajalta, jolloin `reqwest` käytti native-tls:ää; Rust-puolella ei enää ole TLS- tai system-configuration-riippuvuuksia (`Cargo.lock`), mutta kahden jälkimmäisen tarvetta ei ole todennettu uudelleen. Moduuli: `import ScopesSolmu`.
 
 ## Käyttö
 
