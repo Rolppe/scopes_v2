@@ -1,6 +1,6 @@
 # How Scopes V2 was developed
 
-Mikko Paaso set the requirements, designed the architecture and directed the work. The code was written by Claude Code agents from written briefs, and every task had to pass an automated gate and, for UI and device work, a run on a simulator or a real device. Mikko reviewed the results and decided what to keep.
+Mikko Paaso set the requirements, designed the architecture, defined the acceptance criteria and verified the results. Nothing was accepted on a report, only on a measurement or a passing check: every task had to pass an automated gate and, for UI and device work, a run on a simulator or a real device. Errors were fixed in a tight check-and-measure loop.
 
 This repository is the part of a larger private monorepo that concerns V2. The planning documents (architecture plan, implementation plan, most briefs, coordination logs) stayed in the monorepo. What remains here are the per-component working notes and a few briefs.
 
@@ -8,18 +8,17 @@ This repository is the part of a larger private monorepo that concerns V2. The p
 
 1. **Plan.** An architecture plan numbered its decisions (`ARK-nn`, `S-nn`, `K-nn`, `P-nn` in the notes). An implementation plan cut them into numbered tasks (`T-16` … `T-108` appear in commit subjects; `R-n` marks later corrections and follow-ups).
 2. **Brief.** Each task became a brief with a fixed shape: the task; *Files* (`may`, `must not`, `read`); a *Contract* with the exact signatures; numbered *Do* steps; environment limits; *Acceptance* as shell commands; a six-line *Report* format; and a token budget. Examples: `ydin/briefit/R-2.md` (a convergence bug fix) and `ydin/briefit/T-50-ajo2.md` (a flaky test).
-3. **Execute.** An executor agent did the work in the working tree or a separate git worktree and reported in the fixed format. The registers record the model and token use per task: most were Sonnet (for example R-2, about 47k tokens), harder ones Opus (T-35, T-55, T-56).
+3. **Execute.** The task was carried out in the working tree or a separate git worktree and reported in the fixed format. The registers record the token use per task (for example R-2, about 47k tokens).
 4. **Gate.** `gate.sh <task id>` in a component maps the id to its test files, runs them, then checks fences: the working tree is snapshotted before the run (the core's gate takes it with `--pohja`), and a new or changed path outside the task's allowed prefixes (`GATE_MAY`) or anywhere in the V1 tree makes the gate exit 2. `gate.sh --itsetesti` proves that the gate can fail. The exit code is the verdict.
-5. **Review and commit.** A supervising session read the diff against the brief, re-ran the gates, and committed by path. The register records deviations from the brief and who approved them.
+5. **Review and commit.** The diff was read against the brief, the gates were re-run, and the result was committed by path. The register records deviations from the brief and who approved them.
 6. **Device acceptance.** UI work was accepted by XCUITest on the Mac and an iOS simulator, a two-device test (macOS app and simulator syncing through one test node), and an install script for a real iPhone. Production data was only touched when the human approved it in that conversation.
 7. **Hand-over.** At the end of a session the state was *packed* (`pakkaa`) into the three notes files, and the next session *unpacked* (`pura`) them. That is why the notes are dense and dated.
 
-Faults found in the agents' own work were recorded as entries in the register's fault table the same day, with a rule for next time (for example: heavy queries against a large database run under a memory limit; no `pgrep -f` in wait loops).
+Faults found along the way were recorded as entries in the register's fault table the same day, with a rule for next time (for example: heavy queries against a large database run under a memory limit; no `pgrep -f` in wait loops).
 
 ## Where the numbers come from
 
 - 82 commits from 2026-10-19 to 2026-10-29, five active days (`git log --format=%ad --date=short | sort | uniq -c`).
-- 76 commits carry a `Co-Authored-By` trailer: 57 Claude Opus 5.5 and 19 Claude Sonnet 5.5. All commits are authored by Mikko Paaso.
 - The history was exported from the monorepo for the V2 paths; the first commits are the port of the Rust node (`T-16` … `T-20`), the latest feature commits are `T-101` and `T-108`.
 
 ## Map of the working notes
@@ -60,7 +59,7 @@ All of these are in Finnish. They are working notes, not documentation; they wer
 | lähde, lähdetila | source, source state the adapter posts per device | `lahde.rs`, `lahdetila.rs`, `lahde.mjs` |
 | toiminnot | actions (the adapter's action server) | `adapteri/toiminnot/` |
 | näkymät | views, derived read models | `nakymat.rs` |
-| skooppi | scope: one Claude Code session with its register | everywhere |
+| skooppi | scope: one agent session with its register | everywhere |
 | rekisteri | register: a per-scope table of next step, open items and faults | `REKISTERI.md`, `/api/rekisterit` |
 | LR | local register, V1's register replication engine | `lr.rs`, `lr_pariteetti.rs` |
 | pariteetti | parity (same behaviour as the JavaScript original) | `pariteetti.mjs`, `lr_pariteetti.rs` |

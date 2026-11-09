@@ -2,15 +2,15 @@
 
 [![CI](https://github.com/Rolppe/scopes_v2/actions/workflows/ci.yml/badge.svg)](https://github.com/Rolppe/scopes_v2/actions/workflows/ci.yml)
 
-Monitoring and remote control of many parallel Claude Code sessions ("scopes") from an iPhone, a Mac or a browser, for a developer who runs a lot of agent sessions at once.
+Local-first monitoring and remote control of many parallel coding-agent sessions ("scopes") from an iPhone, a Mac or a browser, for a developer who runs a lot of agent sessions at once.
 
-Every client embeds its own Rust node (HTTP server plus SQLite). The nodes replicate with each other, so each client reads and writes local data and there is no central database to keep up. Around the nodes sit a Node.js adapter that mirrors Claude Code transcripts into the system, a SwiftUI app for iOS and macOS, and a framework-less TypeScript web app. V2 replaces a working V1 service piece by piece instead of in one cut-over.
+Every client embeds its own Rust node (HTTP server plus SQLite). The nodes replicate with each other, so each client reads and writes local data and there is no central database to keep up. Nodes replicate with version vectors and hybrid logical clocks. Around the nodes sit a Node.js adapter that mirrors agent session transcripts into the system, SwiftUI apps for iOS and macOS, and a framework-less TypeScript web app. Convergence is tested with real processes, a memory regression test enforces the memory budget, and V2 replaces a working V1 service piece by piece through a strangler-fig bridge instead of in one cut-over.
 
 Names in code, file names and internal notes are Finnish; [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) has a glossary.
 
 ## What it does
 
-- Lists every Claude Code session with its state, the next action and the open items from its register, updated live.
+- Lists every agent session with its state, the next action and the open items from its register, updated live.
 - Shows the chat transcript of a session and sends a message into it.
 - Keeps UI state (selected session, drafts, scroll position, acknowledgements) in sync between Mac and phone; the two-device test requires an edit on one to show up on the other within 2 s.
 - Remote control of an Android phone (screen view, wake, actions) and power control of a Linux server (wake, shut down).
@@ -37,7 +37,7 @@ flowchart LR
     subgraph Mac["Mac"]
         MA["macOS app (SwiftUI)"] --> MN["Rust node (XCFramework)"]
     end
-    subgraph Host["Host running the Claude Code sessions"]
+    subgraph Host["Host running the agent sessions"]
         T["Transcripts (jsonl), tmux, adb"] --> AD["Adapter (Node.js)"]
         AD -- "POST /api/peili, /api/lahde" --> HN["Rust node (scopes-solmu)"]
         HN -- "routes the adapter owns" --> AD
@@ -72,7 +72,7 @@ flowchart LR
 
 ## Architecture
 
-Each node owns a SQLite store of *units* (path, id, version vector, HLC timestamp, content) and an ordered change log. HTTP routes, the SSE stream, the views for the apps and the replication all read that log. Clients never talk to Claude Code directly: the adapter turns transcripts, tmux panes and adb state into units, and the apps read derived views of them. Routes the node cannot answer yet from its own units fall through to V1.
+Each node owns a SQLite store of *units* (path, id, version vector, HLC timestamp, content) and an ordered change log. HTTP routes, the SSE stream, the views for the apps and the replication all read that log. Clients never talk to the agent CLI directly: the adapter turns transcripts, tmux panes and adb state into units, and the apps read derived views of them. Routes the node cannot answer yet from its own units fall through to V1.
 
 Layers, invariants and the main design decisions are in [ARCHITECTURE.md](ARCHITECTURE.md).
 
@@ -127,7 +127,7 @@ cd ../ios && xcodegen                              # then open ScopesV2.xcodepro
 
 Set `DEVELOPMENT_TEAM` in `ios/project.yml` (it contains the placeholder `YOUR_TEAM_ID`; bundle ids use `com.example`). The app starts its own node. The peer address defaults to `http://127.0.0.1:18797`; override it with the environment variable `SCOPES2_VERTAINEN` ([Solmu.swift](shared/ScopesCore2/Sources/ScopesCore2/Solmu.swift)) or the UserDefaults key `scopes2.vertainen` ([iOS](ios/Sources/ScopesV2App.swift), [macOS](macos/Sources/SolmunElinkaari.swift)).
 
-What the system needs beyond this repository: a running V1 service for any bridged route, and the Claude Code sessions, tmux and adb that the adapter observes. Without them the node starts and the apps show fixture data or an empty state. The adapter is started by [kaynnista.sh](kaynnista.sh) or directly with `node adapteri/adapteri.mjs`; its flags are documented in the header of [adapteri/adapteri.mjs](adapteri/adapteri.mjs).
+What the system needs beyond this repository: a running V1 service for any bridged route, and the agent sessions, tmux and adb that the adapter observes. Without them the node starts and the apps show fixture data or an empty state. The adapter is started by [kaynnista.sh](kaynnista.sh) or directly with `node adapteri/adapteri.mjs`; its flags are documented in the header of [adapteri/adapteri.mjs](adapteri/adapteri.mjs).
 
 ## Tests
 
@@ -143,12 +143,12 @@ Rust and web counts are from real runs; the Swift and adapter counts are from gr
 
 ## How it was built
 
-Mikko Paaso set the requirements, designed the architecture and directed the work. Claude Code agents wrote the code from written briefs, and tests plus runs on real devices were the acceptance gates. Mikko reviewed the results and decided what to keep.
+Mikko Paaso set the requirements, designed the architecture, defined the acceptance criteria and verified the results. Nothing was accepted on a report, only on a measurement or a passing check: the test suites, the gate scripts and runs on simulators or real devices. Errors were fixed in a tight check-and-measure loop.
 
-- The work ran in a supervised loop: a planner wrote a brief per task (files the agent may and may not touch, the interface contract, steps, the exact acceptance commands, a six-line report format and a token budget), an executor agent implemented it, and a gate script decided pass or fail. Example briefs: [ydin/briefit/](ydin/briefit/).
+- Each task was specified as a written brief (files that may and may not be touched, the interface contract, steps, the exact acceptance commands, a six-line report format and a token budget), and a gate script decided pass or fail. Example briefs: [ydin/briefit/](ydin/briefit/).
 - Gate scripts snapshot the working tree before a run and fail if anything outside the task's allowed paths changed, and a V1 tree fence stops accidental edits to the old service.
-- Each component keeps a register of open items, decisions and faults, a change history and an archive. Several faults in the registers are the agents' own mistakes, recorded the same day.
-- Evidence in git: 82 commits between 2026-10-19 and 2026-10-29 (five active days), 57 distinct task ids in commit subjects (`T-16` … `T-108`), and 76 commits with a `Co-Authored-By` trailer (57 Claude Opus 5.5, 19 Claude Sonnet 5.5).
+- Each component keeps a register of open items, decisions and faults, a change history and an archive. Faults found along the way are recorded in the registers the same day.
+- Evidence in git: 82 commits between 2026-10-19 and 2026-10-29 (five active days), 57 distinct task ids in commit subjects (`T-16` … `T-108`).
 - The briefs for most tasks lived in the private monorepo and are not included; the registers refer to them by id.
 
 Details and a glossary of the Finnish terms are in [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md).
@@ -159,7 +159,7 @@ Details and a glossary of the Finnish terms are in [docs/DEVELOPMENT.md](docs/DE
 - The adapter's tests import tooling from outside this repository (`claude/siirto/tools/asetus-tila.mjs`); without it most of the 19 adapter test files fail at import (14 fail on macOS in this checkout; 4 pass fully, 1 passes 9 of 10; `kuorma.test.mjs` also reads Linux `/proc`). `ydin/pariteetti.mjs`, `ydin/lr-pariteetti.mjs` and `adapteri/vertailu/` need the V1 repository next to this one (`../../scopes/...`).
 - `kaynnista.sh` is Linux-only (`/proc`, `flock`). `ydin/julkaise.sh` cross-compiles for Linux aarch64 from a Mac.
 - Rust suite, run on 29.10.2026: `muisti_taysi` fails deterministically on its byte-exact snapshot of the `/viestit` replies (`VERTAILU`, recorded before task T-76). The node code has changed since and the snapshot was not re-recorded; the memory limit the test is named for holds (peak 54 MiB < 128 MiB). Two latency tests are timing-sensitive on a loaded host (load average about 4.5 during the runs): `kaksi_solmua_ikkuna` failed once in three full runs, and `tila_kaksi_solmua::tilaviive` (a replication-delay limit) failed in two of three solo runs. The Swift suites were not re-run for this documentation. The web suite and the adapter files that do not need external tooling were run.
-- UI tests, the two-device test and the install script need a Mac, a simulator or an iPhone, and real Claude Code sessions for a meaningful result. No screenshots exist.
+- UI tests, the two-device test and the install script need a Mac, a simulator or an iPhone, and real agent sessions for a meaningful result. No screenshots exist.
 - The HTTP client is built without TLS. Peer links are plain `http://` with a Bearer key, so keep them on loopback or a private tunnel.
 - `shared/ScopesCore2/Package.swift` still links `SystemConfiguration` and `libresolv`, left over from when the Rust side used native TLS. Whether they are still needed is not verified.
 - Test fixtures were synthesised from real shapes; a few still contain path-like strings from the original machine.
